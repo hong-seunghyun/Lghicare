@@ -1,0 +1,1 @@
+(self.webpackChunk_N_E=self.webpackChunk_N_E||[]).push([[332],{103:(e,_,n)=>{"use strict";n.r(_),n.d(_,{default:()=>r});var u=n(7876);function r(){return(0,u.jsx)("h1",{children:"Hello Pages Router"})}},6760:(e,_,n)=>{(window.__NEXT_P=window.__NEXT_P||[]).push(["/",function(){return n(103)}])}},e=>{e.O(0,[636,593,792],()=>e(e.s=6760)),_N_E=e.O()}]);

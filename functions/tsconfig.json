@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",            
+    "target": "es2019",              
+    "outDir": "lib",
+    "sourceMap": true,
+    "strict": false,                
+    "esModuleInterop": true,
+    "moduleResolution": "node",     
+    "skipLibCheck": true,
+    "noImplicitReturns": true,
+    "noUnusedLocals": false        
+  },
+  "compileOnSave": true,
+  "include": ["src"],
+  "exclude": [
+    "node_modules",
+    "../node_modules",  
+    "../.next",         
+    ".next"
+  ]
+}
