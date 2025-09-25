@@ -1,23 +1,30 @@
 import Link from "next/link";
+import { useRouter } from "next/router";
 import styled from "styled-components";
 import { useEffect, useState } from "react";
 
 type Product = { [key: string]: string };
 
 export default function Products() {
+  const router = useRouter();
+  const { middle } = router.query;
+
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!middle) return; // 아직 middle 값 준비 전이면 skip
+
     const fetchProducts = async () => {
       setLoading(true);
-      const res = await fetch("/api/products?sheet=정수기");
+      const res = await fetch(`/api/products?middle=${middle}`);
       const data = await res.json();
       setProducts(data.options || []);
       setLoading(false);
     };
+
     fetchProducts();
-  }, []);
+  }, [middle]);
 
   if (loading) return <div>불러오는 중...</div>;
 
@@ -56,7 +63,7 @@ export default function Products() {
           return (
             <Card key={i}>
               <Link
-                href={`/products/${
+                href={`/products/${middle}/${
                   representative["동일 모델 기준"] || representative["모델코드"]
                 }`}
               >

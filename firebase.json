@@ -1,15 +1,12 @@
 {
   "hosting": {
+    "site": "lghicare-861b3",
     "public": "public",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ],
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
       {
         "source": "**",
-        "function": "nextServer"
+        "function": "nextApp"
       }
     ]
   },

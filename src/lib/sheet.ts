@@ -1,32 +1,54 @@
-// src/lib/sheet.ts
-import Papa from "papaparse";
-import { Product } from "@/types/product";
+import { google } from "googleapis";
 
-export async function fetchSheetData(sheetName: string): Promise<Product[]> {
-  const url =
-    "https://docs.google.com/spreadsheets/d/e/2PACX-1vSbddcvzELdalz6raFQLPAO3-_TMd56tLiD7fZNkcAeV8tMULWgffpTlh8Edtcgj7TOUyjLecrZogkL/pub?output=csv&sheet=" +
-    encodeURIComponent(sheetName);
+let cachedSheets: ReturnType<typeof google.sheets> | null = null;
+type Product = Record<string, string>;
+const cache: Record<string, Product[]> = {}; // 메모리 캐시
 
-  const res = await fetch(url);
-  const text = await res.text();
+export async function getSheetsClient() {
+  if (!cachedSheets) {
+    const auth = new google.auth.GoogleAuth({
+      credentials: {
+        client_email: process.env.GOOGLE_SERVICE_EMAIL,
+        private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+      },
+      scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
+    });
 
-  // ✅ PapaParse로 안전하게 CSV 파싱
-  const { data } = Papa.parse<string[]>(text, { skipEmptyLines: true });
+    cachedSheets = google.sheets({ version: "v4", auth });
+  }
+  return cachedSheets;
+}
 
-  // ✅ "상품명"이 포함된 행을 헤더로 사용
-  const headerIndex = data.findIndex((row: string[]) =>
-    row.includes("상품명")
-  );
-  if (headerIndex === -1) {
-    console.warn("❌ 헤더 행을 찾지 못했습니다");
-    return [];
+export async function fetchSheetData(sheet: string) {
+  // ✅ 메모리 캐시 먼저 확인
+  if (cache[sheet]) {
+    return cache[sheet];
   }
 
-  const headers = data[headerIndex];
-  const dataRows = data.slice(headerIndex + 1);
+  const sheets = await getSheetsClient();
 
-  // ✅ Product[] 반환
-  return dataRows.map((row: string[]): Product =>
-    Object.fromEntries(row.map((val, i) => [headers[i], val])) as Product
-  );
+  // 필요한 범위만 가져오기 (A~T, 컬럼 20개 정도까지만)
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: process.env.GOOGLE_SHEET_ID!,
+    range: `${sheet}!A:T`,
+  });
+
+  const rows = res.data.values || [];
+  const headers = rows[0] || [];
+
+  const products = rows.slice(1).map((r) => {
+    const obj: Record<string, string> = {};
+    headers.forEach((h, i) => {
+      obj[h] = r[i] || "";
+    });
+    return obj;
+  });
+
+  // ✅ 캐시에 저장 (5분 TTL)
+  cache[sheet] = products;
+  setTimeout(() => {
+    delete cache[sheet];
+  }, 5 * 60 * 1000);
+
+  return products;
 }

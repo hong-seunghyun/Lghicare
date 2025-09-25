@@ -6,7 +6,12 @@ type Product = { [key: string]: string };
 
 export default function ProductDetail() {
   const router = useRouter();
-  const { id } = router.query;
+  const { slug } = router.query;
+
+  const slugArr = Array.isArray(slug) ? slug : [];
+  const id = slugArr[slugArr.length - 1]; // 항상 마지막이 id
+  const middle = slugArr.length >= 2 ? slugArr[0] : undefined;
+  const sub = slugArr.length >= 3 ? slugArr[1] : undefined;
 
   const [options, setOptions] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -17,15 +22,21 @@ export default function ProductDetail() {
   const [promoType, setPromoType] = useState("");
   const [promoName, setPromoName] = useState("");
 
+  const [prepay, setPrepay] = useState("");
+  const [prepayAmount, setPrepayAmount] = useState("");
+
+  // 🔹 데이터 불러오기
   useEffect(() => {
-    if (!id) return; // id만 있으면 실행
+    if (!router.isReady || !id) return;
 
     const fetchDetail = async () => {
       try {
         setLoading(true);
-        const res = await fetch(
-          `/api/products?sheet=${encodeURIComponent("정수기")}&id=${id}`
-        );
+        const url = `/api/products?id=${id}${
+          middle ? `&middle=${middle}` : ""
+        }${sub ? `&sub=${sub}` : ""}`;
+
+        const res = await fetch(url);
         if (!res.ok) throw new Error(`API 요청 실패: ${res.status}`);
         const data = await res.json();
         setOptions(data.options || []);
@@ -38,12 +49,19 @@ export default function ProductDetail() {
     };
 
     fetchDetail();
-  }, [id]);
+  }, [router.isReady, id, middle, sub]);
 
   if (loading) return <div>불러오는 중...</div>;
+  if (!options.length) return <div>상품을 찾을 수 없습니다.</div>;
 
-  if (!loading && options.length === 0)
-    return <div>상품을 찾을 수 없습니다.</div>;
+  // 🔹 포맷 변환
+  const formatContract = (value: string) => {
+    if (!value) return value;
+    const months = parseInt(value.replace(/[^0-9]/g, ""), 10);
+    if (isNaN(months)) return value;
+    if (months % 12 === 0) return `${months / 12}년`;
+    return `${months}개월`;
+  };
 
   const current =
     contract && serviceType && serviceCycle && promoType
@@ -53,19 +71,15 @@ export default function ProductDetail() {
             o["서비스유형"] === serviceType &&
             o["서비스주기/월"] === serviceCycle &&
             (o["프로모션유형"]?.trim() || "") === promoType;
-
           if (!baseMatch) return false;
-
-          // 프로모션명 선택 안 함 → 프로모션명 비어있거나 없는 행
           if (!promoName) {
             return !o["프로모션명"] || o["프로모션명"].trim().length === 0;
           }
-
-          // 프로모션명 선택 O → 정확히 일치
           return o["프로모션명"] === promoName;
         })
       : undefined;
 
+  const isPrepay = current?.["선입금여부"] === "Y";
   const usageFee = current
     ? parseInt(
         (current["할인후금액"] || current["정상가"] || "0").replace(
@@ -75,9 +89,7 @@ export default function ProductDetail() {
         10
       )
     : 0;
-
   const bestPrice = current ? Math.max(usageFee - 13000, 0) : 0;
-
   const allModels = Array.from(new Set(options.map((o) => o["모델코드"])));
 
   return (
@@ -86,7 +98,7 @@ export default function ProductDetail() {
       <Sub>모델군 기준: {id}</Sub>
       <Models>모델코드: {allModels.join(", ")}</Models>
 
-      {/* 계약기간 (항상 선택 가능) */}
+      {/* 계약기간 */}
       <Section>
         <Label>계약기간</Label>
         <ButtonGroup>
@@ -102,13 +114,13 @@ export default function ProductDetail() {
                 setPromoName("");
               }}
             >
-              {v}
+              {formatContract(v)}
             </OptionButton>
           ))}
         </ButtonGroup>
       </Section>
 
-      {/* 서비스유형 (계약기간이 선택되지 않으면 disabled) */}
+      {/* 서비스유형 */}
       <Section>
         <Label>서비스유형</Label>
         <ButtonGroup>
@@ -117,7 +129,7 @@ export default function ProductDetail() {
               key={v}
               selected={serviceType === v}
               onClick={() => {
-                if (!contract) return; // 계약기간 안 선택했으면 무시
+                if (!contract) return;
                 setServiceType(v);
                 setServiceCycle("");
                 setPromoType("");
@@ -155,7 +167,7 @@ export default function ProductDetail() {
         </ButtonGroup>
       </Section>
 
-      {/* 프로모션유형 */}
+      {/* 프로모션 */}
       <Section>
         <Label>프로모션유형</Label>
         <ButtonGroup>
@@ -181,7 +193,8 @@ export default function ProductDetail() {
           ))}
         </ButtonGroup>
       </Section>
-      {/* 프로모션명 (드롭박스 유지) */}
+
+      {/* 프로모션명 */}
       <Section>
         <Label>프로모션명</Label>
         <Select
@@ -211,6 +224,34 @@ export default function ProductDetail() {
         </Select>
       </Section>
 
+      {isPrepay && (
+        <Section>
+          <Label>선입금</Label>
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            <Select value={prepay} onChange={(e) => setPrepay(e.target.value)}>
+              <option value="">선택</option>
+              <option value="Y">예</option>
+              <option value="N">아니오</option>
+            </Select>
+            {prepay === "Y" && (
+              <input
+                type="number"
+                value={prepayAmount}
+                onChange={(e) => setPrepayAmount(e.target.value)}
+                placeholder="선입금 금액 입력"
+                style={{
+                  padding: "0.5rem",
+                  border: "1px solid #ccc",
+                  borderRadius: "6px",
+                  width: "150px",
+                }}
+              />
+            )}
+          </div>
+        </Section>
+      )}
+
+      {/* 가격 */}
       <Price>
         이용요금: {current ? `${usageFee.toLocaleString()}원` : "-"} <br />
         최대혜택가:{" "}
@@ -218,6 +259,19 @@ export default function ProductDetail() {
           {current ? `${bestPrice.toLocaleString()}원` : "-"}
         </span>
       </Price>
+
+      {/* ✅ 상세페이지 HTML embed */}
+      <Section>
+        <Label>상세페이지</Label>
+        {id ? (
+          <Iframe
+            src={`/api/product-detail?middle=${middle}&id=${id}`}
+            title={`${id} 상세페이지`}
+          />
+        ) : (
+          <div>상세페이지를 불러올 수 없습니다.</div>
+        )}
+      </Section>
     </Container>
   );
 }
@@ -225,6 +279,8 @@ export default function ProductDetail() {
 // styled-components
 const Container = styled.div`
   padding: 2rem;
+  max-width: 600px;
+  margin: auto;
 `;
 const Title = styled.h1`
   font-size: 1.6rem;
@@ -260,7 +316,6 @@ const ButtonGroup = styled.div`
   flex-wrap: wrap;
   gap: 0.5rem;
 `;
-
 const OptionButton = styled.button<{ selected: boolean }>`
   padding: 0.5rem 1rem;
   border-radius: 6px;
@@ -269,8 +324,10 @@ const OptionButton = styled.button<{ selected: boolean }>`
   color: ${({ selected }) => (selected ? "#fff" : "#333")};
   cursor: ${({ disabled }) => (disabled ? "not-allowed" : "pointer")};
   opacity: ${({ disabled }) => (disabled ? 0.5 : 1)};
-
-  &:hover {
-    border-color: ${({ disabled }) => (disabled ? "#ccc" : "#0070f3")};
-  }
+`;
+const Iframe = styled.iframe`
+  width: 100%;
+  border: none;
+  margin-top: 1rem;
+  min-height: 600px;
 `;
