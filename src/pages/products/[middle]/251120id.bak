@@ -1,0 +1,1468 @@
+import { useRouter } from "next/router";
+import { useEffect, useState } from "react";
+import styled from "styled-components";
+import Link from "next/link";
+import Image from "next/image";
+import Head from "next/head";
+
+import { Swiper, SwiperSlide } from "swiper/react";
+import type { Swiper as SwiperType } from "swiper";
+import { Navigation, Thumbs } from "swiper/modules";
+import "swiper/css";
+import "swiper/css/navigation";
+import "swiper/css/thumbs";
+import type { GetServerSidePropsContext } from "next";
+
+import Loading from "@/components/loading/Loading";
+import ToolTip from "@/components/ToolTip/ToolTip";
+import AutoHeightIframe from "@/components/Iframe/AutoHeightIframe";
+import { colorMap } from "@/constants/colorMap";
+
+import disclaimerData from "@/disclaimer/disclaimer.json";
+
+import { classifyPrepayRate } from "@/utils/prepay/classifyPrepayRate";
+
+type Product = { [key: string]: string };
+
+type OgMeta = {
+  title: string;
+  description: string;
+  image: string;
+};
+
+export async function getServerSideProps(context: GetServerSidePropsContext) {
+  const { middle, id } = context.params as { middle?: string; id?: string };
+
+  try {
+    const host = "lghicare-861b3.web.app";
+    const protocol = "https";
+    const baseUrl = `${protocol}://${host}`;
+
+    const res = await fetch(
+      `${baseUrl}/api/products?middle=${middle}&id=${id}`
+    );
+
+    let productName = id || "";
+    let imageUrl = "https://lghicare-861b3.web.app/images/logo.png";
+
+    if (res.ok) {
+      const data = await res.json();
+      const firstOption = data?.options?.[0];
+      productName = firstOption?.["상품명"] || id || "";
+      imageUrl = firstOption?.thumbnailUrl || imageUrl;
+
+      // ✅ 절대경로 보정
+      if (imageUrl && !/^https?:\/\//.test(imageUrl)) {
+        imageUrl = `${baseUrl}${
+          imageUrl.startsWith("/") ? "" : "/"
+        }${imageUrl}`;
+      }
+
+      // ✅ 🔹 카카오 대응: /api/image-proxy?fileId=... → Drive 직링크 변환
+      if (imageUrl.includes("/api/image-proxy")) {
+        const match = imageUrl.match(/fileId=([^&]+)/);
+        if (match && match[1]) {
+          const fileId = match[1];
+          imageUrl = `https://drive.google.com/uc?export=view&id=${fileId}`;
+        }
+      }
+    }
+
+    const ogMeta = {
+      title: `${productName} | LG 하이케어솔루션`,
+      description: `${productName} 모델 제품 정보 및 혜택 안내`,
+      image: imageUrl,
+    };
+
+    return { props: { ogMeta } };
+  } catch (err) {
+    console.error("❌ OG 메타데이터 생성 오류:", err);
+    return {
+      props: {
+        ogMeta: {
+          title: `${id} | LG 하이케어솔루션`,
+          description: `${id} 모델 제품 정보`,
+          image: "https://lghicare-861b3.web.app/images/logo.png",
+        },
+      },
+    };
+  }
+}
+
+export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
+  const router = useRouter();
+
+  const { middle, id } = router.query;
+
+  const [options, setOptions] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [relatedModels, setRelatedModels] = useState<Product[]>([]);
+
+  const [contract, setContract] = useState("");
+  const [serviceType, setServiceType] = useState("");
+  const [serviceCycle, setServiceCycle] = useState("");
+  const [promoType, setPromoType] = useState("");
+  const [promoName, setPromoName] = useState("");
+
+  const [prepay, setPrepay] = useState("");
+  const [prepayAmount, setPrepayAmount] = useState("");
+
+  const [thumbsSwiper, setThumbsSwiper] = useState<SwiperType | null>(null);
+
+  const [copied, setCopied] = useState(false);
+  const [shared, setShared] = useState(false);
+
+  const allContracts = Array.from(new Set(options.map((o) => o["계약기간"])));
+  const allServiceTypes = Array.from(
+    new Set(options.map((o) => o["서비스유형"]))
+  );
+  const allCycles = Array.from(new Set(options.map((o) => o["서비스주기/월"])));
+  const allPromoTypes = Array.from(
+    new Set(options.map((o) => o["프로모션유형"]?.trim()).filter(Boolean))
+  );
+  const allPromoNames = Array.from(
+    new Set(options.map((o) => o["프로모션명"]).filter(Boolean))
+  );
+
+  const [disclaimerText, setDisclaimerText] = useState<string | null>(null);
+
+  const [prepayRate, setPrepayRate] = useState(""); // 30 / 50 / ""
+  const [prepayAvailableRate, setPrepayAvailableRate] = useState<
+    "30" | "30_50" | null
+  >(null);
+  const [prepayAmountDisplay, setPrepayAmountDisplay] = useState<number | null>(
+    null
+  );
+
+  // 🔹 데이터 불러오기
+  useEffect(() => {
+    const middleValue = Array.isArray(router.query.middle)
+      ? router.query.middle[0]
+      : router.query.middle;
+    const idValue = Array.isArray(router.query.id)
+      ? router.query.id[0]
+      : router.query.id;
+
+    if (!router.isReady || !idValue || !middleValue) return;
+
+    const fetchDetail = async () => {
+      try {
+        setLoading(true);
+
+        const url = `/api/products?middle=${middleValue}&id=${idValue}`;
+        const [res] = await Promise.all([fetch(url)]);
+
+        if (!res.ok) throw new Error(`API 요청 실패: ${res.status}`);
+        const data = await res.json();
+
+        setOptions(data.options || []);
+        setRelatedModels(data.relatedModels || []);
+      } catch (err) {
+        console.error("상품 불러오기 오류:", err);
+        setOptions([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDetail();
+  }, [router.isReady, router.query.middle, router.query.id]);
+
+  // ✅ 최저가 자동 선택
+  useEffect(() => {
+    if (!options.length) return;
+    if (router.query.opt) return;
+    if (contract || serviceType || serviceCycle || promoType) return; // 사용자가 이미 선택했으면 중단
+
+    const parsePrice = (p: Product) => {
+      const raw = p["할인후금액"] || p["할인전금액"] || "0";
+      return parseInt(raw.replace(/[^0-9]/g, ""), 10) || Infinity;
+    };
+
+    const normalizePromo = (v?: string) =>
+      (v || "")
+        .replace(/\s+/g, "") // 공백 제거
+        .replace(/\u3164/g, "") // 특수 공백 제거
+        .trim();
+
+    // ① 완전 일치 (정확히 신규결합)
+    const exactNewJoin = options.filter(
+      (o) => normalizePromo(o["프로모션유형"]) === "신규결합"
+    );
+
+    // ② 포함형 (복합형)
+    const mixedNewJoin = options.filter(
+      (o) =>
+        normalizePromo(o["프로모션유형"]).includes("신규결합") &&
+        normalizePromo(o["프로모션유형"]) !== "신규결합"
+    );
+
+    // ③ 우선순위 고정
+    let targetList: Product[];
+    if (exactNewJoin.length > 0) {
+      targetList = exactNewJoin;
+    } else if (mixedNewJoin.length > 0) {
+      targetList = mixedNewJoin;
+    } else {
+      targetList = options;
+    }
+
+    // ④ targetList 내부에서만 최저가 계산
+    const cheapest = targetList.reduce((min, cur) =>
+      parsePrice(cur) < parsePrice(min) ? cur : min
+    );
+
+    // ⑤ 상태 업데이트
+    setContract(cheapest["계약기간"] || "");
+    setServiceType(cheapest["서비스유형"] || "");
+    setServiceCycle(cheapest["서비스주기/월"] || "");
+    setPromoType(cheapest["프로모션유형"]?.trim() || "");
+    setPromoName(cheapest["프로모션명"] || "");
+  }, [options, router.query.opt]);
+
+  // ✅ URL opt 파라미터 → 옵션 자동 선택
+  useEffect(() => {
+    if (!options.length || !router.query.opt) return;
+
+    const optStr = Array.isArray(router.query.opt)
+      ? router.query.opt[0]
+      : router.query.opt;
+
+    if (!optStr) return;
+
+    const parts = optStr.split("-");
+    try {
+      if (parts[0] && options[+parts[0]])
+        setContract(options[+parts[0]]["계약기간"] || "");
+      if (parts[1] && options[+parts[1]])
+        setServiceType(options[+parts[1]]["서비스유형"] || "");
+      if (parts[2] && options[+parts[2]])
+        setServiceCycle(options[+parts[2]]["서비스주기/월"] || "");
+      if (parts[3] && options[+parts[3]])
+        setPromoType(options[+parts[3]]["프로모션유형"]?.trim() || "");
+      if (parts[4] && options[+parts[4]])
+        setPromoName(options[+parts[4]]["프로모션명"] || "");
+      if (parts[5]) setPrepay(parts[5]);
+      if (parts[6]) setPrepayAmount(parts[6]);
+    } catch (e) {
+      console.error("URL 옵션 파싱 오류:", e);
+    }
+  }, [options, router.query.opt]);
+
+  useEffect(() => {
+    if (!id) return;
+
+    try {
+      const idValue = Array.isArray(id) ? id[0] : id;
+      const found = disclaimerData.find((item) => item["모델코드"] === idValue);
+
+      if (found) setDisclaimerText(found["디스클레이머"]);
+      else setDisclaimerText(null);
+    } catch (err) {
+      console.error("❌ 디스클레이머 로드 오류:", err);
+    }
+  }, [id]);
+
+  // 🔹 포맷 변환
+  const formatContract = (value: string) => {
+    if (!value) return value;
+    const months = parseInt(value.replace(/[^0-9]/g, ""), 10);
+    if (isNaN(months)) return value;
+    if (months % 12 === 0) return `${months / 12}년`;
+    return `${months}개월`;
+  };
+
+  const isValidOption = (
+    key: string,
+    value: string,
+    conditions: Record<string, string>
+  ) => {
+    if (!value) return false;
+
+    return options.some((o) => {
+      // 이전 단계까지만 검사
+      const matches = Object.entries(conditions).every(([k, v]) => {
+        if (!v) return true;
+        return (o[k] || "").trim() === v.trim();
+      });
+
+      return matches && (o[key] || "").trim() === value.trim();
+    });
+  };
+
+  const normalizeNum = (v?: string) =>
+    (v || "")
+      .toString()
+      .replace(/[^0-9]/g, "")
+      .trim();
+  const normalizeStr = (v?: string) => (v || "").toString().trim();
+
+  const current =
+    contract && serviceType && serviceCycle && promoType
+      ? options.find((o) => {
+          const match =
+            normalizeNum(o["계약기간"]) === normalizeNum(contract) &&
+            normalizeStr(o["서비스유형"]) === normalizeStr(serviceType) &&
+            normalizeNum(o["서비스주기/월"]) === normalizeNum(serviceCycle) &&
+            normalizeStr(o["프로모션유형"]) === normalizeStr(promoType) &&
+            (!promoName ||
+              normalizeStr(o["프로모션명"]) === normalizeStr(promoName));
+          return match;
+        })
+      : undefined;
+
+  useEffect(() => {
+    if (!options.length) return;
+    const wrong = options.find((o) => o["할인전금액"]?.includes("49,700"));
+    console.log("🚨 49,700원 데이터 확인:", wrong);
+  }, [options]);
+
+  const isPrepay = current?.["선입금여부"] === "Y";
+
+  const getPriceValue = (product: Product, hasPromo: boolean) => {
+    if (!product) return 0;
+
+    // 1️⃣ 기본: 할인전금액
+    let base = product["할인전금액"] || product["정상가"] || "";
+
+    // 2️⃣ 프로모션이 선택된 경우, 할인후금액이 있으면 그 값으로 교체
+    if (hasPromo && product["할인후금액"]) {
+      base = product["할인후금액"];
+    }
+
+    // 3️⃣ 숫자만 추출
+    const cleaned = base.toString().replace(/[^0-9]/g, "");
+    if (!cleaned) return 0;
+    return parseInt(cleaned, 10);
+  };
+
+  // ✅ 기존 usageFee, bestPrice 부분 교체
+  const usageFee = current ? getPriceValue(current, !!promoName) : 0;
+  const bestPrice = current ? Math.max(usageFee - 13000, 0) : 0;
+
+  const middleValue = options[0]?.["중분류"] ?? "";
+  const allModels = Array.from(new Set(options.map((o) => o["모델코드"])));
+
+  const handleCopy = async () => {
+    try {
+      const text = Array.isArray(id) ? id[0] : id || "";
+      if (!text) return;
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (err) {
+      console.error("❌ 클립보드 복사 실패:", err);
+    }
+  };
+
+  const handleShare = async () => {
+    try {
+      const currentUrl = new URL(window.location.href);
+
+      // 기존 opt 제거
+      currentUrl.searchParams.delete("opt");
+
+      const findIndex = (key: string, value: string) => {
+        if (!value) return "";
+        const idx = options.findIndex((o) => o[key] === value);
+        return idx >= 0 ? idx.toString() : "";
+      };
+
+      const indices = [
+        findIndex("계약기간", contract),
+        findIndex("서비스유형", serviceType),
+        findIndex("서비스주기/월", serviceCycle),
+        findIndex("프로모션유형", promoType),
+        findIndex("프로모션명", promoName),
+
+        // 🔥 기존 선입금 관련
+        prepay || "",
+        prepayAmount || "",
+
+        // 🔥 신규: 선납 할인율 (30 or 50)
+        prepayRate || "",
+      ].filter((v) => v !== "");
+
+      console.log(indices);
+      const optParam = indices.join("-");
+
+      if (optParam) {
+        currentUrl.searchParams.set("opt", optParam);
+      }
+
+      const shareUrl = currentUrl.toString();
+      await navigator.clipboard.writeText(shareUrl);
+
+      setShared(true);
+      setTimeout(() => setShared(false), 1500);
+      alert("링크를 복사 했습니다.");
+    } catch (err) {
+      console.error("❌ 링크 복사 실패:", err);
+    }
+  };
+
+  // ✅ URL → 옵션 자동 세팅
+  useEffect(() => {
+    if (!options.length || !router.query.opt) return;
+
+    const optStr = Array.isArray(router.query.opt)
+      ? router.query.opt[0]
+      : router.query.opt;
+
+    if (!optStr) return;
+    const parts = optStr.split("-");
+
+    try {
+      const setIfValid = (
+        idxStr: string,
+        key: string,
+        setter: (v: string) => void
+      ) => {
+        const idx = parseInt(idxStr, 10);
+        if (!isNaN(idx) && idx >= 0 && options[idx]) {
+          setter(options[idx][key] || "");
+        }
+      };
+
+      if (parts[0]) setIfValid(parts[0], "계약기간", setContract);
+      if (parts[1]) setIfValid(parts[1], "서비스유형", setServiceType);
+      if (parts[2]) setIfValid(parts[2], "서비스주기/월", setServiceCycle);
+      if (parts[3]) setIfValid(parts[3], "프로모션유형", setPromoType);
+      if (parts[4]) setIfValid(parts[4], "프로모션명", setPromoName);
+      if (parts[5]) setPrepay(parts[5]);
+      if (parts[6]) setPrepayAmount(parts[6]);
+      if (parts[7]) setPrepayRate(parts[7]);
+    } catch (e) {
+      console.error("URL 옵션 파싱 오류:", e);
+    }
+  }, [options, router.query.opt]);
+
+  // 🔥 선납 가능 여부 판별
+  useEffect(() => {
+    if (!options.length) return;
+
+    const middle = options[0]["중분류"];
+    const sub = options[0]["소분류"];
+    const model = options[0]["모델코드"];
+
+    const result = classifyPrepayRate({ middle, sub, model });
+    setPrepayAvailableRate(result);
+  }, [options]);
+
+  // 🔥 선납금 계산 (요금 = 월요금 × 72 × (선납비율))
+  useEffect(() => {
+    if (!prepayRate || !current) {
+      setPrepayAmountDisplay(null);
+      return;
+    }
+
+    const rate = Number(prepayRate); // 30 or 50
+    const monthly = usageFee; // 현재 구독료
+    const total = monthly * 72; // 총요금
+
+    const prepayAmount = Math.floor(total * (rate / 100));
+    setPrepayAmountDisplay(prepayAmount);
+  }, [prepayRate, current, usageFee]);
+
+  // 🔥 usageFee & bestPrice에 선납 할인 적용 (13.5%)
+  const finalUsageFee = (() => {
+    if (!current) return 0;
+
+    // 6년 & 선납 선택된 경우
+    if (normalizeNum(contract) === "72" && prepayRate) {
+      const total = usageFee * 72;
+      const rate = Number(prepayRate) / 100; // 0.3 or 0.5
+
+      const prepay = total * rate; // 선납금
+      const discount = prepay * 0.135; // 선납 할인
+
+      const newMonthly = (total - prepay - discount) / 72;
+      return Math.floor(newMonthly);
+    }
+
+    return usageFee;
+  })();
+
+  // 🔥 bestPrice도 동일하게 적용
+  const finalBestPrice =
+    finalUsageFee > 13000 ? finalUsageFee - 13000 : finalUsageFee;
+
+  if (loading) return <Loading />;
+  if (!options.length) return <div>상품을 찾을 수 없습니다.</div>;
+  return (
+    <>
+      <Head>
+        <title>{ogMeta?.title}</title>
+        <meta name="description" content={ogMeta?.description} />
+        <meta property="og:title" content={ogMeta?.title} />
+        <meta property="og:description" content={ogMeta?.description} />
+        <meta property="og:image" content={ogMeta?.image} />
+        <meta property="twitter:card" content="summary_large_image" />
+        <meta property="twitter:image" content={ogMeta?.image} />
+      </Head>
+      <Container>
+        <Section>
+          <Breadcrumb>
+            <Link href="/">홈</Link>
+            <span> &gt; </span>
+            {options[0]?.["대분류"] && (
+              <>
+                <Link
+                  href={`/products/${encodeURIComponent(options[0]["대분류"])}`}
+                >
+                  {options[0]["대분류"]}
+                </Link>
+                <span> &gt; </span>
+              </>
+            )}
+            <Link
+              href={`/products/${encodeURIComponent(options[0]["중분류"])}`}
+            >
+              {options[0]["중분류"]}
+            </Link>
+            <span> &gt; </span>
+            <strong>{id}</strong>
+          </Breadcrumb>
+        </Section>
+        <ProductDetailWrap>
+          <ThumbsWrap>
+            <Section>
+              {options[0]?.images?.length ? (
+                <>
+                  {/* ✅ 메인 슬라이드 */}
+                  <Swiper
+                    modules={[Navigation, Thumbs]}
+                    slidesPerView={1}
+                    style={{
+                      width: "100%",
+                    }}
+                    thumbs={{
+                      swiper:
+                        thumbsSwiper && !thumbsSwiper.destroyed
+                          ? thumbsSwiper
+                          : null,
+                    }}
+                  >
+                    {Array.isArray(options[0]?.images) &&
+                      options[0].images.map((src: string, idx: number) => (
+                        <SwiperSlide
+                          key={idx}
+                          style={{
+                            position: "relative",
+                            width: "100%",
+                            height: "auto",
+                            overflow: "hidden",
+                            aspectRatio: "1 / 1",
+                          }}
+                        >
+                          <Image
+                            src={src}
+                            alt={`상품 이미지 ${idx + 1}`}
+                            width={1000}
+                            height={1000}
+                            style={{
+                              position: "absolute",
+                              top: 0,
+                              left: 0,
+                              width: "100%",
+                              height: "100%",
+                              objectFit: "contain",
+                            }}
+                          />
+                        </SwiperSlide>
+                      ))}
+                  </Swiper>
+
+                  {/* ✅ 썸네일 슬라이드 */}
+                  <ThumbnailSwiper>
+                    <Swiper
+                      modules={[Thumbs]}
+                      onSwiper={setThumbsSwiper}
+                      spaceBetween={24}
+                      slidesPerView={"auto"}
+                      watchSlidesProgress
+                    >
+                      {Array.isArray(options[0]?.images) &&
+                        options[0].images.map((src: string, idx: number) => (
+                          <SwiperSlide key={idx}>
+                            <Image
+                              src={src}
+                              alt={`썸네일 ${idx + 1}`}
+                              width={90}
+                              height={90}
+                              style={{
+                                width: "90px",
+                                height: "90px",
+                                borderRadius: "4px",
+                                objectFit: "cover",
+                                cursor: "pointer",
+                              }}
+                            />
+                          </SwiperSlide>
+                        ))}
+                    </Swiper>
+                  </ThumbnailSwiper>
+                </>
+              ) : (
+                <NonThumnail>
+                  <Logo src={"/images/logo.png"} alt="logo" />
+                  이미지를 준비중 입니다.
+                </NonThumnail>
+              )}
+            </Section>
+          </ThumbsWrap>
+
+          <ProductInfo>
+            <Title>
+              {options[0]["상품명"]}
+
+              <Share onClick={handleShare}>
+                <Image
+                  src={"/images/icon_share.svg"}
+                  alt="copy"
+                  width={24}
+                  height={24}
+                />
+              </Share>
+            </Title>
+            <Model onClick={handleCopy}>
+              <Image
+                src={"/images/icon_copy.svg"}
+                alt="copy"
+                width={24}
+                height={24}
+              />
+              {id}
+              {copied && (
+                <span
+                  style={{
+                    color: "red",
+                    marginLeft: "8px",
+                  }}
+                >
+                  복사되었습니다.
+                </span>
+              )}
+            </Model>
+            <Section>
+              <Label>색상</Label>
+              <ButtonGroup>
+                {(() => {
+                  const idValue = Array.isArray(id) ? id[0] : id || "";
+                  const currentModel = options.find(
+                    (o) => (o["모델코드"] || "").trim() === idValue.trim()
+                  );
+                  if (!currentModel) return null;
+
+                  // ✅ 동일모델기준 없으면 "" 처리
+                  const currentCode = (currentModel["모델코드"] || "").trim();
+                  const groupKey =
+                    (currentModel["동일모델기준"] || "").trim() ===
+                    "동일모델기준없음"
+                      ? currentCode
+                      : (currentModel["동일모델기준"] || "").trim() ||
+                        currentCode;
+
+                  // ✅ 그룹에 포함되는 모델 찾기
+                  // ✅ API에서 전달된 relatedModels를 우선 사용
+                  let groupModels = relatedModels.length
+                    ? relatedModels
+                    : options.filter((o) => {
+                        const modelCode = (o["모델코드"] || "").trim();
+                        const sameGroup = (o["동일모델기준"] || "").trim();
+
+                        return (
+                          modelCode === groupKey ||
+                          sameGroup === groupKey ||
+                          modelCode === currentCode ||
+                          sameGroup === currentCode
+                        );
+                      });
+
+                  // ✅ 중복 제거 (API 응답에도 혹시 중복이 있을 수 있으니)
+                  groupModels = Array.from(
+                    new Map(
+                      groupModels.map((m) => [(m["모델코드"] || "").trim(), m])
+                    ).values()
+                  );
+
+                  // ✅ 버튼 렌더링
+                  return groupModels.map((item) => {
+                    if (!item) return null;
+
+                    const code = (item["모델코드"] || "").trim();
+                    const colorName = item["제품색상"] || code;
+
+                    const colors = colorName
+                      .split(/[/|]/)
+                      .map((c) => c.replace(/\s+/g, ""))
+                      .map((c) =>
+                        c.includes("무드업") ? "rainbow" : colorMap[c] || "#ccc"
+                      );
+
+                    return (
+                      <OptionButton
+                        key={code}
+                        style={{
+                          position: "relative",
+                          width: "32px",
+                          height: "32px",
+                          overflow: "hidden",
+                          cursor: "pointer",
+                          borderRadius: "100%",
+                          minWidth: "initial",
+                        }}
+                        selected={code === idValue}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          router.replace(
+                            `/products/${encodeURIComponent(
+                              middleValue
+                            )}/${encodeURIComponent(code)}`
+                          );
+                        }}
+                      >
+                        <ColorChipBox
+                          colors={colors}
+                          data-colorname={colorName}
+                        />
+                      </OptionButton>
+                    );
+                  });
+                })()}
+              </ButtonGroup>
+            </Section>
+
+            {/* 계약기간 */}
+            <Section>
+              <Label>
+                계약기간
+                <ToolTip
+                  title={
+                    "고객님이 원하시는 기간을 선택해서 구독할 수 있어요.\n(계약기간 내 무상 A/S 및 케어서비스)"
+                  }
+                >
+                  <svg
+                    className="gray--600"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                  >
+                    <circle
+                      cx="8"
+                      cy="8"
+                      r="6.875"
+                      stroke="black"
+                      stroke-width="1.4"
+                      stroke-linecap="square"
+                      className="color--stroke"
+                    ></circle>
+                    <circle
+                      cx="8"
+                      cy="5.1875"
+                      r="0.9375"
+                      fill="black"
+                      className="color--fill"
+                    ></circle>
+                    <path
+                      d="M8 7.375V11.75"
+                      stroke="black"
+                      stroke-width="1.4"
+                      className="color--stroke"
+                    ></path>
+                  </svg>
+                </ToolTip>
+              </Label>
+              <ButtonGroup>
+                {allContracts.map((v) => (
+                  <OptionButton
+                    key={v}
+                    style={{ flex: 1 }}
+                    selected={contract === v}
+                    disabled={!isValidOption("계약기간", v, {})} // 조건 없음
+                    onClick={() => {
+                      setContract(v);
+                      setServiceType("");
+                      setServiceCycle("");
+                      setPromoType("");
+                      setPromoName("");
+                    }}
+                  >
+                    {formatContract(v)}
+                  </OptionButton>
+                ))}
+              </ButtonGroup>
+            </Section>
+            {/* 서비스유형 */}
+            <Section>
+              <Label>
+                케어서비스 유형
+                <ToolTip
+                  title={
+                    "다양한 케어 서비스 중에서 원하는 옵션을 선택해 보세요."
+                  }
+                >
+                  <svg
+                    className="gray--600"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                  >
+                    <circle
+                      cx="8"
+                      cy="8"
+                      r="6.875"
+                      stroke="black"
+                      stroke-width="1.4"
+                      stroke-linecap="square"
+                      className="color--stroke"
+                    ></circle>
+                    <circle
+                      cx="8"
+                      cy="5.1875"
+                      r="0.9375"
+                      fill="black"
+                      className="color--fill"
+                    ></circle>
+                    <path
+                      d="M8 7.375V11.75"
+                      stroke="black"
+                      stroke-width="1.4"
+                      className="color--stroke"
+                    ></path>
+                  </svg>
+                </ToolTip>
+              </Label>
+              <ButtonGroup>
+                {allServiceTypes.map((v) => (
+                  <OptionButton
+                    key={v}
+                    selected={serviceType === v}
+                    style={{ flex: 1 }}
+                    disabled={
+                      !isValidOption("서비스유형", v, { 계약기간: contract })
+                    }
+                    onClick={() => {
+                      if (!contract) return;
+                      setServiceType(v);
+                      setServiceCycle("");
+                      setPromoType("");
+                      setPromoName("");
+                    }}
+                  >
+                    {v}
+                  </OptionButton>
+                ))}
+              </ButtonGroup>
+            </Section>
+            {/* 서비스주기 */}
+            <Section>
+              <Label>
+                케어서비스 주기
+                <ToolTip
+                  title={
+                    "제품을 오래 깨끗하게 안심하고 사용하실 수 있도록 정기적으로 관리해드리는 가전 케어 서비스입니다.\n\n방문관리 : 방문주기에 따라 가전 케어 전문가의 관리를 원한다면 추천\n\n자기관리 : 스스로 제품을 관리하고 싶다면 추천"
+                  }
+                >
+                  <svg
+                    className="gray--600"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                  >
+                    <circle
+                      cx="8"
+                      cy="8"
+                      r="6.875"
+                      stroke="black"
+                      stroke-width="1.4"
+                      stroke-linecap="square"
+                      className="color--stroke"
+                    ></circle>
+                    <circle
+                      cx="8"
+                      cy="5.1875"
+                      r="0.9375"
+                      fill="black"
+                      className="color--fill"
+                    ></circle>
+                    <path
+                      d="M8 7.375V11.75"
+                      stroke="black"
+                      stroke-width="1.4"
+                      className="color--stroke"
+                    ></path>
+                  </svg>
+                </ToolTip>
+              </Label>
+              <ButtonGroup>
+                {allCycles.map((v) => (
+                  <OptionButton
+                    key={v}
+                    style={{ flex: 1 }}
+                    selected={serviceCycle === v}
+                    disabled={
+                      !isValidOption("서비스주기/월", v, {
+                        계약기간: contract,
+                        서비스유형: serviceType,
+                      })
+                    }
+                    onClick={() => {
+                      if (!serviceType) return;
+                      setServiceCycle(v);
+                      setPromoType("");
+                      setPromoName("");
+                    }}
+                  >
+                    {v}
+                  </OptionButton>
+                ))}
+              </ButtonGroup>
+            </Section>
+            {/* 프로모션 */}
+            <Section>
+              <Label>프로모션유형</Label>
+              <ButtonGroup>
+                {allPromoTypes.map((v) => (
+                  <OptionButton
+                    style={{ width: "calc(50% - 4px)" }}
+                    key={v}
+                    selected={promoType === v}
+                    disabled={
+                      !isValidOption("프로모션유형", v, {
+                        계약기간: contract,
+                        서비스유형: serviceType,
+                        "서비스주기/월": serviceCycle,
+                      })
+                    }
+                    onClick={() => {
+                      if (!serviceCycle) return;
+                      setPromoType(v);
+                      setPromoName("");
+                    }}
+                  >
+                    {v}
+                  </OptionButton>
+                ))}
+              </ButtonGroup>
+            </Section>
+            {/* 프로모션명 */}
+            <Section>
+              <Label>프로모션명</Label>
+              <Select
+                value={promoName}
+                onChange={(e) => setPromoName(e.target.value)}
+                disabled={!promoType}
+                style={{ flex: 1, width: "100%" }}
+              >
+                <option value="">선택 안 함</option>
+                {Array.from(
+                  new Set(
+                    options
+                      .filter(
+                        (o) =>
+                          o["계약기간"] === contract &&
+                          o["서비스유형"] === serviceType &&
+                          o["서비스주기/월"] === serviceCycle &&
+                          (o["프로모션유형"]?.trim() || "") === promoType
+                      )
+                      .map((o) => o["프로모션명"])
+                      .filter((v): v is string => !!v)
+                  )
+                ).map((v) => (
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
+                ))}
+              </Select>
+            </Section>
+
+            {contract &&
+              normalizeNum(contract) === "72" &&
+              prepayAvailableRate && ( // ← 이 조건 추가!
+                <Section>
+                  <Label>선납</Label>
+                  <Select
+                    value={prepayRate}
+                    onChange={(e) => setPrepayRate(e.target.value)}
+                    style={{ flex: 1, width: "100%" }}
+                  >
+                    <option value="">선택 안 함</option>
+
+                    {prepayAvailableRate === "30" && (
+                      <option value="30">30% 선납</option>
+                    )}
+                    {prepayAvailableRate === "30_50" && (
+                      <>
+                        <option value="30">30% 선납</option>
+                        <option value="50">50% 선납</option>
+                      </>
+                    )}
+                  </Select>
+                </Section>
+              )}
+
+            {/* 🔥 선납금 UI (선납 선택 시에만 노출) */}
+            {prepayRate && prepayRate !== "" && prepayAmountDisplay && (
+              <SectionFlex>
+                <Label style={{ marginTop: "3px" }}>선납금액</Label>
+                <Prepay>
+                  <b>{prepayAmountDisplay.toLocaleString()}</b>원
+                </Prepay>
+              </SectionFlex>
+            )}
+
+            {/* 가격 */}
+            <PriceWrapper
+              style={{
+                paddingTop: "20px",
+                marginTop: "20px",
+                borderTop: "1px solid #ddd",
+              }}
+            >
+              <p>이용요금</p>
+              <span
+                style={{
+                  fontSize: "14px",
+                  fontWeight: 500,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                }}
+              >
+                1년차 월 요금 기준
+                <Price>
+                  월
+                  <b>{current ? `${finalUsageFee.toLocaleString()}원` : "-"}</b>
+                </Price>
+              </span>
+            </PriceWrapper>
+
+            <PriceWrapper>
+              <p>최대혜택가</p>
+              <span
+                style={{
+                  fontSize: "14px",
+                  fontWeight: 500,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                }}
+              >
+                <PriceSale>
+                  월{" "}
+                  <b>
+                    {current ? `${finalBestPrice.toLocaleString()}원` : "-"}
+                  </b>
+                </PriceSale>
+              </span>
+            </PriceWrapper>
+
+            <InfoText>
+              혜택은 적용되는 할인 혜택, 제휴 카드사에 따라 다르게 계산되어,
+              실제 청약 신청 시 최대 혜택가와 다를 수 있습니다. 상세 내용은
+              가전구독 혜택 안내에서 확인이 가능합니다.
+            </InfoText>
+
+            <PSTextBox>
+              <Text>
+                대표요금제 기준이며 요금제에 따라 가전 구독 총 비용이 다를 수
+                있음
+              </Text>
+              <Text>계약기간 동안 무상 A/S</Text>
+              <Text>초기 구입비용 0원(계약기간 동안 분할납부)</Text>
+              {disclaimerText && <Text>{disclaimerText}</Text>}
+            </PSTextBox>
+          </ProductInfo>
+        </ProductDetailWrap>
+
+        {/* ✅ 상세페이지 HTML embed */}
+        <ResponsiveSection style={{ marginTop: "240px" }}>
+          {id ? (
+            <AutoHeightIframe
+              src={`/api/product-detail?middle=${middle}&id=${id}`}
+              title={`${id} 상세페이지`}
+              minHeight={600}
+            />
+          ) : (
+            <div>상세페이지를 불러올 수 없습니다.</div>
+          )}
+        </ResponsiveSection>
+      </Container>
+    </>
+  );
+}
+
+const ThumbnailSwiper = styled.div`
+  margin-top: 24px;
+
+  .swiper-slide {
+    position: relative;
+    width: 90px;
+    height: 90px;
+  }
+
+  .swiper-slide::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: 1px solid #8f8f8f;
+    border-radius: 4px;
+    pointer-events: none;
+    box-sizing: border-box;
+  }
+
+  .swiper-slide-thumb-active::before {
+    border: 2px solid #000;
+  }
+`;
+
+// styled-components
+const Breadcrumb = styled.nav`
+  font-size: 0.85rem;
+  color: #555;
+  margin-bottom: 1rem;
+
+  a {
+    color: #000;
+    text-decoration: none;
+  }
+
+  a:hover {
+    text-decoration: underline;
+  }
+
+  span {
+    margin: 0 0.25rem;
+    color: #aaa;
+  }
+
+  strong {
+    color: #000;
+  }
+`;
+
+const Container = styled.div`
+  padding: 0 40px;
+  max-width: 1460px;
+  margin: auto;
+
+  @media (max-width: 499px) {
+    padding: 0 16px;
+  }
+`;
+const Title = styled.h1`
+  font-size: 28px;
+  line-height: 36px;
+  padding-right: 80px;
+  margin-bottom: 12px;
+  font-weight: 800;
+
+  @media (max-width: 768px) {
+    font-size: 20px;
+    margin-bottom: 6px;
+  }
+`;
+const Share = styled.button`
+  position: absolute;
+  top: 0;
+  right: 0;
+  cursor: pointer;
+`;
+const Model = styled.p`
+  font-size: 16px;
+  color: #666;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  @media (max-width: 768px) {
+    font-size: 12px;
+
+    img {
+      width: 16px;
+      height: 16px;
+    }
+  }
+`;
+
+const Section = styled.div`
+  margin-top: 1.5rem;
+
+  @media (max-width: 768px) {
+    margin-top: 1.2rem;
+  }
+`;
+const SectionFlex = styled.div`
+  margin-top: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+
+  > div {
+    margin: 0;
+  }
+
+  @media (max-width: 768px) {
+    margin-top: 1.2rem;
+  }
+`;
+
+const Prepay = styled.div`
+  font-size: 22px;
+  > b {
+    font-weight: 500;
+  }
+
+  @media (max-width: 768px) {
+    font-size: 18px;
+  }
+`;
+
+const ResponsiveSection = styled(Section)`
+  margin-top: 240px;
+
+  @media (max-width: 768px) {
+    margin-top: 50px !important;
+  }
+`;
+
+const Label = styled.div`
+  font-size: 15px;
+  line-height: 22px;
+  color: #111;
+  font-weight: 500;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  svg {
+    opacity: 0.6;
+  }
+
+  @media (max-width: 768px) {
+    margin-bottom: 8px;
+    font-size: 13px;
+  }
+`;
+
+const Select = styled.select`
+  border-radius: 6px;
+  border: 1px solid #dee1e5;
+  height: 48px;
+  min-width: 100px;
+  color: #444;
+  font-size: 14px;
+  font-weight: 400;
+  padding: 0 12px;
+
+  @media (max-width: 768px) {
+    font-size: 13px;
+    height: 40px;
+  }
+`;
+const PriceWrapper = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 20px;
+  font-weight: 500;
+
+  @media (max-width: 768px) {
+    p {
+      font-size: 14px;
+    }
+    span {
+      font-size: 12px !important;
+    }
+  }
+`;
+const Price = styled.h2`
+  color: #000;
+  font-size: 24px;
+  b {
+    font-weight: 700;
+  }
+
+  @media (max-width: 768px) {
+    font-size: 18px;
+  }
+`;
+const PriceSale = styled.h2`
+  color: #ea1917 !important;
+  font-size: 24px;
+  font-weight: 500;
+  font {
+    color: #ea1917 !important;
+  }
+  b {
+    font-weight: 700;
+  }
+
+  @media (max-width: 768px) {
+    font-size: 18px;
+  }
+`;
+const ButtonGroup = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+`;
+const OptionButton = styled.button<{ selected: boolean }>`
+  border-radius: 6px;
+  font-size: 14px;
+  border: 1px solid ${({ selected }) => (selected ? "#000" : "#dee1e5")};
+  color: ${({ selected }) => (selected ? "#111" : "#444")};
+  font-weight: ${({ selected }) => (selected ? "700" : "400")};
+  background: #fff;
+  cursor: ${({ disabled }) => (disabled ? "not-allowed" : "pointer")};
+  opacity: ${({ disabled }) => (disabled ? 0.5 : 1)};
+  height: 48px;
+  min-width: 100px;
+
+  @media (max-width: 768px) {
+    height: 40px;
+    font-size: 13px;
+    width: calc(50% - 4px);
+  }
+`;
+
+const ProductDetailWrap = styled.div`
+  display: flex;
+  position: relative;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  @media (max-width: 768px) {
+    gap: 24px;
+
+    flex-direction: column;
+  }
+`;
+
+const ThumbsWrap = styled.div`
+  width: 660px;
+  overflow: hidden;
+  position: sticky;
+  top: 0;
+
+  @media (max-width: 768px) {
+    position: relative;
+    width: 100%;
+  }
+`;
+
+const ProductInfo = styled.div`
+  width: 560px;
+  @media (max-width: 768px) {
+    width: 100%;
+  }
+`;
+
+const InfoText = styled.p`
+  font-size: 14px;
+  color: #444;
+  margin-top: 24px;
+
+  @media (max-width: 768px) {
+    font-size: 12px;
+  }
+`;
+
+const PSTextBox = styled.div`
+  margin-top: 24px;
+  padding-top: 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 23px;
+  padding: 24px;
+  background-color: #f4f4f4;
+
+  @media (max-width: 768px) {
+    font-size: 12px;
+  }
+`;
+
+const Text = styled.p`
+  line-height: 1.5;
+  font-size: 14px;
+  color: #666;
+  position: relative;
+  padding-left: 11px;
+
+  &::before {
+    content: "";
+    display: inline-block;
+    width: 3px;
+    height: 3px;
+    background: #666;
+    border-radius: 50%;
+    position: absolute;
+    top: 9px;
+    left: 0;
+  }
+
+  @media (max-width: 768px) {
+    font-size: 12px;
+  }
+`;
+
+const NonThumnail = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  aspect-ratio: 1/1;
+`;
+
+const Logo = styled.img`
+  width: auto;
+  height: 25px;
+`;
+
+const ColorChipBox = styled.div<{ colors: string[] }>`
+  position: relative;
+  width: 32px;
+  height: 32px;
+  overflow: hidden;
+  cursor: pointer;
+  border-radius: 100%;
+
+  ${({ colors }) =>
+    colors.length === 1
+      ? `background: ${colors[0]};`
+      : colors.length === 2
+      ? `
+        background: linear-gradient(to bottom, ${colors[0]} 50%, ${colors[1]} 50%);
+      `
+      : `background: linear-gradient(
+          to right,
+          red, orange, yellow, green, blue, indigo, violet
+        );`}
+
+  &:hover::after {
+    content: attr(data-colorname);
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 4px;
+    padding: 2px 6px;
+    font-size: 12px;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.75);
+    border-radius: 4px;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+`;

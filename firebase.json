@@ -1,0 +1,22 @@
+{
+  "hosting": {
+    "public": "public",
+    "headers": [
+      {
+        "source": "**/*.@(js|css|png|jpg|jpeg|svg|ico)",
+        "headers": [
+          { "key": "Cache-Control", "value": "public, max-age=31536000" }
+        ]
+      }
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "run": {
+          "serviceId": "nextapp",
+          "region": "us-central1"
+        }
+      }
+    ]
+  }
+}

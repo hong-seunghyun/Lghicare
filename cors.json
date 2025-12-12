@@ -1,0 +1,24 @@
+[
+  {
+    "origin": [
+      "http://localhost:3000",
+      "https://lghicare.web.app",
+      "https://lghicare-861b3.firebaseapp.com"
+    ],
+    "method": [
+      "GET",
+      "HEAD",
+      "PUT",
+      "POST",
+      "DELETE",
+      "OPTIONS"
+    ],
+    "responseHeader": [
+      "Authorization",
+      "Content-Type",
+      "x-goog-meta-*",
+      "x-goog-resumable"
+    ],
+    "maxAgeSeconds": 3600
+  }
+]
