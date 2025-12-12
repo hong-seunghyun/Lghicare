@@ -48,3 +48,14 @@ next-env.d.ts
 
 # Next.js
 .next/
+cloudrun.env
+.env
+.env.*
+*.env
+
+
+cloudrun.env
+.env
+.env.*
+*.env
+
