@@ -43,6 +43,34 @@ export default function useInfiniteProducts(category: string, search: string) {
     currentSearchRef.current = search.trim();
   }, [category, search]);
 
+	const dedupeProductsByModelCode = (items: Product[]): Product[] => {
+		const map = new Map<string, Product>();
+	
+		for (const item of items) {
+			const code = (item.모델코드 ?? "").toString().trim();
+			if (!code) continue;
+	
+			const prev = map.get(code);
+			if (!prev) {
+				map.set(code, item);
+				continue;
+			}
+	
+			const prevVariants = Array.isArray(prev.variants) ? prev.variants : [];
+			const nextVariants = Array.isArray(item.variants) ? item.variants : [];
+	
+			map.set(code, {
+				...prev,
+				...item,
+				// ✅ variants 누적
+				variants: [...prevVariants, ...nextVariants],
+			});
+		}
+	
+		return Array.from(map.values());
+	};
+
+	
   const fetchProducts = useCallback(
     async (pageToLoad: number, reset = false) => {
       // ✅ 검색어 추적 (검색어가 바뀌면 캐시 무시)
@@ -54,12 +82,13 @@ export default function useInfiniteProducts(category: string, search: string) {
       setIsLoading(true);
 
       try {
-        const params = new URLSearchParams({ middle: category });
+				const params = new URLSearchParams({ middle: category, groupBy: "modelCode" });
+
         if (keyword) params.append("q", keyword);
 
         const res = await fetch(`/api/products?${params.toString()}`);
         const data: ApiResponse = await res.json();
-        const allProducts = data.options || [];
+				const allProductsRaw = data.options || [];
 
         // ✅ 검색어가 도중에 바뀐 경우 — 중간 요청 취소
         if (keyword !== currentKeyword) {
@@ -68,16 +97,22 @@ export default function useInfiniteProducts(category: string, search: string) {
           return;
         }
 
+        // ✅ 모델코드 기준으로 중복 제거 + variants 합치기
+        const dedupedAllProducts = dedupeProductsByModelCode(allProductsRaw);
+
         // ✅ 페이지 슬라이싱
         const start = pageToLoad * PAGE_SIZE;
         const end = start + PAGE_SIZE;
-        const nextChunk = allProducts.slice(start, end);
+        const nextChunk = dedupedAllProducts.slice(start, end);
 
-        setProducts((prev) =>
-          reset ? nextChunk : [...prev, ...nextChunk]
-        );
-        setHasMore(end < allProducts.length);
+        setProducts((prev) => {
+          if (reset) return nextChunk;
+          return dedupeProductsByModelCode([...prev, ...nextChunk]);
+        });
+
+        setHasMore(end < dedupedAllProducts.length);
         setPage(pageToLoad + 1);
+
       } catch (err) {
         console.error("❌ 제품 데이터 불러오기 오류:", err);
       } finally {

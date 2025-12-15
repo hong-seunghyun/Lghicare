@@ -239,6 +239,9 @@ export default async function handler(
   const sub = req.query.sub as string | undefined;
   const id = req.query.id as string | undefined;
 
+	const groupBy = req.query.groupBy as string | undefined;
+  const isModelCodeGrouping = groupBy === "modelCode";
+
   const sheet = middle || "정수기";
 
   try {
@@ -337,10 +340,11 @@ export default async function handler(
       new Set(products.map((p) => p["소분류"]).filter(Boolean))
     );
 
-    const getGroupKey = (p: Product): string => {
+      const getGroupKey = (p: Product): string => {
       const model = (p["모델코드"] || "").trim();
+      if (isModelCodeGrouping) return model; // ✅ 견적용: 무조건 모델코드 기준
       const group = (p["동일모델기준"] || "").trim();
-      return group || model;
+      return group || model; // ✅ 기존 동작 유지
     };
 
     const grouped = products.reduce<Record<string, Product[]>>((acc, cur) => {
@@ -362,21 +366,29 @@ export default async function handler(
       const target = options[0];
 
       // ✅ 2️⃣ 동일모델 그룹키 계산
-      const groupKey =
-        (target["동일모델기준"] || "").trim() ||
-        (target["모델코드"] || "").trim();
+			const groupKey = isModelCodeGrouping
+			? (target["모델코드"] || "").trim()
+			: ((target["동일모델기준"] || "").trim() ||
+				 (target["모델코드"] || "").trim());
 
-      // ✅ 3️⃣ 동일모델 그룹 리스트 추출
-      const relatedModels = products.filter((p) => {
-        const model = (p["모델코드"] || "").trim();
-        const sameGroup = (p["동일모델기준"] || "").trim();
-        return (
-          model === groupKey ||
-          sameGroup === groupKey ||
-          model === target["모델코드"] ||
-          sameGroup === target["모델코드"]
-        );
-      });
+		const relatedModels = products.filter((p) => {
+			const model = (p["모델코드"] || "").trim();
+
+			if (isModelCodeGrouping) {
+				// ✅ 견적용: 같은 모델코드 행만 (실질적으로 동일 모델코드 variants 묶는 용도)
+				return model === groupKey;
+			}
+
+			// ✅ 기존 동작 유지: 동일모델기준 그룹 확장
+			const sameGroup = (p["동일모델기준"] || "").trim();
+			return (
+				model === groupKey ||
+				sameGroup === groupKey ||
+				model === (target["모델코드"] || "").trim() ||
+				sameGroup === (target["모델코드"] || "").trim()
+			);
+		});
+
 
       // ✅ 4️⃣ 중복 제거 (모델코드 기준)
       const dedupedRelated = Array.from(
