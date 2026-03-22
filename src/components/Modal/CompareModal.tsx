@@ -71,7 +71,7 @@ const CompareModal: React.FC<CompareModalProps> = ({
                   <div className="code">{p["모델코드"]}</div>
                 </div>
 
-                {/* ✅ 개별 삭제 버튼 */}
+                {/*  개별 삭제 버튼 */}
                 <RemoveButton
                   onClick={() => onRemove(p["모델코드"])}
                   aria-label="제품 제거"
@@ -94,7 +94,7 @@ const CompareModal: React.FC<CompareModalProps> = ({
 
 export default CompareModal;
 
-/* ✅ 스타일 (기존 구조 100% 유지 + 삭제 버튼 추가) */
+/*  스타일 (기존 구조 100% 유지 + 삭제 버튼 추가) */
 const ModalWrap = styled.div<{ $open: boolean }>`
   position: fixed;
   bottom: 0;

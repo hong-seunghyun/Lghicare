@@ -186,8 +186,8 @@ export default function CardDiscountAdminPage() {
                 allowTeacher: editAllowTeacher,
                 isActive: editIsActive,
               }
-            : c
-        )
+            : c,
+        ),
       );
 
       cancelEdit();
@@ -208,8 +208,8 @@ export default function CardDiscountAdminPage() {
 
       setCards((prev) =>
         prev.map((c) =>
-          c.id === card.id ? { ...c, isActive: !card.isActive } : c
-        )
+          c.id === card.id ? { ...c, isActive: !card.isActive } : c,
+        ),
       );
     } catch (err) {
       console.error("❌ 활성/비활성 토글 오류:", err);
@@ -228,8 +228,8 @@ export default function CardDiscountAdminPage() {
 
       setCards((prev) =>
         prev.map((c) =>
-          c.id === card.id ? { ...c, allowTeacher: !card.allowTeacher } : c
-        )
+          c.id === card.id ? { ...c, allowTeacher: !card.allowTeacher } : c,
+        ),
       );
     } catch (err) {
       console.error("❌ 구독교원 허용 토글 오류:", err);
@@ -394,7 +394,6 @@ export default function CardDiscountAdminPage() {
 /* ----------------- styled-components ----------------- */
 
 const Wrapper = styled.div`
-  max-width: 960px;
   margin: 40px auto;
   padding: 0 16px 40px;
 `;

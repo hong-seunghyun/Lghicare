@@ -69,7 +69,7 @@ export default function ProductGrid({
   );
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  // ✅ IntersectionObserver로 무한 스크롤 감시
+  //  IntersectionObserver로 무한 스크롤 감시
   useEffect(() => {
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
@@ -114,7 +114,7 @@ export default function ProductGrid({
 const styles: Record<string, React.CSSProperties> = {
   container: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", // ✅ 반응형
+    gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", //  반응형
     gap: 24,
     marginTop: 64,
     alignItems: "start",

@@ -1,4 +1,4 @@
-// pages/api/products.ts
+﻿// pages/api/products.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { fetchSheetData } from "@/lib/sheet";
 import { google, drive_v3 } from "googleapis";
@@ -12,13 +12,13 @@ type MiddleCacheEntry = {
   id: string;
   subFolders: drive_v3.Schema$File[];
   images: Record<string, string[]>; // 폴더 원래 이름 기준
-  imageIndex: Record<string, string[]>; // ✅ 정규화된 폴더명 기준 (O(1) 조회용)
+  imageIndex: Record<string, string[]>; //  정규화된 폴더명 기준 (O(1) 조회용)
   ts: number;
 };
 
 type Product = { [key: string]: string };
 
-// ✅ 전역 Drive 클라이언트 + 캐시 설정
+//  전역 Drive 클라이언트 + 캐시 설정
 const g = globalThis as typeof globalThis & {
   __driveClient?: drive_v3.Drive;
 };
@@ -28,22 +28,22 @@ const DRIVE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30일
 const DRIVE_MAX_RETRIES = 3;
 const DRIVE_BACKOFF_BASE_MS = 800; // 0.8s → 1.6s → 3.2s ...
 
-// ✅ 기존 전역 캐시 안전하게 초기화 (타입 충돌 방지)
+//  기존 전역 캐시 안전하게 초기화 (타입 충돌 방지)
 if (!globalThis.__driveCache) {
   globalThis.__driveCache = { middleCache: {} };
 }
 
-// ✅ 여기서만 확장형으로 단언
+//  여기서만 확장형으로 단언
 const driveCache = globalThis.__driveCache as DriveCacheExtended;
 if (!driveCache.pending) {
   driveCache.pending = {};
 }
 
-// ✅ 공통 정규화 함수 (폴더명/모델명 정규화에 사용)
+//  공통 정규화 함수 (폴더명/모델명 정규화에 사용)
 const normalizeName = (s?: string) =>
   normalizeModelName((s || "").replace(/\s+/g, "").trim().toLowerCase());
 
-// ✅ 전역 Drive 클라이언트 (1회 생성 후 재사용)
+//  전역 Drive 클라이언트 (1회 생성 후 재사용)
 async function getDriveClient(): Promise<drive_v3.Drive> {
   if (g.__driveClient) return g.__driveClient;
 
@@ -69,7 +69,7 @@ async function getDriveClient(): Promise<drive_v3.Drive> {
   return g.__driveClient!;
 }
 
-// ✅ 안전한 Drive API 호출 (쿼터 초과 자동 백오프)
+//  안전한 Drive API 호출 (쿼터 초과 자동 백오프)
 async function safeDriveList(
   drive: drive_v3.Drive,
   params: drive_v3.Params$Resource$Files$List,
@@ -107,7 +107,7 @@ async function safeDriveList(
   return { files: [] };
 }
 
-// ✅ 병렬 이미지 조회 (쿼터 완화 + 자연 정렬 완벽 대응)
+//  병렬 이미지 조회 (쿼터 완화 + 자연 정렬 완벽 대응)
 async function fetchImagesInBatches(
   subFolders: drive_v3.Schema$File[],
   drive: drive_v3.Drive
@@ -115,7 +115,7 @@ async function fetchImagesInBatches(
   const BATCH_SIZE = 5; // 병렬 요청 단위
   const images: Record<string, string[]> = {};
 
-  // ✅ 자연 정렬 객체 (사람이 보는 순서 그대로)
+  //  자연 정렬 객체 (사람이 보는 순서 그대로)
   const collator = new Intl.Collator(undefined, {
     numeric: true,
     sensitivity: "base",
@@ -132,7 +132,7 @@ async function fetchImagesInBatches(
           pageSize: 1000,
         });
 
-        // ✅ 파일명 자연 정렬 적용
+        //  파일명 자연 정렬 적용
         const sortedFiles = (res.files || []).sort((a, b) =>
           collator.compare(a.name || "", b.name || "")
         );
@@ -141,19 +141,19 @@ async function fetchImagesInBatches(
       })
     );
 
-    // ✅ 폴더별 이미지 경로 병합
+    //  폴더별 이미지 경로 병합
     for (const { folderName, files } of results) {
       images[folderName] = files.map((f) => `/api/image-proxy?fileId=${f.id}`);
     }
 
-    // ✅ 쿼터 초과 방지용 짧은 딜레이
+    //  쿼터 초과 방지용 짧은 딜레이
     await new Promise((r) => setTimeout(r, 200));
   }
 
   return images;
 }
 
-// ✅ 중분류 캐시 생성 함수
+//  중분류 캐시 생성 함수
 async function ensureMiddleCache(
   middleName: string,
   drive: drive_v3.Drive,
@@ -167,7 +167,7 @@ async function ensureMiddleCache(
     | undefined;
   if (cached && now - cached.ts < ttl) return cached;
 
-  // ✅ pending Promise 존재 여부 안전하게 확인
+  //  pending Promise 존재 여부 안전하게 확인
   const existing = driveCache.pending[middleName];
   if (existing) {
     return existing;
@@ -199,7 +199,7 @@ async function ensureMiddleCache(
 
       const images = await fetchImagesInBatches(subFolders, drive);
 
-      // ✅ 정규화된 폴더명 → 이미지 배열 인덱스 미리 생성 (O(1) 조회용)
+      //  정규화된 폴더명 → 이미지 배열 인덱스 미리 생성 (O(1) 조회용)
       const imageIndex: Record<string, string[]> = {};
       for (const [folderName, urls] of Object.entries(images)) {
         const key = normalizeName(folderName);
@@ -220,7 +220,7 @@ async function ensureMiddleCache(
     } catch (error) {
       console.error(`❌ ensureMiddleCache(${middleName}) Error:`, error);
       const cached = driveCache.middleCache[middleName];
-      // ✅ 타입 단언으로 명시적 보장
+      //  타입 단언으로 명시적 보장
       return (cached as MiddleCacheEntry) ?? null;
     } finally {
       delete driveCache.pending[middleName];
@@ -238,6 +238,7 @@ export default async function handler(
   const middle = req.query.middle as string | undefined;
   const sub = req.query.sub as string | undefined;
   const id = req.query.id as string | undefined;
+  const q = req.query.q as string | undefined;
 
 	const groupBy = req.query.groupBy as string | undefined;
   const isModelCodeGrouping = groupBy === "modelCode";
@@ -247,14 +248,14 @@ export default async function handler(
   try {
     const drive = await getDriveClient();
 
-    // ✅ 1. 시트 데이터 (fetchSheetData 자체는 별도 캐시 사용)
+    //  1. 시트 데이터 (fetchSheetData 자체는 별도 캐시 사용)
     const products = await fetchSheetData(sheet);
 
     // (기존 normalize는 그대로 두되, 아래에서는 normalizeName 사용)
     const normalize = (s?: string) =>
       (s || "").replace(/\s+/g, "").trim().toLowerCase();
 
-    // ✅ 요청 단위 썸네일/이미지 캐시 (UI 반응성 + 중복 연산 제거)
+    //  요청 단위 썸네일/이미지 캐시 (UI 반응성 + 중복 연산 제거)
     const thumbCache = new Map<string, string>();
     const imagesCache = new Map<string, string[]>();
 
@@ -342,9 +343,9 @@ export default async function handler(
 
       const getGroupKey = (p: Product): string => {
       const model = (p["모델코드"] || "").trim();
-      if (isModelCodeGrouping) return model; // ✅ 견적용: 무조건 모델코드 기준
+      if (isModelCodeGrouping) return model; //  견적용: 무조건 모델코드 기준
       const group = (p["동일모델기준"] || "").trim();
-      return group || model; // ✅ 기존 동작 유지
+      return group || model; //  기존 동작 유지
     };
 
     const grouped = products.reduce<Record<string, Product[]>>((acc, cur) => {
@@ -354,9 +355,9 @@ export default async function handler(
       return acc;
     }, {});
 
-    // ✅ 상세 조회
+    //  상세 조회
     if (id) {
-      // ✅ 1️⃣ 현재 모델코드 기준 행만
+      //  1️⃣ 현재 모델코드 기준 행만
       const options = products.filter(
         (p) => p["모델코드"]?.trim() === id.trim()
       );
@@ -365,7 +366,7 @@ export default async function handler(
 
       const target = options[0];
 
-      // ✅ 2️⃣ 동일모델 그룹키 계산
+      //  2️⃣ 동일모델 그룹키 계산
 			const groupKey = isModelCodeGrouping
 			? (target["모델코드"] || "").trim()
 			: ((target["동일모델기준"] || "").trim() ||
@@ -375,11 +376,11 @@ export default async function handler(
 			const model = (p["모델코드"] || "").trim();
 
 			if (isModelCodeGrouping) {
-				// ✅ 견적용: 같은 모델코드 행만 (실질적으로 동일 모델코드 variants 묶는 용도)
+				//  견적용: 같은 모델코드 행만 (실질적으로 동일 모델코드 variants 묶는 용도)
 				return model === groupKey;
 			}
 
-			// ✅ 기존 동작 유지: 동일모델기준 그룹 확장
+			//  기존 동작 유지: 동일모델기준 그룹 확장
 			const sameGroup = (p["동일모델기준"] || "").trim();
 			return (
 				model === groupKey ||
@@ -390,14 +391,14 @@ export default async function handler(
 		});
 
 
-      // ✅ 4️⃣ 중복 제거 (모델코드 기준)
+      //  4️⃣ 중복 제거 (모델코드 기준)
       const dedupedRelated = Array.from(
         new Map<string, Product>(
           relatedModels.map((m) => [m["모델코드"], m])
         ).values()
       );
 
-      // ✅ 5️⃣ 이미지 fetch 병렬화
+      //  5️⃣ 이미지 fetch 병렬화
       const [thumb, imgs] = await Promise.all([
         getThumbnailUrl(target["중분류"], target["모델코드"]),
         getAllImages(target["중분류"], target["모델코드"]),
@@ -409,7 +410,7 @@ export default async function handler(
         images: imgs,
       }));
 
-      // ✅ 6️⃣ 응답에 relatedModels 추가
+      //  6️⃣ 응답에 relatedModels 추가
       res.setHeader(
         "Cache-Control",
         "public, s-maxage=60, stale-while-revalidate=300"
@@ -421,7 +422,7 @@ export default async function handler(
       });
     }
 
-    // ✅ 목록 조회
+    //  목록 조회
     let filtered = products;
     if (middle)
       filtered = filtered.filter(
@@ -429,6 +430,18 @@ export default async function handler(
       );
     if (sub)
       filtered = filtered.filter((p) => p["소분류"]?.trim() === sub.trim());
+    const keyword = (q || "").trim();
+    if (keyword) {
+      const normalizedKeyword = normalize(keyword);
+      const searchableFields = ["모델코드", "상품명", "제품명"];
+      filtered = filtered.filter((p) =>
+        searchableFields.some((field) => {
+          const value = p[field];
+          if (typeof value !== "string") return false;
+          return normalize(value).includes(normalizedKeyword);
+        })
+      );
+    }
 
     const groupedFiltered = filtered.reduce<Record<string, Product[]>>(
       (acc, cur) => {

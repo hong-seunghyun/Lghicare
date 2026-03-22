@@ -14,7 +14,7 @@ type SheetGlobalCache = {
   sheetsClient: ReturnType<typeof google.sheets> | null;
 };
 
-// ✅ 전역 객체에 __sheetCache 붙여서
+//  전역 객체에 __sheetCache 붙여서
 //    - HMR / 여러 API 라우트 간에도 캐시 & pending 공유
 const g = globalThis as typeof globalThis & {
   __sheetCache?: SheetGlobalCache;
@@ -30,7 +30,7 @@ if (!g.__sheetCache) {
 
 const sheetGlobal = g.__sheetCache;
 
-// ✅ 시트 클라이언트 가져오기 (전역 1회 생성)
+//  시트 클라이언트 가져오기 (전역 1회 생성)
 export async function getSheetsClient() {
   if (sheetGlobal.sheetsClient) return sheetGlobal.sheetsClient;
 
@@ -46,7 +46,7 @@ export async function getSheetsClient() {
   return sheetGlobal.sheetsClient!;
 }
 
-// ✅ 안전한 Sheets API 호출 (403 / 429 백오프 재시도)
+//  안전한 Sheets API 호출 (403 / 429 백오프 재시도)
 async function safeSheetGet(
   sheet: string,
   range: string,
@@ -88,7 +88,7 @@ async function safeSheetGet(
   throw new Error(`safeSheetGet(${sheet}) failed`);
 }
 
-// ✅ admin에서 부를 수 있는 시트 캐시 초기화 헬퍼
+//  admin에서 부를 수 있는 시트 캐시 초기화 헬퍼
 export function clearSheetCache(sheet?: string) {
   if (sheet) {
     delete sheetGlobal.dataCache[sheet];
@@ -99,10 +99,10 @@ export function clearSheetCache(sheet?: string) {
   }
 }
 
-// ✅ 시트 데이터 가져오기 (30일 TTL + 전역 캐시 + pending 공유)
+//  시트 데이터 가져오기 (30일 TTL + 전역 캐시 + pending 공유)
 export async function fetchSheetData(sheet: string) {
   const now = Date.now();
-  const ttl = 30 * 24 * 60 * 60 * 1000; // ✅ 30일 TTL
+  const ttl = 30 * 24 * 60 * 60 * 1000; //  30일 TTL
 
   // 1) 캐시 유효하면 바로 반환
   const cached = sheetGlobal.dataCache[sheet];
@@ -136,14 +136,14 @@ export async function fetchSheetData(sheet: string) {
 
       const entry: CacheEntry = { data: products, ts: Date.now() };
 
-      // ✅ 전역 캐시에 저장
+      //  전역 캐시에 저장
       sheetGlobal.dataCache[sheet] = entry;
 
       return entry;
     } catch (err) {
       console.error(`❌ fetchSheetData(${sheet}) 오류:`, err);
 
-      // ✅ 에러인데 이전 캐시라도 있으면 그걸 반환
+      //  에러인데 이전 캐시라도 있으면 그걸 반환
       const fallback = sheetGlobal.dataCache[sheet];
       if (fallback) return fallback;
 

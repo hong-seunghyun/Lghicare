@@ -15,7 +15,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    // ✅ 이미 global.d.ts에서 선언된 __driveCache를 그대로 가져오되,
+    //  이미 global.d.ts에서 선언된 __driveCache를 그대로 가져오되,
     //    여기서는 타입을 느슨하게 다루기 위해 any로 우회
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cache = (globalThis as any).__driveCache as
@@ -23,28 +23,25 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
       | undefined;
 
     if (cache) {
-      // ✅ middleCache 초기화
+      //  middleCache 초기화
       if (cache.middleCache) {
         cache.middleCache = {};
       } else {
         cache.middleCache = {};
       }
 
-      // ✅ pending 있으면 함께 초기화 (없어도 에러 X)
+      //  pending 있으면 함께 초기화 (없어도 에러 X)
       if (cache.pending) {
         cache.pending = {};
       }
     }
 
-    // ✅ 시트 데이터 캐시 초기화 (fetchSheetData 캐시)
-    clearSheetCache(); // sheet 이름 없이 호출하면 전체 시트 캐시 초기화
-
-    // ✅ 드라이브 썸네일 캐시 초기화 (getDriveThumbnail 캐시)
+    //  드라이브 썸네일 캐시 초기화 (getDriveThumbnail 캐시)
     clearDriveThumbnailCache(); // 모델코드 없이 호출하면 전체 썸네일 캐시 초기화
 
     return res.status(200).json({
       ok: true,
-      message: "Drive 이미지/썸네일 및 시트 캐시가 모두 초기화되었습니다.",
+      message: "Drive 이미지/썸네일 캐시가 초기화되었습니다.",
     });
   } catch (error) {
     console.error("❌ clear-drive-cache error:", error);

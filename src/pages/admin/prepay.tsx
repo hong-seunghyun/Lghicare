@@ -35,7 +35,7 @@ export default function PrepayAdminPage() {
   // 🔍 중복 검수 결과
   const [duplicateModels, setDuplicateModels] = useState<string[]>([]);
 
-  // ✅ 선택된 항목 관리
+  //  선택된 항목 관리
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -80,11 +80,11 @@ export default function PrepayAdminPage() {
   const handleToggle = async (
     id: string,
     field: "rate30" | "rate50",
-    value: boolean
+    value: boolean,
   ) => {
     try {
       setRules((prev) =>
-        prev.map((r) => (r.id === id ? { ...r, [field]: value } : r))
+        prev.map((r) => (r.id === id ? { ...r, [field]: value } : r)),
       );
       await updateDoc(doc(db, "prepayRules", id), {
         [field]: value,
@@ -137,7 +137,7 @@ export default function PrepayAdminPage() {
     }
   };
 
-  // ✅ 체크박스: 단일 선택 토글
+  //  체크박스: 단일 선택 토글
   const handleSelectToggle = (id: string, checked: boolean) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -150,7 +150,7 @@ export default function PrepayAdminPage() {
     });
   };
 
-  // ✅ 체크박스: 전체 선택 토글
+  //  체크박스: 전체 선택 토글
   const handleSelectAllToggle = (checked: boolean) => {
     if (!checked) {
       setSelectedIds(new Set());
@@ -166,7 +166,7 @@ export default function PrepayAdminPage() {
   // 🔥 단일 삭제
   const handleDelete = async (id: string) => {
     const confirmDelete = window.confirm(
-      `정말 삭제하시겠어요?\n(doc id: ${id})`
+      `정말 삭제하시겠어요?\n(doc id: ${id})`,
     );
     if (!confirmDelete) return;
 
@@ -208,7 +208,7 @@ export default function PrepayAdminPage() {
     }
 
     const confirmDelete = window.confirm(
-      `선택된 ${ids.length}개의 항목을 삭제하시겠어요?`
+      `선택된 ${ids.length}개의 항목을 삭제하시겠어요?`,
     );
     if (!confirmDelete) return;
 
@@ -234,7 +234,7 @@ export default function PrepayAdminPage() {
     }
 
     const confirmDelete = window.confirm(
-      `prepayRules 전체 ${rules.length}개 항목을 모두 삭제하시겠어요?\n되돌릴 수 없습니다.`
+      `prepayRules 전체 ${rules.length}개 항목을 모두 삭제하시겠어요?\n되돌릴 수 없습니다.`,
     );
     if (!confirmDelete) return;
 
@@ -261,7 +261,7 @@ export default function PrepayAdminPage() {
 
     if (!lines.length) {
       alert(
-        "등록할 데이터가 없습니다. 엑셀에서 복사한 내용을 붙여넣어 주세요."
+        "등록할 데이터가 없습니다. 엑셀에서 복사한 내용을 붙여넣어 주세요.",
       );
       return;
     }
@@ -328,7 +328,7 @@ export default function PrepayAdminPage() {
             updatedAt: new Date(),
             createdAt: new Date(),
           },
-          { merge: true }
+          { merge: true },
         );
 
         newItems.push({
@@ -344,22 +344,22 @@ export default function PrepayAdminPage() {
       if (bulkDuplicateModels.length) {
         alert(
           `아래 모델 코드는 붙여넣기 데이터 내에서 중복되어 한 번만 반영되었습니다.\n\n${bulkDuplicateModels.join(
-            ", "
-          )}`
+            ", ",
+          )}`,
         );
       }
 
       if (modelsForced30.length) {
         alert(
           `아래 모델은 50%가 선택되어 30%도 자동으로 체크했습니다.\n\n${modelsForced30.join(
-            ", "
-          )}`
+            ", ",
+          )}`,
         );
       }
 
       if (!newItems.length) {
         alert(
-          "유효한 데이터가 없습니다. 형식을 다시 확인해주세요.\n(예: TV OLED83G5KW X O)"
+          "유효한 데이터가 없습니다. 형식을 다시 확인해주세요.\n(예: TV OLED83G5KW X O)",
         );
         setBulkSaving(false);
         return;
@@ -421,8 +421,8 @@ export default function PrepayAdminPage() {
     } else {
       alert(
         `중복된 모델 코드가 발견되었습니다.\n\n${dups.join(
-          ", "
-        )}\n\n아래 '중복 모델 목록'을 확인해주세요.`
+          ", ",
+        )}\n\n아래 '중복 모델 목록'을 확인해주세요.`,
       );
     }
   };
@@ -547,7 +547,6 @@ export default function PrepayAdminPage() {
 }
 
 const Wrapper = styled.div`
-  max-width: 960px;
   margin: 40px auto;
   padding: 0 16px;
 `;

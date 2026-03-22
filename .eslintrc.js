@@ -8,7 +8,7 @@ module.exports = {
         "plugin:@typescript-eslint/recommended",
     ],
     rules: {
-        // ✅ any 허용
+        //  any 허용
         "@typescript-eslint/no-explicit-any": "off",
     },
 };

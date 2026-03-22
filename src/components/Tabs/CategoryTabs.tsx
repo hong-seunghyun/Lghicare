@@ -73,7 +73,7 @@ export default function CategoryTabs({
 }
 
 //
-// ✅ styled-components
+//  styled-components
 //
 const Wrapper = styled.div`
   position: relative;

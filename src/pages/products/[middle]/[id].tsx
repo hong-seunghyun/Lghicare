@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+﻿/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useRouter } from "next/router";
 import { useEffect, useState, useMemo, useRef } from "react";
 import styled from "styled-components";
@@ -599,6 +599,12 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
         }
 
         const shareCountCol = collection(db, "shareCount");
+        const shareTypeCountCol = collection(db, "shareCountByType");
+        const sharePageCountCol = collection(db, "shareCountByPage");
+        const shareManagerCountCol = collection(db, "shareCountByManager");
+        const shareBranchCountCol = collection(db, "shareCountByBranch");
+        const managerCategoryStatsCol = collection(db, "managerCategoryStats");
+        const managerProductStatsCol = collection(db, "managerProductStats");
         const now = new Date();
 
         // 👉 페이지 기반 key (ex: /products/abc → "products_abc")
@@ -617,6 +623,32 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
           "unknown";
 
         const analyticsTasks: Promise<unknown>[] = [];
+
+        // 0) 타입별 공유 카운트 (BEST 공유용)
+        analyticsTasks.push(
+          setDoc(
+            doc(shareTypeCountCol, `type_${estimateType}`),
+            {
+              type: estimateType,
+              totalCount: increment(1),
+              updatedAt: now,
+            },
+            { merge: true },
+          ),
+        );
+
+        analyticsTasks.push(
+          setDoc(
+            doc(sharePageCountCol, `page_${pathKey}_type_${estimateType}`),
+            {
+              path: pathName,
+              type: estimateType,
+              totalCount: increment(1),
+              updatedAt: now,
+            },
+            { merge: true },
+          ),
+        );
 
         // 1) 전체 페이지 기준 공유 카운트
         analyticsTasks.push(
@@ -655,6 +687,22 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
             )
           );
 
+          analyticsTasks.push(
+            setDoc(
+              doc(shareManagerCountCol, `manager_${uid}_type_${estimateType}`),
+              {
+                type: estimateType,
+                managerUid: uid,
+                managerId,
+                managerName: name,
+                branch,
+                totalCount: increment(1),
+                updatedAt: now,
+              },
+              { merge: true },
+            ),
+          );
+
           // 3) 지점별 페이지 공유 카운트
           if (branch) {
             analyticsTasks.push(
@@ -671,7 +719,73 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
                 { merge: true }
               )
             );
+
+            analyticsTasks.push(
+              setDoc(
+                doc(shareBranchCountCol, `branch_${branch}_type_${estimateType}`),
+                {
+                  type: estimateType,
+                  branch,
+                  totalCount: increment(1),
+                  updatedAt: now,
+                },
+                { merge: true },
+              ),
+            );
           }
+
+          const modelCode =
+            (current?.["모델코드"] as string | undefined) ||
+            (options[0]?.["모델코드"] as string | undefined) ||
+            (typeof id === "string" ? id : Array.isArray(id) ? id[0] : "unknown") ||
+            "unknown";
+          const productName =
+            (current?.["상품명"] as string | undefined) ||
+            (options[0]?.["상품명"] as string | undefined) ||
+            "";
+          const region = (managerMeta as any).region ?? "";
+          const office = (managerMeta as any).office ?? "";
+
+          analyticsTasks.push(
+            setDoc(
+              doc(
+                managerCategoryStatsCol,
+                `manager_${uid}_category_${estimateType}`,
+              ),
+              {
+                type: estimateType,
+                managerUid: uid,
+                managerId,
+                managerName: name,
+                branch,
+                region,
+                office,
+                shareCount: increment(1),
+                updatedAt: serverTimestamp(),
+              },
+              { merge: true },
+            ),
+          );
+
+          analyticsTasks.push(
+            setDoc(
+              doc(managerProductStatsCol, `manager_${uid}_product_${modelCode}`),
+              {
+                type: estimateType,
+                modelCode,
+                productName,
+                managerUid: uid,
+                managerId,
+                managerName: name,
+                branch,
+                region,
+                office,
+                shareCount: increment(1),
+                updatedAt: serverTimestamp(),
+              },
+              { merge: true },
+            ),
+          );
         }
 
         if (analyticsTasks.length > 0) {

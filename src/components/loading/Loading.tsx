@@ -3,7 +3,7 @@ import React from "react";
 import styled from "styled-components";
 import Lottie from "lottie-react";
 
-// ✅ public/animations/loading.json 파일 필요
+//  public/animations/loading.json 파일 필요
 import loadingAnimation from "../../../public/animations/Loading.json";
 
 export default function Loading() {

@@ -6,7 +6,7 @@ const dev = process.env.NODE_ENV !== "production";
 const app = next({ dev, conf: { distDir: ".next" } });
 const handle = app.getRequestHandler();
 
-// ✅ 앱 준비는 한번만 실행
+//  앱 준비는 한번만 실행
 let isPrepared = false;
 
 const prepareApp = async () => {

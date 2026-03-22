@@ -72,7 +72,7 @@ export default function CustomSelect({
   );
 }
 
-// ✅ styled-components
+//  styled-components
 const Wrapper = styled.div`
   position: relative;
   width: 100%;
@@ -98,6 +98,11 @@ const Label = styled.span`
 const SelectedValue = styled.span`
   color: #555;
   font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 80px;
+  text-align: right;
 `;
 
 const Arrow = styled.span<{ open: boolean }>`
@@ -127,7 +132,6 @@ const OptionItem = styled.div`
   color: #444;
   transition: background 0.15s;
   text-align: right;
-  padding-right: 45px;
 
   &:hover {
     background: #f6f6f6;

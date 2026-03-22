@@ -10,7 +10,7 @@ export default function HeaderSearch() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // ✅ ESC로 닫기
+  //  ESC로 닫기
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
@@ -19,7 +19,7 @@ export default function HeaderSearch() {
     return () => window.removeEventListener("keydown", handleEsc);
   }, []);
 
-  // ✅ 모달 열릴 때 인풋 자동포커스
+  //  모달 열릴 때 인풋 자동포커스
   useEffect(() => {
     if (open && inputRef.current) {
       setTimeout(() => inputRef.current?.focus(), 150);

@@ -29,7 +29,7 @@ const useEstimateStore = create<EstimateStore>()(
     (set, get) => ({
       items: [],
 
-      // ✅ 제품 담기 (중복 방지)
+      //  제품 담기 (중복 방지)
       addItem: (product) => {
         const exists = get().items.some(
           (p) => p.모델코드 === product.모델코드
@@ -38,14 +38,14 @@ const useEstimateStore = create<EstimateStore>()(
         set({ items: [...get().items, product] });
       },
 
-      // ✅ 개별 삭제
+      //  개별 삭제
       removeItem: (modelCode) => {
         set({
           items: get().items.filter((p) => p.모델코드 !== modelCode),
         });
       },
 
-      // ✅ 전체 비우기
+      //  전체 비우기
       clearItems: () => set({ items: [] }),
     }),
     {

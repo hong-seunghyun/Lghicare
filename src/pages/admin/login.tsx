@@ -26,7 +26,7 @@ const LoginPage: React.FC = () => {
 
   const auth = getAuth(app);
 
-  // ✅ 로그인 상태 확인 (이미 로그인되어 있으면 role 확인 후 /admin 으로 보냄)
+  //  로그인 상태 확인 (이미 로그인되어 있으면 role 확인 후 /admin 으로 보냄)
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) {
@@ -62,7 +62,7 @@ const LoginPage: React.FC = () => {
     return () => unsubscribe();
   }, [auth, router]);
 
-  // ✅ 로그인 처리
+  //  로그인 처리
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -116,7 +116,7 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  // ✅ 로그인 상태 확인중 로딩 UI
+  //  로그인 상태 확인중 로딩 UI
   if (authChecking) {
     return (
       <FullScreenCenter>

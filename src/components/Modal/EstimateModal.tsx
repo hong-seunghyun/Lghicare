@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+﻿/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import Image from "next/image";
 import React, { useState, useEffect } from "react";
@@ -6,6 +6,9 @@ import styled from "styled-components";
 
 import { db } from "@/lib/firebase";
 import { useRouter } from "next/router";
+
+import { calcMultiProductVoucher } from "@/utils/voucher/calcVoucher";
+import { fetchVoucherRules } from "@/lib/voucherMaster";
 
 import {
   addDoc,
@@ -39,20 +42,36 @@ export interface SelectedProduct {
   상품명: string;
   thumbnailUrl?: string;
 
-  // 👉 제품 옵션
   selectedVariant?: ProductVariant;
 
-  // 👉 계산 관련 값들
-  baseMonthly?: number; // 기준 월 이용요금
-  finalPrice?: number | string; // 최종 혜택가 월 이용요금
+  baseMonthly?: number;
+  finalPrice?: number | string;
 
-  // 👉 할인 정보
-  cardDiscount?: number; // 제휴카드 월 할인 금액
-  teacherDiscount?: number; // 구독교원 월 할인 금액
+  cardDiscount?: number;
+  teacherDiscount?: number;
 
-  // 👉 선납 정보
   prepayRate?: string; // "30" | "50" | ""
-  prepayAmount?: number; // 선납금액
+  prepayAmount?: number;
+
+  selectedCardId?: string;
+  selectedCardName?: string;
+  selectedCardAmount?: number;
+
+  teacherSelections?: Record<string, number>;
+  teacherTotalSeats?: number;
+  teacherSelectionDetails?: Array<{
+    planId: string;
+    type: string;
+    seats: number;
+    discountPerSeat: number;
+    monthlyDiscount: number;
+  }>;
+
+  prepayMonthlyDiscount?: number;
+
+  voucherTotal?: number;
+  voucherDetails?: Array<{ type: string; amount: number; reason: string }>;
+  voucherMultiProductCount?: number;
 }
 
 interface Props {
@@ -62,7 +81,6 @@ interface Props {
   onRemove: (modelCode: string) => void;
 }
 
-// 💰 공통 숫자 파서
 function parseMoney(value: unknown): number {
   if (!value) return 0;
   if (typeof value === "number") return value;
@@ -73,9 +91,49 @@ function parseMoney(value: unknown): number {
   return isNaN(num) ? 0 : num;
 }
 
-// 🔹 기준 이용요금 계산 (할인후금액 → 정상가 까지 우선순위)
+function normalizePrepayMonthlyDiscount(raw: unknown): number {
+  const v = parseMoney(raw);
+  const truncated = Math.floor(v / 100) * 100; // 100원 단위 절삭
+  return truncated >= 1000 ? truncated : 0; // 1000원 미만 0 처리
+}
+
+function getSaveDiscounts(p: SelectedProduct) {
+  const v = p.selectedVariant as any | undefined;
+
+  // 카드할인: 선택값 우선
+  const card = parseMoney(
+    (p as any).cardDiscount ??
+      (p as any).selectedCardAmount ??
+      v?.cardDiscount ??
+      v?.카드할인금액 ??
+      v?.제휴카드할인금액,
+  );
+
+  // 교원할인: 선택값 우선
+  const teacher = parseMoney(
+    (p as any).teacherDiscount ?? v?.teacherDiscount ?? v?.구독교원할인금액,
+  );
+
+  // 선결제 월할인: 다른 컴포넌트 계산값 반영 (없으면 0)
+  const prepay = normalizePrepayMonthlyDiscount(
+    (p as any).prepayMonthlyDiscount,
+  );
+
+  // 카드/교원/선결제 할인 선택이 없으면 기본 카드 13,000 적용
+  const hasAny = card > 0 || teacher > 0 || prepay > 0;
+  const cardEffective = hasAny ? card : 13000;
+
+  return {
+    cardDiscount: cardEffective,
+    teacherDiscount: teacher,
+    prepayMonthlyDiscount: prepay,
+    totalDiscount: Math.max(cardEffective + teacher + prepay, 0),
+  };
+}
+
+// 기본 월 요금 계산 (할인후금액 -> 정상가 -> 할인전금액)
 function calcBaseMonthly(p: SelectedProduct): number {
-  // ProductCard에서 baseMonthly를 직접 넣어준 경우 우선 사용
+  // ProductCard에서 baseMonthly가 있으면 우선 사용
   if (typeof (p as any).baseMonthly === "number") {
     return (p as any).baseMonthly;
   }
@@ -91,35 +149,21 @@ function calcBaseMonthly(p: SelectedProduct): number {
   );
 }
 
-// 🔹 혜택가(최종 월 요금) 계산
-function calcFinalMonthly(p: SelectedProduct): number {
+function calcFinalMonthlyForSave(p: SelectedProduct): number {
   const base = calcBaseMonthly(p);
   if (!base) return 0;
 
-  const v = p.selectedVariant as any | undefined;
+  const { totalDiscount } = getSaveDiscounts(p);
 
-  // ✅ ProductCard에서 넣어준 월 할인 금액 우선 사용
-  const cardDiscount = parseMoney(
-    (p as any).cardDiscount ??
-      v?.cardDiscount ??
-      v?.카드할인금액 ??
-      v?.제휴카드할인금액
-  );
-  const teacherDiscount = parseMoney(
-    (p as any).teacherDiscount ?? v?.teacherDiscount ?? v?.구독교원할인금액
-  );
-
-  // 🔥 진짜로 선택된 할인(제휴카드/구독교원)이 있는지 체크
-  const hasAnyDiscount = cardDiscount > 0 || teacherDiscount > 0;
-
-  // 👉 둘 다 0이면 기본 제휴카드 할인 13,000원을 적용
-  const discountSum = hasAnyDiscount ? cardDiscount + teacherDiscount : 13000;
-
-  // 👉 할인합이 월 이용요금을 넘지 않도록 캡핑
-  const effectiveDiscount = Math.min(discountSum, base);
-
-  const final = base - effectiveDiscount;
+  // 0원 이하는 0원 처리
+  const final = base - Math.min(totalDiscount, base);
   return final > 0 ? final : 0;
+}
+
+function getVoucherTotal(p: SelectedProduct): number {
+  const v = (p as any).voucherTotal;
+  const n = parseMoney(v);
+  return n > 0 ? n : 0;
 }
 
 export default function EstimateModal({
@@ -130,42 +174,81 @@ export default function EstimateModal({
 }: Props) {
   const [isOpen, setIsOpen] = useState(true);
   const [productList, setProductList] = useState(products);
+  const [multiProductVoucher, setMultiProductVoucher] = useState<{
+    total: number;
+    details: Array<{ type: string; amount: number; reason: string }>;
+  }>({ total: 0, details: [] });
   const router = useRouter();
 
   useEffect(() => {
     setProductList(products);
   }, [products]);
 
-  // ✅ 전체 합계
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const rules = await fetchVoucherRules();
+        if (!rules || cancelled) return;
+        const multiProduct = calcMultiProductVoucher({
+          voucherRules: rules as any,
+          products: productList.map((p) => ({
+            modelCode: p.모델코드,
+            multiProductCount: p.voucherMultiProductCount ?? 0,
+          })),
+        });
+        if (!cancelled) {
+          setMultiProductVoucher(multiProduct);
+        }
+      } catch (err) {
+        console.error("다품목 상품권 계산 오류:", err);
+        if (!cancelled) {
+          setMultiProductVoucher({ total: 0, details: [] });
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [productList]);
+
+  // 합계 계산
   const totalBasePrice = productList.reduce(
     (sum, p) => sum + calcBaseMonthly(p),
-    0
-  );
-  const totalFinalPrice = productList.reduce(
-    (sum, p) => sum + calcFinalMonthly(p),
-    0
+    0,
   );
 
-  // ✅ 총 할인 금액 = 각 상품별 (기준 - 혜택가)의 합
+  const totalVoucher = productList.reduce(
+    (sum, p) => sum + getVoucherTotal(p),
+    0,
+  );
+  const totalVoucherWithMultiProduct =
+    totalVoucher + (multiProductVoucher?.total ?? 0);
+
+  const totalFinalPrice = productList.reduce(
+    (sum, p) => sum + calcFinalMonthlyForSave(p),
+    0,
+  );
+
   const totalDiscount = productList.reduce((sum, p) => {
     const base = calcBaseMonthly(p);
-    const final = calcFinalMonthly(p);
+    const final = calcFinalMonthlyForSave(p);
     return sum + Math.max(base - final, 0);
   }, 0);
 
   const handleConfirmEstimate = async () => {
     try {
-      // 🔌 오프라인 상태였다면 네트워크 재활성화
       await enableNetwork(db);
 
-      // ⚠️ 선택된 제품이 없으면 저장 진행 X
       if (!productList || productList.length === 0) {
         alert("선택된 제품이 없습니다.");
         return;
       }
 
       function cleanData<T extends Record<string, unknown>>(
-        obj: T
+        obj: T,
       ): Partial<T> {
         const cleaned: Partial<T> = {};
         (Object.entries(obj) as [keyof T, T[keyof T]][]).forEach(([k, v]) => {
@@ -176,38 +259,45 @@ export default function EstimateModal({
         return cleaned;
       }
 
-      // 🔢 저장용도도 혜택가 합계 기준 (👉 productList 기준)
-      const safeTotalPrice = productList.reduce(
-        (sum, p) => sum + calcFinalMonthly(p),
-        0
-      );
+      const safeProducts = productList.map((p) => {
+        const base = calcBaseMonthly(p);
+        const discounts = getSaveDiscounts(p);
+        const final = calcFinalMonthlyForSave(p);
 
-      const safeProducts = productList.map((p) =>
-        cleanData({
+        return cleanData({
           모델코드: p.모델코드,
           상품명: p.상품명,
           thumbnailUrl: p.thumbnailUrl || "",
-          baseMonthly: calcBaseMonthly(p), // 기준 월 요금
-          finalPrice: calcFinalMonthly(p), // 혜택가 월 요금(최대혜택가)
+          baseMonthly: base,
+          finalPrice: final,
+          cardDiscount: discounts.cardDiscount,
+          teacherDiscount: discounts.teacherDiscount,
+          prepayMonthlyDiscount: discounts.prepayMonthlyDiscount,
+          selectedCardId: (p as any).selectedCardId ?? "",
+          selectedCardName: (p as any).selectedCardName ?? "",
+          selectedCardAmount: (p as any).selectedCardAmount ?? 0,
+          teacherSelections: (p as any).teacherSelections ?? {},
+          teacherTotalSeats: (p as any).teacherTotalSeats ?? 0,
+          teacherSelectionDetails: (p as any).teacherSelectionDetails ?? [],
+          prepayRate: (p as any).prepayRate ?? "",
+          prepayAmount: (p as any).prepayAmount ?? 0,
           selectedVariant: p.selectedVariant
             ? cleanData(p.selectedVariant as Record<string, unknown>)
             : undefined,
-        })
-      );
+          voucherTotal: getVoucherTotal(p),
+          voucherDetails: (p as any).voucherDetails ?? [],
+          voucherMultiProductCount: (p as any).voucherMultiProductCount ?? 0,
+        });
+      });
 
-      // ✅ 견적 type(중분류) 추출 (여러 개 가능)
-      //    - 각 상품에서 중분류(or type)를 뽑아서, 중복 제거한 배열로 관리
       const typeList = productList.map((p) => {
         const anyP = p as any;
         return anyP?.중분류 || anyP?.type || "unknown";
       });
 
-      // 중복 제거
       const estimateTypes = Array.from(new Set(typeList));
-      // 이전 호환용: 첫 번째 type도 같이 남겨두고 싶으면
       const primaryEstimateType = estimateTypes[0] || "unknown";
 
-      // ✅ 현재 로그인 유저 정보에서 매니저인지 확인
       const { getAuth } = await import("firebase/auth");
       const auth = getAuth();
       const currentUser = auth.currentUser;
@@ -217,6 +307,8 @@ export default function EstimateModal({
         managerId: string;
         name: string;
         branch: string;
+        region: string;
+        office: string;
       } | null = null;
 
       if (currentUser) {
@@ -229,20 +321,34 @@ export default function EstimateModal({
               managerId: userData.managerId ?? "",
               name: userData.name ?? "",
               branch: userData.branch ?? "",
+              region: userData.region ?? "",
+              office: userData.office ?? userData.branch ?? "",
             };
           }
         }
       }
 
-      // 🔹 기본 payload + 매니저 정보 포함
+      const safeTotalFinal = productList.reduce(
+        (sum, p) => sum + calcFinalMonthlyForSave(p),
+        0,
+      );
+      const safeTotalBase = productList.reduce(
+        (sum, p) => sum + calcBaseMonthly(p),
+        0,
+      );
+      const safeTotalDiscount = Math.max(safeTotalBase - safeTotalFinal, 0);
+
       const payload: any = {
         products: safeProducts,
-        totalBasePrice, // 기준 이용 요금(월 합계) → 이미 productList 기준으로 계산된 값
-        totalFinalPrice: safeTotalPrice, // 혜택가 월 합계
-        totalDiscount: Math.max(totalBasePrice - safeTotalPrice, 0),
-        estimateTypes, // ✅ 이 견적에 포함된 전체 type 리스트
-        primaryEstimateType, // ✅ 대표 type (기존 단일 타입이 필요할 수 있어서)
+        totalBasePrice: safeTotalBase,
+        totalFinalPrice: safeTotalFinal,
+        totalDiscount: safeTotalDiscount,
+        estimateTypes,
+        primaryEstimateType,
         createdAt: new Date(),
+        totalVoucher: totalVoucherWithMultiProduct,
+        multiProductVoucherTotal: multiProductVoucher?.total ?? 0,
+        multiProductVoucherDetails: multiProductVoucher?.details ?? [],
       };
 
       if (managerMeta) {
@@ -252,19 +358,17 @@ export default function EstimateModal({
         payload.managerBranch = managerMeta.branch;
       }
 
-      // ✅ 견적 본문 저장
       const docRef = await addDoc(collection(db, "estimates"), payload);
 
-      // ✅ 애널리틱스: estimatesCount 컬렉션 업데이트
-      //    👉 여러 type이 있을 수 있으니, 각 type마다 카운트 증가
       const analyticsTasks: Promise<unknown>[] = [];
       const estimatesCountCol = collection(db, "estimatesCount");
+      const managerCategoryStatsCol = collection(db, "managerCategoryStats");
+      const managerProductStatsCol = collection(db, "managerProductStats");
       const now = new Date();
 
       estimateTypes.forEach((type) => {
         const safeType = type || "unknown";
 
-        // 1) 전체 type 기준 카운트
         analyticsTasks.push(
           setDoc(
             doc(estimatesCountCol, `type_${safeType}`),
@@ -274,14 +378,13 @@ export default function EstimateModal({
               lastEstimateId: docRef.id,
               updatedAt: now,
             },
-            { merge: true }
-          )
+            { merge: true },
+          ),
         );
 
         if (managerMeta) {
           const { uid, managerId, name, branch } = managerMeta;
 
-          // 2) 매니저별 type 카운트
           analyticsTasks.push(
             setDoc(
               doc(estimatesCountCol, `manager_${uid}_${safeType}`),
@@ -295,11 +398,10 @@ export default function EstimateModal({
                 lastEstimateId: docRef.id,
                 updatedAt: now,
               },
-              { merge: true }
-            )
+              { merge: true },
+            ),
           );
 
-          // 3) 지점별 type 카운트
           if (branch) {
             analyticsTasks.push(
               setDoc(
@@ -311,14 +413,69 @@ export default function EstimateModal({
                   lastEstimateId: docRef.id,
                   updatedAt: now,
                 },
-                { merge: true }
-              )
+                { merge: true },
+              ),
             );
           }
         }
       });
 
-      // 🔄 애널리틱스 병렬 처리 (UI 반응성 위해 한 번에)
+      if (managerMeta) {
+        const { uid, managerId, name, branch, region, office } = managerMeta;
+
+        productList.forEach((p) => {
+          const anyP = p as any;
+          const productType = anyP?.중분류 || anyP?.type || primaryEstimateType;
+          const safeProductType = productType || "unknown";
+          const modelCode = anyP?.모델코드 || "unknown";
+          const productName = anyP?.상품명 || "";
+
+          analyticsTasks.push(
+            setDoc(
+              doc(
+                managerCategoryStatsCol,
+                `manager_${uid}_category_${safeProductType}`,
+              ),
+              {
+                type: safeProductType,
+                managerUid: uid,
+                managerId,
+                managerName: name,
+                branch,
+                region,
+                office,
+                estimateCount: increment(1),
+                updatedAt: serverTimestamp(),
+              },
+              { merge: true },
+            ),
+          );
+
+          analyticsTasks.push(
+            setDoc(
+              doc(
+                managerProductStatsCol,
+                `manager_${uid}_product_${modelCode}`,
+              ),
+              {
+                type: safeProductType,
+                modelCode,
+                productName,
+                managerUid: uid,
+                managerId,
+                managerName: name,
+                branch,
+                region,
+                office,
+                estimateCount: increment(1),
+                updatedAt: serverTimestamp(),
+              },
+              { merge: true },
+            ),
+          );
+        });
+      }
+
       if (analyticsTasks.length > 0) {
         await Promise.all(analyticsTasks);
       }
@@ -351,12 +508,12 @@ export default function EstimateModal({
       <ModalWrap>
         <Header>
           <HeaderTop>
-            <Title>제품 견적 비교하기</Title>
+            <Title>상품 견적 비교하기</Title>
           </HeaderTop>
           <Desc>
-            ※ 기존 가전 구독/케어십 고객이 다른 제품군을 추가 구독하거나, 2개
-            이상의 제품군을 동시에 신규 구독 시 결합할인 혜택을 드립니다. (최대
-            5% 혜택, 제품 별로 상이)
+            기존 가전 구독/케어십 고객이 다른 상품군을 추가 구독하거나 2개 이상의
+            상품군을 동시에 구독할 때 결합할인 혜택을 드립니다. (최대 5% 할인,
+            상품별 상이)
           </Desc>
         </Header>
 
@@ -364,14 +521,16 @@ export default function EstimateModal({
           <ProductList>
             <ProductSlide>
               {productList.map((p) => {
-                const base = calcBaseMonthly(p); // 👉 월 기준 이용요금
+                const base = calcBaseMonthly(p);
+                const final = calcFinalMonthlyForSave(p);
 
+                console.log(p);
                 return (
                   <ProductItem key={p.모델코드}>
                     <ImageWrap>
                       <StyledImage
                         src={p.thumbnailUrl || "/placeholder.png"}
-                        alt={p.상품명 || "제품 이미지"}
+                        alt={p.상품명 || "상품 이미지"}
                         width={120}
                         height={120}
                         unoptimized
@@ -381,27 +540,52 @@ export default function EstimateModal({
                       <ProductName>{p.상품명}</ProductName>
                       <ProductModel>{p.모델코드}</ProductModel>
 
-                      {/* 👉 월 기준 이용요금만 노출 */}
                       <ProductBenefit>
-                        월 <b>{base.toLocaleString()}</b>원
+                        기본 월 요금 <b>{base.toLocaleString()}</b>원
+                        <br />
+                        <span style={{ color: "#ea1917" }}>
+                          월 청구금액 <b>{final.toLocaleString()}</b>원
+                        </span>
+                        {/* 상품권 표시 */}
+                        {getVoucherTotal(p) > 0 && (
+                          <>
+                            <VoucherLine>
+                              지급 상품권{" "}
+                              <b>{getVoucherTotal(p).toLocaleString()}</b>원
+                            </VoucherLine>
+                            {Array.isArray((p as any).voucherDetails) &&
+                              (p as any).voucherDetails.length > 0 && (
+                                <VoucherDetail>
+                                  {(p as any).voucherDetails
+                                    .filter((d: any) => parseMoney(d?.amount) > 0)
+                                    .map((d: any, idx: number) => (
+                                      <p key={`${p.모델코드}-voucher-${idx}`}>
+                                        - {d.type}:{" "}
+                                        {parseMoney(d.amount).toLocaleString()}원
+                                      </p>
+                                    ))}
+                                </VoucherDetail>
+                              )}
+                          </>
+                        )}
                       </ProductBenefit>
                     </ProductInfo>
                     <RemoveButton onClick={() => onRemove(p.모델코드)}>
-                      ✕
+                      ×
                     </RemoveButton>
                   </ProductItem>
                 );
               })}
               {productList.length === 0 && (
-                <EmptyBox>선택된 제품이 없습니다.</EmptyBox>
+                <EmptyBox>선택된 상품이 없습니다.</EmptyBox>
               )}
             </ProductSlide>
           </ProductList>
 
           <Summary>
             <Total>
-              <span>기준 이용 요금</span>
-              <b>월 {totalBasePrice.toLocaleString()}원</b>
+              <span>기본 월 요금</span>
+              <b>{totalBasePrice.toLocaleString()}원</b>
             </Total>
 
             <SaleWrap>
@@ -410,9 +594,31 @@ export default function EstimateModal({
                 <p>-{totalDiscount.toLocaleString()}원</p>
               </CardsSale>
               <TotalSale>
-                <p>최대 혜택가 월</p>
+                <p>월 청구금액</p>
                 <p>{totalFinalPrice.toLocaleString()}원</p>
               </TotalSale>
+
+              {(
+                <VoucherTotalBox>
+                  <span>총 지급 상품권</span>
+                  <b>{totalVoucherWithMultiProduct.toLocaleString()}원</b>
+                </VoucherTotalBox>
+              )}
+              {multiProductVoucher?.total > 0 && (
+                <VoucherLine>
+                  다품목 상품권{" "}
+                  <b>{multiProductVoucher.total.toLocaleString()}</b>원
+                </VoucherLine>
+              )}
+              {multiProductVoucher?.details?.length > 0 && (
+                <VoucherDetail>
+                  {multiProductVoucher.details.map((d, idx) => (
+                    <p key={`multi-voucher-${idx}`}>
+                      - {d.type}: {parseMoney(d.amount).toLocaleString()}원
+                    </p>
+                  ))}
+                </VoucherDetail>
+              )}
             </SaleWrap>
 
             <ConfirmButton onClick={handleConfirmEstimate}>
@@ -425,7 +631,7 @@ export default function EstimateModal({
   );
 }
 
-/* ✅ Styled Components (디자인 완전 유지) */
+/* Styled Components */
 
 const ModalContainer = styled.div`
   position: fixed;
@@ -631,7 +837,7 @@ const Summary = styled.div`
   padding: 24px 32px;
   background: #f6f6f6;
   border-radius: 8px;
-  height: 250px;
+  height: 270px;
   display: flex;
   gap: 0px;
   flex-direction: column;
@@ -701,6 +907,7 @@ const ConfirmButton = styled.button`
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
+  margin-top: 1px;
 
   &:hover {
     background-color: #c91515;
@@ -719,3 +926,47 @@ const SummaryBottom = styled.div`
     font-size: 12px;
   }
 `;
+
+const VoucherLine = styled.div`
+  margin-top: 6px;
+  font-size: 13px;
+  color: #666;
+
+  b {
+    font-weight: 500;
+  }
+`;
+
+const VoucherTotalBox = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  span {
+    font-size: 14px;
+    color: #666;
+  }
+
+  b {
+    font-size: 16px;
+    font-weight: 500;
+    color: #666;
+  }
+`;
+
+const VoucherDetail = styled.div`
+  margin-top: 6px;
+  font-size: 12px;
+  color: #666;
+
+  p {
+    margin: 2px 0;
+  }
+`;
+
+
+
+
+
+
+

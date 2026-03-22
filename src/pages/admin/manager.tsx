@@ -1,33 +1,36 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+﻿/* eslint-disable @typescript-eslint/no-explicit-any */
 // pages/admin/managers.tsx
 
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
-import { db, app } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
 import {
   collection,
   getDocs,
-  addDoc, // 👉 원본에 있던 import는 그대로 둠 (현재는 사용 X)
   updateDoc,
   doc,
   serverTimestamp,
   orderBy,
   query,
   where,
-  setDoc,
 } from "firebase/firestore";
-import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
+import {
+  getBoardCategoryFullLabel,
+  getSalesIndexedCategoryIds,
+} from "@/config/boardCategories";
 
 type Manager = {
   id: string; // Firestore 문서 ID (== Auth uid)
   managerId: string;
   email: string;
-  password?: string; // ⚠️ 실서비스에서는 해시 권장
+  password?: string;
   name: string;
-  branch: string;
-  uniqueCode: string;
+  position: string;
+  region: string;
+  office: string;
+  teamLeaderId: string;
   memo: string;
   isActive: boolean;
   createdAt?: any;
@@ -39,28 +42,50 @@ const ManagerManagementPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 생성/수정 모달 상태
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingManager, setEditingManager] = useState<Manager | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const MANAGER_AUTH_EMAIL_SUFFIX = "@co.kr";
-  const MANAGER_AUTH_COMMON_PASSWORD = "q1w2e3r4@@!!@@";
+  const DEFAULT_MANAGER_PASSWORD = "123456";
 
-  // 폼 상태
   const [form, setForm] = useState({
     managerId: "",
     email: "",
-    password: "",
+    password: DEFAULT_MANAGER_PASSWORD,
     name: "",
-    branch: "",
-    uniqueCode: "",
+    position: "",
+    region: "",
+    office: "",
+    teamLeaderId: "",
     memo: "",
   });
 
-  const auth = getAuth(app);
+  const [searchField, setSearchField] = useState<
+    "region" | "office" | "teamLeaderId" | "managerId" | "name"
+  >("name");
+  const [searchValue, setSearchValue] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [deduping, setDeduping] = useState(false);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 30;
 
-  // ✅ 매니저 리스트 불러오기 (users 컬렉션 + role === "manager")
+  const [statsManager, setStatsManager] = useState<Manager | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsError, setStatsError] = useState<string | null>(null);
+  const [statsSummary, setStatsSummary] = useState({
+    totalViews: 0,
+    totalShares: 0,
+  });
+  const [statsRows, setStatsRows] = useState<
+    {
+      postId: string;
+      title: string;
+      categoryId: string;
+      viewCount: number;
+      shareCount: number;
+    }[]
+  >([]);
+
   useEffect(() => {
     const fetchManagers = async () => {
       try {
@@ -70,7 +95,7 @@ const ManagerManagementPage: React.FC = () => {
         const q = query(
           collection(db, "users"),
           where("role", "==", "manager"),
-          orderBy("createdAt", "desc")
+          orderBy("createdAt", "desc"),
         );
 
         const snap = await getDocs(q);
@@ -82,8 +107,10 @@ const ManagerManagementPage: React.FC = () => {
             email: data.email ?? "",
             password: data.password ?? "",
             name: data.name ?? "",
-            branch: data.branch ?? "",
-            uniqueCode: data.uniqueCode ?? "",
+            position: data.position ?? "",
+            region: data.region ?? "",
+            office: data.office ?? data.branch ?? "",
+            teamLeaderId: data.teamLeaderId ?? "",
             memo: data.memo ?? "",
             isActive: data.isActive ?? true,
             createdAt: data.createdAt,
@@ -103,16 +130,17 @@ const ManagerManagementPage: React.FC = () => {
     fetchManagers();
   }, []);
 
-  // ✅ 폼 열기 (생성 / 수정 공용)
   const openCreateModal = () => {
     setEditingManager(null);
     setForm({
       managerId: "",
       email: "",
-      password: "",
+      password: DEFAULT_MANAGER_PASSWORD,
       name: "",
-      branch: "",
-      uniqueCode: "",
+      position: "",
+      region: "",
+      office: "",
+      teamLeaderId: "",
       memo: "",
     });
     setIsModalOpen(true);
@@ -123,10 +151,12 @@ const ManagerManagementPage: React.FC = () => {
     setForm({
       managerId: manager.managerId,
       email: manager.email,
-      password: "", // 수정 시에는 비밀번호는 비워두고, Auth 비번은 변경하지 않음
+      password: manager.password ?? DEFAULT_MANAGER_PASSWORD,
       name: manager.name,
-      branch: manager.branch,
-      uniqueCode: manager.uniqueCode,
+      position: manager.position,
+      region: manager.region,
+      office: manager.office,
+      teamLeaderId: manager.teamLeaderId,
       memo: manager.memo,
     });
     setIsModalOpen(true);
@@ -137,9 +167,8 @@ const ManagerManagementPage: React.FC = () => {
     setIsModalOpen(false);
   };
 
-  // ✅ 폼 입력 변경
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = e.target;
     setForm((prev) => ({
@@ -148,107 +177,60 @@ const ManagerManagementPage: React.FC = () => {
     }));
   };
 
-  // ✅ 생성/수정 저장
-  // ✅ 생성/수정 저장
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const isEdit = !!editingManager;
 
-    if (!form.managerId || !form.name || !form.branch) {
-      alert("매니저 아이디, 매니저명, 지점은 필수입니다.");
+    if (!form.managerId || !form.name) {
+      alert("업무등록번호/사용자명은 필수입니다.");
       return;
     }
 
-    if (!isEdit) {
-      // ✅ 신규 생성 시에는 "로그인용 비밀번호"만 필수
-      if (!form.password) {
-        alert("신규 매니저 생성 시 로그인 비밀번호는 필수입니다.");
-        return;
-      }
+    if (!form.password) {
+      alert("로그인 비밀번호는 필수입니다.");
+      return;
     }
 
     setSaving(true);
 
     try {
-      if (isEdit && editingManager) {
-        // ✏️ 수정: Auth 계정(email/password)은 건드리지 않고, Firestore 메타 정보만 수정
-        const ref = doc(db, "users", editingManager.id);
-        await updateDoc(ref, {
-          managerId: form.managerId,
-          // email은 여기서 변경하지 않음 (Auth와 동기화 필요하기 때문)
-          name: form.name,
-          branch: form.branch,
-          uniqueCode: form.uniqueCode,
-          memo: form.memo,
-          updatedAt: serverTimestamp(),
-        });
+      const payload = {
+        uid: isEdit ? editingManager?.id : null,
+        managerId: form.managerId.trim(),
+        password: form.password.trim(),
+        name: form.name.trim(),
+        position: form.position.trim(),
+        region: form.region.trim(),
+        office: form.office.trim(),
+        teamLeaderId: form.teamLeaderId.trim(),
+        memo: form.memo.trim(),
+        isActive: editingManager?.isActive ?? true,
+      };
 
+      const response = await fetch("/api/admin/managers/upsert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || "upsert failed");
+      }
+
+      const result = await response.json();
+      const saved = result?.manager as Manager | undefined;
+      if (!saved) {
+        throw new Error("manager save response missing");
+      }
+
+      if (isEdit && editingManager) {
         setManagers((prev) =>
-          prev.map((m) =>
-            m.id === editingManager.id
-              ? {
-                  ...m,
-                  managerId: form.managerId,
-                  // email은 그대로 유지
-                  name: form.name,
-                  branch: form.branch,
-                  uniqueCode: form.uniqueCode,
-                  memo: form.memo,
-                }
-              : m
-          )
+          prev.map((m) => (m.id === saved.id ? { ...m, ...saved } : m)),
         );
       } else {
-        // ➕ 신규 생성
-        const now = serverTimestamp();
-
-        // ✅ 매니저 아이디 기반으로 Auth용 이메일/비밀번호 생성
-        const authEmail = `${form.managerId}${MANAGER_AUTH_EMAIL_SUFFIX}`;
-        const commonPassword = MANAGER_AUTH_COMMON_PASSWORD; // 공통 비밀번호
-
-        // 1) Firebase Auth 계정 생성 (authEmail + 공통 비밀번호)
-        const cred = await createUserWithEmailAndPassword(
-          auth,
-          authEmail,
-          commonPassword
-        );
-        const uid = cred.user.uid;
-
-        // 2) users/{uid} 문서 생성 (role: "manager")
-        const ref = doc(db, "users", uid);
-        await setDoc(ref, {
-          managerId: form.managerId,
-          // 🔹 Auth와 맞추기 위해 Firestore에도 authEmail을 저장
-          email: authEmail,
-          // 🔹 여기는 "매니저가 로그인할 때 입력하는 비밀번호" (예: 123123)
-          //    로그인 페이지에서 managerId + password 검증 후
-          //    Auth에는 공통 비밀번호로 로그인
-          password: form.password,
-          name: form.name,
-          branch: form.branch,
-          uniqueCode: form.uniqueCode,
-          memo: form.memo,
-          role: "manager",
-          isActive: true,
-          createdAt: now,
-          updatedAt: now,
-        });
-
-        setManagers((prev) => [
-          {
-            id: uid,
-            managerId: form.managerId,
-            email: authEmail,
-            password: form.password,
-            name: form.name,
-            branch: form.branch,
-            uniqueCode: form.uniqueCode,
-            memo: form.memo,
-            isActive: true,
-          },
-          ...prev,
-        ]);
+        setManagers((prev) => [saved, ...prev]);
       }
 
       setIsModalOpen(false);
@@ -260,15 +242,13 @@ const ManagerManagementPage: React.FC = () => {
     }
   };
 
-  // ✅ 활동 정지/해제 토글
   const handleToggleActive = async (manager: Manager) => {
     const nextActive = !manager.isActive;
 
-    // UI 반응성 위해 낙관적 업데이트
     setManagers((prev) =>
       prev.map((m) =>
-        m.id === manager.id ? { ...m, isActive: nextActive } : m
-      )
+        m.id === manager.id ? { ...m, isActive: nextActive } : m,
+      ),
     );
 
     try {
@@ -278,61 +258,369 @@ const ManagerManagementPage: React.FC = () => {
         updatedAt: serverTimestamp(),
       });
     } catch (err: any) {
-      console.error("활동 상태 변경 오류:", err);
-      alert("활동 상태 변경 중 오류가 발생했습니다.");
+      console.error("활성 상태 변경 오류:", err);
+      alert("활성 상태 변경 중 오류가 발생했습니다.");
 
-      // 실패 시 롤백
       setManagers((prev) =>
         prev.map((m) =>
-          m.id === manager.id ? { ...m, isActive: manager.isActive } : m
-        )
+          m.id === manager.id ? { ...m, isActive: manager.isActive } : m,
+        ),
       );
     }
   };
+
+  const handleImportManagers = async () => {
+    if (importing) return;
+    if (!confirm("managerList.json 파일 기준으로 일괄등록을 진행할까요?")) return;
+
+    try {
+      setImporting(true);
+      const response = await fetch("/api/admin/managers/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ defaultPassword: DEFAULT_MANAGER_PASSWORD }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result?.error || "import failed");
+      }
+
+      alert(
+        `일괄등록 완료\n신규: ${result.created}\n업데이트: ${result.updated}\n스킵: ${result.skipped}\n오류: ${result.errors}`,
+      );
+
+      setLoading(true);
+      const q = query(
+        collection(db, "users"),
+        where("role", "==", "manager"),
+        orderBy("createdAt", "desc"),
+      );
+      const snap = await getDocs(q);
+      const list: Manager[] = snap.docs.map((d) => {
+        const data = d.data() as any;
+        return {
+          id: d.id,
+          managerId: data.managerId ?? "",
+          email: data.email ?? "",
+          password: data.password ?? "",
+          name: data.name ?? "",
+          position: data.position ?? "",
+          region: data.region ?? "",
+          office: data.office ?? data.branch ?? "",
+          teamLeaderId: data.teamLeaderId ?? "",
+          memo: data.memo ?? "",
+          isActive: data.isActive ?? true,
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt,
+        };
+      });
+      setManagers(list);
+    } catch (err: any) {
+      console.error("일괄등록 오류:", err);
+      alert("일괄등록 중 오류가 발생했습니다.");
+    } finally {
+      setImporting(false);
+      setLoading(false);
+    }
+  };
+
+  const handleDeduplicateManagers = async () => {
+    if (deduping) return;
+    if (!confirm("업무등록번호 기준으로 중복 계정을 점검/삭제할까요?")) return;
+
+    try {
+      setDeduping(true);
+      const response = await fetch("/api/admin/managers/dedupe", {
+        method: "POST",
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result?.error || "dedupe failed");
+      }
+
+      alert(
+        `점검 완료\n스캔: ${result.scanned}\n중복: ${result.duplicates}\n삭제: ${result.removed}`,
+      );
+
+      setLoading(true);
+      const q = query(
+        collection(db, "users"),
+        where("role", "==", "manager"),
+        orderBy("createdAt", "desc"),
+      );
+      const snap = await getDocs(q);
+      const list: Manager[] = snap.docs.map((d) => {
+        const data = d.data() as any;
+        return {
+          id: d.id,
+          managerId: data.managerId ?? "",
+          email: data.email ?? "",
+          password: data.password ?? "",
+          name: data.name ?? "",
+          position: data.position ?? "",
+          region: data.region ?? "",
+          office: data.office ?? data.branch ?? "",
+          teamLeaderId: data.teamLeaderId ?? "",
+          memo: data.memo ?? "",
+          isActive: data.isActive ?? true,
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt,
+        };
+      });
+      setManagers(list);
+    } catch (err: any) {
+      console.error("중복 점검 오류:", err);
+      alert("중복 점검 중 오류가 발생했습니다.");
+    } finally {
+      setDeduping(false);
+      setLoading(false);
+    }
+  };
+
+  const handleOpenStats = async (manager: Manager) => {
+    setStatsManager(manager);
+    setStatsLoading(true);
+    setStatsError(null);
+    setStatsSummary({ totalViews: 0, totalShares: 0 });
+    setStatsRows([]);
+
+    try {
+      const salesCategoryIds = Array.from(
+        new Set(getSalesIndexedCategoryIds()),
+      );
+      if (salesCategoryIds.length === 0) {
+        setStatsSummary({ totalViews: 0, totalShares: 0 });
+        setStatsRows([]);
+        setStatsLoading(false);
+        return;
+      }
+
+      const chunkSize = 10;
+      const postSnaps = [];
+      for (let i = 0; i < salesCategoryIds.length; i += chunkSize) {
+        const chunk = salesCategoryIds.slice(i, i + chunkSize);
+        const postsQuery = query(
+          collection(db, "boardPosts"),
+          where("categoryId", "in", chunk),
+        );
+        const postsSnap = await getDocs(postsQuery);
+        postSnaps.push(postsSnap);
+      }
+
+      const posts = postSnaps.flatMap((postsSnap) =>
+        postsSnap.docs.map((docSnap) => {
+          const data = docSnap.data() as any;
+          return {
+            id: docSnap.id,
+            title: data.title ?? "(제목 없음)",
+            categoryId: data.categoryId ?? "",
+          };
+        }),
+      );
+
+      const activityQuery = query(
+        collection(db, "boardPostActivity"),
+        where("managerUid", "==", manager.id),
+      );
+      const activitySnap = await getDocs(activityQuery);
+      const activityMap = new Map<
+        string,
+        { viewCount: number; shareCount: number }
+      >();
+      activitySnap.docs.forEach((docSnap) => {
+        const data = docSnap.data() as any;
+        if (!data.postId) return;
+        activityMap.set(data.postId, {
+          viewCount: Number(data.viewCount ?? 0),
+          shareCount: Number(data.shareCount ?? 0),
+        });
+      });
+
+      let totalViews = 0;
+      let totalShares = 0;
+      const rows = posts.map((post) => {
+        const activity = activityMap.get(post.id) ?? {
+          viewCount: 0,
+          shareCount: 0,
+        };
+        totalViews += activity.viewCount;
+        totalShares += activity.shareCount;
+        return {
+          postId: post.id,
+          title: post.title,
+          categoryId: post.categoryId,
+          viewCount: activity.viewCount,
+          shareCount: activity.shareCount,
+        };
+      });
+
+      setStatsSummary({ totalViews, totalShares });
+      setStatsRows(rows);
+    } catch (err: any) {
+      console.error("학습현황 조회 오류:", err);
+      setStatsError("학습현황을 불러오는 중 오류가 발생했습니다.");
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  const filteredManagers = useMemo(() => {
+    const keyword = searchValue.trim().toLowerCase();
+    if (!keyword) return managers;
+
+    return managers.filter((manager) => {
+      const valueMap = {
+        region: manager.region,
+        office: manager.office,
+        teamLeaderId: manager.teamLeaderId,
+        managerId: manager.managerId,
+        name: manager.name,
+      };
+      const target = (valueMap[searchField] ?? "").toLowerCase();
+      return target.includes(keyword);
+    });
+  }, [managers, searchField, searchValue]);
+
+  const totalPages = useMemo(() => {
+    if (searchValue.trim()) return 1;
+    return Math.max(1, Math.ceil(managers.length / PAGE_SIZE));
+  }, [managers.length, searchValue]);
+
+  const pagedManagers = useMemo(() => {
+    if (searchValue.trim()) return filteredManagers;
+    const start = (page - 1) * PAGE_SIZE;
+    return managers.slice(start, start + PAGE_SIZE);
+  }, [filteredManagers, managers, page, searchValue]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchField, searchValue, managers.length]);
+
+  const regionOptions = useMemo(
+    () =>
+      Array.from(new Set(managers.map((m) => m.region).filter(Boolean))).sort(),
+    [managers],
+  );
+  const officeOptions = useMemo(
+    () =>
+      Array.from(new Set(managers.map((m) => m.office).filter(Boolean))).sort(),
+    [managers],
+  );
+  const teamLeaderOptions = useMemo(
+    () =>
+      Array.from(new Set(managers.map((m) => m.teamLeaderId).filter(Boolean))).sort(),
+    [managers],
+  );
 
   return (
     <PageWrapper>
       <HeaderRow>
         <Title>매니저 관리</Title>
-        <CreateButton type="button" onClick={openCreateModal}>
-          + 매니저 계정 생성
-        </CreateButton>
+        <HeaderActions>
+          <CreateButton
+            type="button"
+            onClick={handleImportManagers}
+            disabled={importing}
+          >
+            {importing ? "일괄등록 중..." : "일괄등록"}
+          </CreateButton>
+          <CreateButton
+            type="button"
+            onClick={handleDeduplicateManagers}
+            disabled={deduping}
+          >
+            {deduping ? "점검 중..." : "점검"}
+          </CreateButton>
+          <CreateButton type="button" onClick={openCreateModal}>
+            + 개별등록
+          </CreateButton>
+        </HeaderActions>
       </HeaderRow>
+
+      <SearchRow>
+        <SearchSelect
+          value={searchField}
+          onChange={(e) =>
+            setSearchField(e.target.value as typeof searchField)
+          }
+        >
+          <option value="name">사용자</option>
+          <option value="managerId">업무등록번호</option>
+          <option value="region">권역</option>
+          <option value="office">사무소</option>
+          <option value="teamLeaderId">담당팀장</option>
+        </SearchSelect>
+        <SearchInput
+          value={searchValue}
+          onChange={(e) => setSearchValue(e.target.value)}
+          placeholder="검색어를 입력하세요."
+          list={
+            searchField === "region"
+              ? "regionOptions"
+              : searchField === "office"
+                ? "officeOptions"
+                : searchField === "teamLeaderId"
+                  ? "teamLeaderOptions"
+                  : undefined
+          }
+        />
+        <SearchHint>카테고리별로 검색할 수 있습니다.</SearchHint>
+        <datalist id="regionOptions">
+          {regionOptions.map((value) => (
+            <option key={value} value={value} />
+          ))}
+        </datalist>
+        <datalist id="officeOptions">
+          {officeOptions.map((value) => (
+            <option key={value} value={value} />
+          ))}
+        </datalist>
+        <datalist id="teamLeaderOptions">
+          {teamLeaderOptions.map((value) => (
+            <option key={value} value={value} />
+          ))}
+        </datalist>
+      </SearchRow>
 
       {loading && <InfoText>매니저 목록을 불러오는 중입니다...</InfoText>}
       {error && <ErrorText>{error}</ErrorText>}
 
-      {!loading && !error && managers.length === 0 && (
+      {!loading && !error && filteredManagers.length === 0 && (
         <InfoText>등록된 매니저 계정이 없습니다.</InfoText>
       )}
 
-      {!loading && !error && managers.length > 0 && (
+      {!loading && !error && filteredManagers.length > 0 && (
         <TableWrapper>
           <StyledTable>
             <thead>
               <tr>
                 <th>활성</th>
-                <th>매니저 아이디</th>
-                <th>매니저명</th>
-                <th>지점</th>
-                <th>고유번호</th>
+                <th>업무등록번호</th>
+                <th>사용자</th>
+                <th>직급</th>
+                <th>권역</th>
+                <th>사무소</th>
+                <th>담당팀장</th>
                 <th>메모</th>
                 <th>관리</th>
               </tr>
             </thead>
             <tbody>
-              {managers.map((m) => (
+              {pagedManagers.map((m) => (
                 <tr key={m.id}>
                   <td>
                     <StatusBadge $active={m.isActive}>
-                      {m.isActive ? "활성" : "정지"}
+                      {m.isActive ? "활성" : "비활성"}
                     </StatusBadge>
                   </td>
                   <td>{m.managerId}</td>
-                  <td>{m.email}</td>
                   <td>{m.name}</td>
-                  <td>{m.branch}</td>
-                  <td>{m.uniqueCode}</td>
+                  <td>{m.position}</td>
+                  <td>{m.region}</td>
+                  <td>{m.office}</td>
+                  <td>{m.teamLeaderId || "-"}</td>
                   <td>
                     <MemoText title={m.memo}>{m.memo}</MemoText>
                   </td>
@@ -346,10 +634,16 @@ const ManagerManagementPage: React.FC = () => {
                       </SmallButton>
                       <SmallButton
                         type="button"
+                        onClick={() => handleOpenStats(m)}
+                      >
+                        학습현황
+                      </SmallButton>
+                      <SmallButton
+                        type="button"
                         $danger={!m.isActive}
                         onClick={() => handleToggleActive(m)}
                       >
-                        {m.isActive ? "정지" : "활성화"}
+                        {m.isActive ? "비활성" : "활성"}
                       </SmallButton>
                     </RowActions>
                   </td>
@@ -360,7 +654,44 @@ const ManagerManagementPage: React.FC = () => {
         </TableWrapper>
       )}
 
-      {/* 생성/수정 모달 */}
+      {!loading && !error && !searchValue.trim() && managers.length > 0 && (
+        <PaginationRow>
+          <PaginationInfo>
+            전체 {managers.length}명 · {page}/{totalPages} 페이지
+          </PaginationInfo>
+          <PaginationControls>
+            <PageButton
+              type="button"
+              onClick={() => setPage(1)}
+              disabled={page === 1}
+            >
+              처음
+            </PageButton>
+            <PageButton
+              type="button"
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+              disabled={page === 1}
+            >
+              이전
+            </PageButton>
+            <PageButton
+              type="button"
+              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+              disabled={page === totalPages}
+            >
+              다음
+            </PageButton>
+            <PageButton
+              type="button"
+              onClick={() => setPage(totalPages)}
+              disabled={page === totalPages}
+            >
+              마지막
+            </PageButton>
+          </PaginationControls>
+        </PaginationRow>
+      )}
+
       {isModalOpen && (
         <ModalOverlay>
           <ModalContent>
@@ -373,36 +704,33 @@ const ManagerManagementPage: React.FC = () => {
               <ModalBody>
                 <FieldRow>
                   <Field>
-                    <FieldLabel>매니저 아이디 *</FieldLabel>
+                    <FieldLabel>업무등록번호*</FieldLabel>
                     <FieldInput
                       name="managerId"
                       value={form.managerId}
                       onChange={handleChange}
-                      placeholder="예: manager001"
+                      placeholder="예: H12345"
                     />
                   </Field>
                 </FieldRow>
 
                 <FieldRow>
                   <Field>
-                    <FieldLabel>
-                      패스워드 {editingManager ? "(변경 불가)" : "*"}
-                    </FieldLabel>
+                    <FieldLabel>비밀번호(생년월일 6자리)*</FieldLabel>
                     <FieldInput
-                      type="text"
+                      type="password"
                       name="password"
                       value={form.password}
                       onChange={handleChange}
                       placeholder={
                         editingManager
-                          ? "기존 비밀번호는 변경 화면에서 관리해주세요."
-                          : "로그인에 사용할 패스워드"
+                          ? "생년월일 6자리로 수정할 수 있습니다."
+                          : "기본값 123456"
                       }
-                      disabled={!!editingManager} // 수정 시에는 비밀번호 변경 X
                     />
                   </Field>
                   <Field>
-                    <FieldLabel>매니저명 *</FieldLabel>
+                    <FieldLabel>사용자*</FieldLabel>
                     <FieldInput
                       name="name"
                       value={form.name}
@@ -414,21 +742,42 @@ const ManagerManagementPage: React.FC = () => {
 
                 <FieldRow>
                   <Field>
-                    <FieldLabel>지점 *</FieldLabel>
+                    <FieldLabel>직급</FieldLabel>
                     <FieldInput
-                      name="branch"
-                      value={form.branch}
+                      name="position"
+                      value={form.position}
                       onChange={handleChange}
-                      placeholder="예: 서울지점"
+                      placeholder="예: 파트장"
                     />
                   </Field>
                   <Field>
-                    <FieldLabel>고유번호</FieldLabel>
+                    <FieldLabel>권역</FieldLabel>
                     <FieldInput
-                      name="uniqueCode"
-                      value={form.uniqueCode}
+                      name="region"
+                      value={form.region}
                       onChange={handleChange}
-                      placeholder="내부용 고유번호"
+                      placeholder="예: B2B_B"
+                    />
+                  </Field>
+                </FieldRow>
+
+                <FieldRow>
+                  <Field>
+                    <FieldLabel>사무소</FieldLabel>
+                    <FieldInput
+                      name="office"
+                      value={form.office}
+                      onChange={handleChange}
+                      placeholder="예: 강남사무소"
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel>담당팀장</FieldLabel>
+                    <FieldInput
+                      name="teamLeaderId"
+                      value={form.teamLeaderId}
+                      onChange={handleChange}
+                      placeholder="예: H01064"
                     />
                   </Field>
                 </FieldRow>
@@ -456,13 +805,71 @@ const ManagerManagementPage: React.FC = () => {
                 </ModalButton>
                 <ModalButtonPrimary type="submit" disabled={saving}>
                   {saving
-                    ? "저장 중..."
+                    ? "저장 중.."
                     : editingManager
-                    ? "수정 완료"
-                    : "생성"}
+                      ? "수정 완료"
+                      : "생성"}
                 </ModalButtonPrimary>
               </ModalFooter>
             </form>
+          </ModalContent>
+        </ModalOverlay>
+      )}
+
+      {statsManager && (
+        <ModalOverlay>
+          <ModalContent>
+            <ModalHeader>
+              <ModalTitle>{statsManager.name} 학습현황</ModalTitle>
+            </ModalHeader>
+            <ModalBody>
+              {statsLoading && (
+                <InfoText>학습현황을 불러오는 중입니다...</InfoText>
+              )}
+              {statsError && <ErrorText>{statsError}</ErrorText>}
+              {!statsLoading && !statsError && (
+                <>
+                  <StatsSummary>
+                    <StatsCard>
+                      <StatsLabel>페이지 열람 횟수</StatsLabel>
+                      <StatsValue>{statsSummary.totalViews}</StatsValue>
+                    </StatsCard>
+                    <StatsCard>
+                      <StatsLabel>페이지 공유 횟수</StatsLabel>
+                      <StatsValue>{statsSummary.totalShares}</StatsValue>
+                    </StatsCard>
+                  </StatsSummary>
+
+                  <StatsTable>
+                    <thead>
+                      <tr>
+                        <th>카테고리</th>
+                        <th>게시글</th>
+                        <th>열람</th>
+                        <th>공유</th>
+                        <th>열람여부</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {statsRows.map((row) => (
+                        <tr key={row.postId}>
+                          <td>{getBoardCategoryFullLabel(row.categoryId)}</td>
+                          <td>{row.title}</td>
+                          <td>{row.viewCount}</td>
+                          <td>{row.shareCount}</td>
+                          <td>{row.viewCount > 0 ? "열람" : "미열람"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </StatsTable>
+                </>
+              )}
+            </ModalBody>
+            <ModalFooter>
+              <ModalButton type="button" onClick={() => setStatsManager(null)}>
+                닫기
+              </ModalButton>
+            </ModalFooter>
           </ModalContent>
         </ModalOverlay>
       )}
@@ -472,11 +879,10 @@ const ManagerManagementPage: React.FC = () => {
 
 export default ManagerManagementPage;
 
-// ===== styled-components 쪽은 원래 코드 그대로 사용 =====
-
 const PageWrapper = styled.div`
   display: flex;
   flex-direction: column;
+  padding: 25px;
 `;
 
 const HeaderRow = styled.div`
@@ -484,6 +890,11 @@ const HeaderRow = styled.div`
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
+`;
+
+const HeaderActions = styled.div`
+  display: flex;
+  gap: 8px;
 `;
 
 const Title = styled.h1`
@@ -509,6 +920,34 @@ const CreateButton = styled.button`
   }
 `;
 
+const SearchRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+`;
+
+const SearchSelect = styled.select`
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  font-size: 13px;
+`;
+
+const SearchInput = styled.input`
+  min-width: 220px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  font-size: 13px;
+`;
+
+const SearchHint = styled.span`
+  font-size: 12px;
+  color: #777;
+`;
+
 const InfoText = styled.div`
   font-size: 14px;
   color: #555;
@@ -524,6 +963,41 @@ const ErrorText = styled.div`
 const TableWrapper = styled.div`
   width: 100%;
   overflow-x: auto;
+`;
+
+const PaginationRow = styled.div`
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+`;
+
+const PaginationInfo = styled.div`
+  font-size: 12px;
+  color: #666;
+`;
+
+const PaginationControls = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+`;
+
+const PageButton = styled.button`
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  background: #fff;
+  font-size: 12px;
+  cursor: pointer;
+
+  &:disabled {
+    background: #f5f5f5;
+    color: #aaa;
+    cursor: default;
+  }
 `;
 
 const StyledTable = styled.table`
@@ -605,7 +1079,7 @@ const ModalOverlay = styled.div`
 
 const ModalContent = styled.div`
   width: 100%;
-  max-width: 640px;
+  max-width: 760px;
   background: #fff;
   border-radius: 12px;
   overflow: hidden;
@@ -711,4 +1185,47 @@ const FieldTextArea = styled.textarea`
   border: 1px solid #ddd;
   font-size: 13px;
   resize: vertical;
+`;
+
+const StatsSummary = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+`;
+
+const StatsCard = styled.div`
+  border: 1px solid #eee;
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: #fafafa;
+`;
+
+const StatsLabel = styled.div`
+  font-size: 12px;
+  color: #777;
+  margin-bottom: 6px;
+`;
+
+const StatsValue = styled.div`
+  font-size: 18px;
+  font-weight: 700;
+`;
+
+const StatsTable = styled.table`
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+
+  th,
+  td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #eee;
+    text-align: left;
+  }
+
+  th {
+    background: #f5f5f5;
+    font-weight: 600;
+  }
 `;

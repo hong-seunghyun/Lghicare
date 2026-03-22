@@ -2,14 +2,14 @@
 export type CategoryItem = {
   label: string;
   url: string;
-  external?: boolean; // ✅ optional
+  external?: boolean; //  optional
 };
 
 export type SubCategory = {
   name: string;
   url: string;
   items: CategoryItem[];
-  external?: boolean; // ✅ optional
+  external?: boolean; //  optional
 };
 
 export type Category = {
@@ -112,6 +112,11 @@ export const categories: Category[] = [
         url: "/products/가습기",
         items: [],
       },
+      {
+        name: "바스에어시스템",
+        url: "/products/바스에어시스템",
+        items: [],
+      },
     ],
   },
   {
@@ -190,7 +195,7 @@ export const categories: Category[] = [
     subCategories: [
       {
         name: "구독 이용 가이드",
-        url: "https://lghicaresolution.com/another/rentalService.html", // ✅ 네가 직접 URL 지정
+        url: "https://lghicaresolution.com/another/rentalService.html", //  네가 직접 URL 지정
         items: [],
       },
       {

@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+﻿/* eslint-disable @typescript-eslint/no-explicit-any */
 import Image from "next/image";
 import React, { useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
@@ -6,51 +6,95 @@ import styled from "styled-components";
 import CustomSelect from "@/components/Select/CustomSelect";
 import { classifyPrepayRate } from "@/utils/prepay/classifyPrepayRate";
 
+import { calcVoucher } from "@/utils/voucher/calcVoucher";
+import { getVoucherMasterForModel } from "@/lib/voucherMaster";
+
+const KEY = {
+  modelCode: "모델코드",
+  productName: "상품명",
+  contract: "계약기간",
+  serviceType: "서비스유형",
+  serviceCycle: "서비스주기/월",
+  promoType: "프로모션유형",
+  promoName: "프로모션명",
+  normalPrice: "정상가",
+  priceBefore: "할인전금액",
+  priceAfter: "할인후금액",
+  middle: "중분류",
+  sub: "소분류",
+} as const;
+
 interface ProductVariant {
   [key: string]: unknown;
-  모델코드: string;
-  상품명: string;
-  계약기간?: string;
-  서비스유형?: string;
-  "서비스주기/월"?: string;
-  프로모션유형?: string;
-  프로모션명?: string;
-  정상가?: string | number;
-  할인전금액?: string | number;
-  할인금액?: string | number;
-  선입금할인금액?: string | number;
-  할인후금액?: string | number;
+  [KEY.modelCode]?: string;
+  [KEY.productName]?: string;
+  [KEY.contract]?: string;
+  [KEY.serviceType]?: string;
+  [KEY.serviceCycle]?: string;
+  [KEY.promoType]?: string;
+  [KEY.promoName]?: string;
+  [KEY.normalPrice]?: string | number;
+  [KEY.priceBefore]?: string | number;
+  [KEY.priceAfter]?: string | number;
   thumbnailUrl?: string;
 }
 
 interface Product {
-  모델코드: string;
-  상품명: string;
-
-  제품기능?: string;
+  [key: string]: unknown;
+  [KEY.modelCode]?: string;
+  [KEY.productName]?: string;
+  [KEY.contract]?: string;
+  [KEY.serviceType]?: string;
+  [KEY.serviceCycle]?: string;
+  [KEY.promoType]?: string;
+  [KEY.promoName]?: string;
+  [KEY.normalPrice]?: string | number;
+  [KEY.priceBefore]?: string | number;
+  [KEY.priceAfter]?: string | number;
   thumbnailUrl?: string;
   variants?: ProductVariant[];
 }
 
 export interface SelectedProduct {
-  모델코드: string;
-  상품명: string;
+  [KEY.modelCode]: string;
+  [KEY.productName]: string;
   thumbnailUrl?: string;
 
-  // 👉 제품 옵션
+  // ??? ??품 ??션
   selectedVariant?: ProductVariant;
 
-  // 👉 계산 관련 값들
-  baseMonthly?: number; // 기준 월 이용요금
-  finalPrice?: number | string; // 최종 혜택가 월 이용요금
+  // ??? 계산 관??값들
+  baseMonthly?: number; // ??기?? ????용??금(??납/카드/교원 ??용 ??
+  finalPrice?: number | string; // 최종 ??택가 ????용??금
 
-  // 👉 할인 정보
-  cardDiscount?: number; // 제휴카드 월 할인 금액
-  teacherDiscount?: number; // 구독교원 월 할인 금액
+  // ??? ??인 ??보
+  cardDiscount?: number; // ??휴카드 ????인 금액
+  teacherDiscount?: number; // 구독교원 ????인 금액
 
-  // 👉 선납 정보
+  // ??? ??납 ??보
   prepayRate?: string; // "30" | "50" | ""
-  prepayAmount?: number; // 선납금액
+  prepayAmount?: number; // ??납금액
+
+  // ??(추??) ??납??로 ??한 "????감?? (기????- ??납반영 ??요??
+  prepayMonthlyDiscount?: number;
+
+  //  (추??) 견적 비교 ??기 ????택 ??보??같이 ??달 (기존 ??용??깨??지 ??게 optional)
+  selectedCardId?: string;
+  selectedCardName?: string;
+  selectedCardAmount?: number;
+
+  teacherSelections?: Record<string, number>; // planId -> seats
+  teacherTotalSeats?: number;
+  teacherSelectionDetails?: Array<{
+    planId: string;
+    type: string;
+    seats: number;
+    discountPerSeat: number;
+    monthlyDiscount: number;
+  }>;
+  voucherTotal?: number;
+  voucherDetails?: Array<{ type: string; amount: number; reason: string }>;
+  voucherMultiProductCount?: number;
 }
 
 interface TeacherPlan {
@@ -63,11 +107,11 @@ interface TeacherPlan {
 interface CardDiscount {
   id: string;
   cardName: string;
-  amount: number; // 월 할인 금액
+  amount: number; // ????인 금액
   allowTeacher: boolean;
 }
 
-// 🔥 선납 가능 여부 캐시 (middle/sub/model 조합 기준)
+// ??? ??납 가?????? 캐시 (middle/sub/model 조합 기??)
 const prepayRateCache = new Map<string, "30" | "30_50" | null>();
 
 interface Props {
@@ -83,70 +127,149 @@ export default function ProductCard({
   teacherPlans,
   cardDiscounts,
 }: Props) {
+  const [showOptions, setShowOptions] = useState(false);
   const [contract, setContract] = useState("");
   const [serviceType, setServiceType] = useState("");
   const [serviceCycle, setServiceCycle] = useState("");
   const [promoType, setPromoType] = useState("");
+  const [promo, setPromo] = useState("");
 
-  // 🔥 선납 상태
+  const [voucherMasterForModel, setVoucherMasterForModel] = useState<
+    any | null
+  >(null);
+
+  // ??? ??납 ??태
   const [prepayRate, setPrepayRate] = useState<string>(""); // "30" | "50" | ""
   const [prepayAvailableRate, setPrepayAvailableRate] = useState<
     "30" | "30_50" | null
   >(null);
   const [prepayAmountDisplay, setPrepayAmountDisplay] = useState<number | null>(
-    null
+    null,
   );
 
-  // 🔥 제휴카드 / 구독교원 상태
+  // ??? ??휴카드 / 구독교원 ??태
   const [selectedCardId, setSelectedCardId] = useState<string>("");
   const [teacherSelections, setTeacherSelections] = useState<
     Record<string, number>
   >({});
 
-  // ✅ 드롭다운 리스트 생성
+  const variants = useMemo(() => product.variants ?? [], [product.variants]);
+
+  //  ??롭??운 리스????성 (선택 상태에 따라 필터링)
   const contractList = useMemo(
     () =>
-      Array.from(
-        new Set(product.variants?.map((v) => v.계약기간).filter(Boolean))
-      ),
-    [product.variants]
+      Array.from(new Set(variants.map((v) => v[KEY.contract]).filter(Boolean))),
+    [variants],
   );
+
+  const variantsByContract = useMemo(() => {
+    if (!contract) return variants;
+    return variants.filter((v) => v[KEY.contract] === contract);
+  }, [variants, contract]);
+
   const serviceTypeList = useMemo(
     () =>
       Array.from(
-        new Set(product.variants?.map((v) => v.서비스유형).filter(Boolean))
+        new Set(
+          variantsByContract.map((v) => v[KEY.serviceType]).filter(Boolean),
+        ),
       ),
-    [product.variants]
+    [variantsByContract],
   );
+
+  const variantsByServiceType = useMemo(() => {
+    if (!serviceType) return variantsByContract;
+    return variantsByContract.filter((v) => v[KEY.serviceType] === serviceType);
+  }, [variantsByContract, serviceType]);
+
   const serviceCycleList = useMemo(
     () =>
       Array.from(
         new Set(
-          product.variants?.map((v) => v["서비스주기/월"]).filter(Boolean)
-        )
+          variantsByServiceType.map((v) => v[KEY.serviceCycle]).filter(Boolean),
+        ),
       ),
-    [product.variants]
+    [variantsByServiceType],
   );
+
+  const variantsByServiceCycle = useMemo(() => {
+    if (!serviceCycle) return variantsByServiceType;
+    return variantsByServiceType.filter(
+      (v) => v[KEY.serviceCycle] === serviceCycle,
+    );
+  }, [variantsByServiceType, serviceCycle]);
+
   const promoTypeList = useMemo(
     () =>
       Array.from(
-        new Set(product.variants?.map((v) => v.프로모션유형).filter(Boolean))
+        new Set(
+          variantsByServiceCycle.map((v) => v[KEY.promoType]).filter(Boolean),
+        ),
       ),
-    [product.variants]
+    [variantsByServiceCycle],
   );
 
-  // ✅ 현재 조합에 맞는 옵션 찾기
+  const variantsByPromoType = useMemo(() => {
+    if (!promoType) return variantsByServiceCycle;
+    return variantsByServiceCycle.filter((v) => v[KEY.promoType] === promoType);
+  }, [variantsByServiceCycle, promoType]);
+
+  const promoList = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          variantsByPromoType.map((v) => v[KEY.promoName]).filter(Boolean),
+        ),
+      ),
+    [variantsByPromoType],
+  );
+
+  const normalizeNum = (v?: string | number) => {
+    if (v == null) return "";
+    return v
+      .toString()
+      .replace(/[^0-9]/g, "")
+      .trim();
+  };
+  const normalizeStr = (v?: unknown) => (v ?? "").toString().trim();
+
+  const getPriceValue = (
+    variant: ProductVariant | undefined,
+    hasPromo: boolean,
+  ) => {
+    if (!variant) return 0;
+
+    // 기본: 할인전금액 우선
+    let base =
+      variant[KEY.priceBefore] || variant[KEY.normalPrice] || variant[KEY.priceAfter] || "";
+
+    // 프로모션 선택 시 할인후금액 적용
+    if (hasPromo && variant[KEY.priceAfter]) {
+      base = variant[KEY.priceAfter] as string | number;
+    }
+
+    const cleaned = base.toString().replace(/[^0-9]/g, "");
+    if (!cleaned) return 0;
+    return parseInt(cleaned, 10);
+  };
+
+  //  ??재 조합??맞는 ??션 찾기
   const current = useMemo(() => {
     if (!contract || !serviceType || !serviceCycle || !promoType)
       return undefined;
-    return product.variants?.find(
-      (v) =>
-        v.계약기간 === contract &&
-        v.서비스유형 === serviceType &&
-        v["서비스주기/월"] === serviceCycle &&
-        v.프로모션유형 === promoType
-    );
-  }, [contract, serviceType, serviceCycle, promoType, product.variants]);
+    return variants.find((v) => {
+      const match =
+        normalizeNum(v[KEY.contract] as string | number) ===
+          normalizeNum(contract) &&
+        normalizeStr(v[KEY.serviceType]) === normalizeStr(serviceType) &&
+        normalizeNum(v[KEY.serviceCycle] as string | number) ===
+          normalizeNum(serviceCycle) &&
+        normalizeStr(v[KEY.promoType]) === normalizeStr(promoType) &&
+        (!promo ||
+          normalizeStr(v[KEY.promoName]) === normalizeStr(promo));
+      return match;
+    });
+  }, [contract, serviceType, serviceCycle, promoType, promo, variants]);
 
   const toSafeNumber = (val?: string | number): number => {
     if (!val) return 0;
@@ -156,40 +279,41 @@ export default function ProductCard({
     return isNaN(parsed) ? 0 : parsed;
   };
 
-  const normalizeNum = (v?: string | number) => {
-    if (v == null) return "";
-    return v
-      .toString()
-      .replace(/[^0-9]/g, "")
-      .trim();
-  };
-
-  // ✅ 최저가 기준 기본 세팅
+  //  최??가 기?? 기본 ??팅 (????로모션??형: '기존결합' ??선)
   useEffect(() => {
     if (product.variants && product.variants.length > 0) {
       const sorted = [...product.variants].sort((a, b) => {
-        const priceA =
-          toSafeNumber(a.할인후금액) ||
-          toSafeNumber(a.할인전금액) ||
-          toSafeNumber(a.정상가);
-        const priceB =
-          toSafeNumber(b.할인후금액) ||
-          toSafeNumber(b.할인전금액) ||
-          toSafeNumber(b.정상가);
+        const priceA = toSafeNumber(
+          (a[KEY.priceAfter] as string | number | undefined) ||
+            (a[KEY.priceBefore] as string | number | undefined) ||
+            (a[KEY.normalPrice] as string | number | undefined),
+        );
+        const priceB = toSafeNumber(
+          (b[KEY.priceAfter] as string | number | undefined) ||
+            (b[KEY.priceBefore] as string | number | undefined) ||
+            (b[KEY.normalPrice] as string | number | undefined),
+        );
         return priceA - priceB;
       });
 
-      const cheapest = sorted[0];
-      setContract(cheapest?.계약기간 || "");
-      setServiceType(cheapest?.서비스유형 || "");
-      setServiceCycle(cheapest?.["서비스주기/월"] || "");
-      setPromoType(cheapest?.프로모션유형 || "");
-      // 옵션이 변경되면 선납/카드/교원 선택도 초기화
+      // ??1) '기존결합' ??로모션??형????는지 ??선 ??색 (최??가 기????로)
+      const preferred =
+        sorted.find(
+          (v) => (v[KEY.promoType] ?? "").toString().trim() === "기존결합",
+        ) ?? sorted[0];
+
+      setContract((preferred?.[KEY.contract] as string) || "");
+      setServiceType((preferred?.[KEY.serviceType] as string) || "");
+      setServiceCycle((preferred?.[KEY.serviceCycle] as string) || "");
+      setPromoType((preferred?.[KEY.promoType] as string) || "");
+      setPromo((preferred?.[KEY.promoName] as string) || "");
+
+      // ??션??변경되????납/카드/교원 ??택??초기??
       setPrepayRate("");
     }
   }, [product.variants]);
 
-  // 🔥 구독교원 기본 선택값 0으로 초기화
+  // ??? 구독교원 기본 ??택??0??로 초기??
   useEffect(() => {
     setTeacherSelections((prev) => {
       const next: Record<string, number> = { ...prev };
@@ -200,7 +324,7 @@ export default function ProductCard({
     });
   }, [teacherPlans]);
 
-  // 🔥 선납 가능 여부 조회 (ProductDetail과 동일한 규칙)
+  // ??? ??납 가?????? 조회 (ProductDetail????일??규칙)
   useEffect(() => {
     if (!product.variants || product.variants.length === 0) {
       setPrepayAvailableRate(null);
@@ -208,13 +332,17 @@ export default function ProductCard({
     }
 
     const firstVariant: any = product.variants[0] || {};
-    const middle = (firstVariant["중분류"] || (product as any)["중분류"] || "")
+    const middle = (
+      firstVariant[KEY.middle] ||
+      (product as any)[KEY.middle] ||
+      ""
+    )
       .toString()
       .trim();
-    const sub = (firstVariant["소분류"] || (product as any)["소분류"] || "")
+    const sub = (firstVariant[KEY.sub] || (product as any)[KEY.sub] || "")
       .toString()
       .trim();
-    const model = (product.모델코드 || "").toString().trim();
+    const model = ((product[KEY.modelCode] as string) || "").toString().trim();
 
     if (!middle) {
       setPrepayAvailableRate(null);
@@ -238,7 +366,7 @@ export default function ProductCard({
           setPrepayAvailableRate(rate);
         }
       } catch (err) {
-        console.error("❌ 선납 규칙 조회 오류(estimate):", err);
+        console.error("선납 규칙 조회 오류(estimate):", err);
         if (!cancelled) {
           prepayRateCache.set(cacheKey, null);
           setPrepayAvailableRate(null);
@@ -251,26 +379,22 @@ export default function ProductCard({
     };
   }, [product]);
 
-  // 🔢 계약기간(개월) 숫자
+  // ??? 계약기간(개월) ??자
   const contractMonths = useMemo(() => {
     if (!contract) return 0;
     const num = Number(normalizeNum(contract));
     return isNaN(num) ? 0 : num;
   }, [contract]);
 
-  // 🔢 현재 월 이용요금 (프로모션 반영)
+  // ??? ??재 ????용??금 (??로모션 반영) ??"기?? ????금"????천
   const usageFee = useMemo(() => {
     if (!current) return 0;
-    return (
-      toSafeNumber(current.할인후금액) ||
-      toSafeNumber(current.할인전금액) ||
-      toSafeNumber(current.정상가)
-    );
-  }, [current]);
+    return getPriceValue(current, !!promo);
+  }, [current, promo]);
 
   const floorTo10 = (v: number) => Math.floor(v / 100) * 100;
 
-  // 🔥 선납금 계산 (72개월 & 선납 선택 시)
+  // ??? ??납??계산 (72개월 & ??납 ??택 ??
   useEffect(() => {
     if (!prepayRate || !current || !usageFee || contractMonths !== 72) {
       setPrepayAmountDisplay(null);
@@ -285,16 +409,16 @@ export default function ProductCard({
     setPrepayAmountDisplay(truncatedPrepay);
   }, [prepayRate, current, usageFee, contractMonths]);
 
-  // 🔥 제휴카드 선택
+  // ??? ??휴카드 ??택
   const selectedCard = useMemo(() => {
     if (!selectedCardId) return null;
     return cardDiscounts.find((c) => c.id === selectedCardId) ?? null;
   }, [cardDiscounts, selectedCardId]);
 
-  // 🔥 이 카드에서만 구독교원 사용 가능
+  // ??? ??카드??서??구독교원 ??용 가??
   const isTeacherAvailable = !!selectedCard?.allowTeacher;
 
-  // 🔥 구독교원 허용되지 않는 카드 선택 시, 좌수 초기화
+  // ??? 구독교원 ??용???? ??는 카드 ??택 ?? 좌수 초기??
   useEffect(() => {
     if (isTeacherAvailable) return;
     if (teacherPlans.length > 0) {
@@ -308,7 +432,7 @@ export default function ProductCard({
     }
   }, [isTeacherAvailable, teacherPlans]);
 
-  // 🔥 구독교원 총 구좌 / 총 할인액 (최대 4구좌)
+  // ??? 구독교원 ??구좌 / ????인??(최?? 4구좌)
   const { teacherTotalSeats, teacherTotalDiscount } = useMemo(() => {
     if (!isTeacherAvailable) {
       return { teacherTotalSeats: 0, teacherTotalDiscount: 0 };
@@ -327,11 +451,28 @@ export default function ProductCard({
     return { teacherTotalSeats: seats, teacherTotalDiscount: discount };
   }, [teacherPlans, teacherSelections, isTeacherAvailable]);
 
-  // 🔥 구독교원 좌수 변경 핸들러 (총 4구좌 제한)
+  //  (추??) 구독교원 ??택 ??세(견적 비교????께 ??기 ??함)
+  const teacherSelectionDetails = useMemo(() => {
+    if (!isTeacherAvailable) return [];
+    return teacherPlans
+      .map((p) => {
+        const seats = teacherSelections[p.id] ?? 0;
+        return {
+          planId: p.id,
+          type: p.type,
+          seats,
+          discountPerSeat: p.discountPerSeat,
+          monthlyDiscount: seats * p.discountPerSeat,
+        };
+      })
+      .filter((x) => x.seats > 0);
+  }, [teacherPlans, teacherSelections, isTeacherAvailable]);
+
+  // ??? 구독교원 좌수 변????들??(??4구좌 ??한)
   const handleTeacherSeatsChange = (
     planId: string,
     maxSeats: number,
-    nextSeats: number
+    nextSeats: number,
   ) => {
     if (nextSeats < 0 || nextSeats > maxSeats) return;
 
@@ -340,7 +481,7 @@ export default function ProductCard({
 
       let totalSeats = 0;
       teacherPlans.forEach((p) => {
-        const cnt = p.id === planId ? currentSeats : prev[p.id] ?? 0;
+        const cnt = p.id === planId ? currentSeats : (prev[p.id] ?? 0);
         totalSeats += cnt;
       });
 
@@ -358,16 +499,16 @@ export default function ProductCard({
     });
   };
 
-  // 🔥 선납/제휴카드/구독교원 반영된 최종 이용요금 & 최대혜택가
+  // ??? ??납/??휴카드/구독교원 반영??최종 ??용??금 & ??체감 ??택
 
-  // 1단계: 선납까지 반영된 월 이용요금
+  // 1??계: ??납까?? 반영??????용??금
   const finalUsageFee = useMemo(() => {
     if (!current || !usageFee) return 0;
 
-    // 6년 & 선납 선택된 경우 (ProductDetail과 동일 로직)
+    // 6??& ??납 ??택??경우 (ProductDetail????일 로직)
     if (contractMonths === 72 && prepayRate && prepayAmountDisplay) {
       const total = usageFee * 72;
-      const discount = prepayAmountDisplay * 0.135; // 선납 할인 13.5%
+      const discount = prepayAmountDisplay * 0.135; // ??납 ??인 13.5%
 
       const newMonthlyRaw = (total - prepayAmountDisplay - discount) / 72;
       const newMonthly = floorTo10(newMonthlyRaw);
@@ -377,12 +518,12 @@ export default function ProductCard({
     return usageFee;
   }, [current, usageFee, contractMonths, prepayRate, prepayAmountDisplay]);
 
-  // 2단계: 제휴카드까지 반영된 기본 최대혜택가
+  // 2??계: ??휴카드까?? 반영??기본 ??체감 ??택
   const baseBestPrice = useMemo(() => {
     if (!current || !finalUsageFee) return 0;
 
     if (!selectedCard) {
-      const bp = finalUsageFee > 13000 ? finalUsageFee - 13000 : finalUsageFee;
+      const bp = finalUsageFee > 0 ? finalUsageFee - 0 : finalUsageFee;
       return Math.max(bp, 0);
     }
 
@@ -390,21 +531,75 @@ export default function ProductCard({
     return Math.max(discounted, 0);
   }, [current, finalUsageFee, selectedCard]);
 
-  // 3단계: 구독교원까지 반영된 최종 최대혜택가
+  // 3??계: 구독교원까?? 반영??최종 ??체감 ??택
   const finalBestPriceWithTeacher = useMemo(() => {
     if (!current) return 0;
     return Math.max(baseBestPrice - teacherTotalDiscount, 0);
   }, [current, baseBestPrice, teacherTotalDiscount]);
 
-  // 담기용 최종 가격 (최대혜택가 우선, 없으면 이용요금)
+  // ??기??최종 가??(??체감 ??택 ??선, ??으????용??금)
   const finalPriceForCompare = useMemo(() => {
     if (finalBestPriceWithTeacher > 0) return finalBestPriceWithTeacher;
     if (finalUsageFee > 0) return finalUsageFee;
     if (!current) return 0;
     const base =
-      current.할인후금액 || current.정상가 || current.할인전금액 || "0";
+      (current[KEY.priceAfter] as string | number | undefined) ||
+      (current[KEY.normalPrice] as string | number | undefined) ||
+      (current[KEY.priceBefore] as string | number | undefined) ||
+      "0";
     return toSafeNumber(base);
   }, [current, finalBestPriceWithTeacher, finalUsageFee]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const master = await getVoucherMasterForModel(
+          (product[KEY.modelCode] as string) || "",
+        );
+        if (!cancelled) setVoucherMasterForModel(master);
+      } catch (err) {
+        console.error("상품권 마스터 불러오기 오류:", err);
+        if (!cancelled) setVoucherMasterForModel(null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [product[KEY.modelCode]]);
+
+  const voucher = useMemo(() => {
+    if (!current || !voucherMasterForModel) {
+      return { total: 0, details: [] };
+    }
+
+    return calcVoucher({
+      voucherMaster: voucherMasterForModel as any,
+      modelCode: (product[KEY.modelCode] as string) || "",
+      promoType: promoType,
+      serviceCycle: serviceCycle,
+      promoName: promo,
+    });
+  }, [
+    current,
+    voucherMasterForModel,
+    product[KEY.modelCode],
+    promoType,
+    serviceCycle,
+    promo,
+  ]);
+
+  const multiProductCount = useMemo(() => {
+    const model =
+      voucherMasterForModel?.products?.[
+        (product[KEY.modelCode] as string) || ""
+      ] ?? null;
+    if (!model) return 0;
+    const count = Number(model.multiProductCount);
+    return Number.isFinite(count) ? count : 0;
+  }, [voucherMasterForModel, product[KEY.modelCode]]);
 
   return (
     <Card>
@@ -412,7 +607,7 @@ export default function ProductCard({
         {product.thumbnailUrl ? (
           <StyledImage
             src={product.thumbnailUrl}
-            alt={product.상품명}
+            alt={(product[KEY.productName] as string) || ""}
             width={280}
             height={280}
             loading="lazy"
@@ -423,155 +618,175 @@ export default function ProductCard({
       </ImageBox>
 
       <InfoBox>
-        <Title>{product.상품명}</Title>
-        <Model>{product.모델코드}</Model>
-        <Spec>{product.제품기능}</Spec>
-        <OptionBox>
-          <CustomSelect
-            label="계약기간"
-            value={contract}
-            onChange={(val) => {
-              setContract(val);
-              setServiceType("");
-              setServiceCycle("");
-              setPromoType("");
-              setPrepayRate("");
-            }}
-            options={contractList.map((v) => {
-              const months = Number(v);
-              const years = months / 12;
-              return {
-                label: `${years}년`,
-                value: String(v ?? ""),
-              };
-            })}
-          />
+        <Title>{(product[KEY.productName] as string) || ""}</Title>
+        <Model>{(product[KEY.modelCode] as string) || ""}</Model>
+        <Spec>{(product["상품기능"] as string) || ""}</Spec>
+        <OptionsToggle
+          type="button"
+          onClick={() => setShowOptions((prev) => !prev)}
+        >
+          {showOptions ? "옵션 닫기" : "옵션 설정"}
+        </OptionsToggle>
 
-          <CustomSelect
-            label="서비스유형"
-            value={serviceType}
-            onChange={(val) => {
-              setServiceType(val);
-              setServiceCycle("");
-              setPromoType("");
-              setPrepayRate("");
-            }}
-            options={serviceTypeList.map((v) => ({
-              label: v || "",
-              value: v || "",
-            }))}
-          />
+        {showOptions && (
+          <OptionsPanel>
+            <OptionBox>
+              <CustomSelect
+                label="계약기간"
+                value={contract}
+                onChange={(val) => {
+                  setContract(val);
+                  setServiceType("");
+                  setServiceCycle("");
+                  setPromoType("");
+                  setPromo("");
+                  setPrepayRate("");
+                }}
+                options={contractList.map((v) => {
+                  const months = Number(v);
+                  const years = months / 12;
+                  return {
+                    label: `${years}년`,
+                    value: String(v ?? ""),
+                  };
+                })}
+              />
 
-          <CustomSelect
-            label="방문주기"
-            value={serviceCycle}
-            onChange={(val) => {
-              setServiceCycle(val);
-              setPromoType("");
-              setPrepayRate("");
-            }}
-            options={serviceCycleList.map((v) => ({
-              label: v || "",
-              value: v || "",
-            }))}
-          />
+              <CustomSelect
+                label="서비스유형"
+                value={serviceType}
+                onChange={(val) => {
+                  setServiceType(val);
+                  setServiceCycle("");
+                  setPromoType("");
+                  setPromo("");
+                  setPrepayRate("");
+                }}
+                options={serviceTypeList.map((v) => ({
+                  label: v || "",
+                  value: v || "",
+                }))}
+              />
 
-          <CustomSelect
-            label="프로모션유형"
-            value={promoType}
-            onChange={(val) => {
-              setPromoType(val);
-              setPrepayRate("");
-            }}
-            options={promoTypeList.map((v) => ({
-              label: v || "",
-              value: v || "",
-            }))}
-          />
+              <CustomSelect
+                label="방문주기"
+                value={serviceCycle}
+                onChange={(val) => {
+                  setServiceCycle(val);
+                  setPromoType("");
+                  setPromo("");
+                  setPrepayRate("");
+                }}
+                options={serviceCycleList.map((v) => ({
+                  label: v || "",
+                  value: v || "",
+                }))}
+              />
 
-          {/* 🔥 선납 선택 (72개월 & 선납 가능할 때만 노출) */}
-          {contractMonths === 72 && prepayAvailableRate && (
-            <CustomSelect
-              label="선납"
-              value={prepayRate}
-              onChange={setPrepayRate}
-              options={[
-                { label: "선택 안 함", value: "" },
-                ...(prepayAvailableRate === "30" ||
-                prepayAvailableRate === "30_50"
-                  ? [{ label: "30% 선납", value: "30" }]
-                  : []),
-                ...(prepayAvailableRate === "30_50"
-                  ? [{ label: "50% 선납", value: "50" }]
-                  : []),
-              ]}
-            />
-          )}
+              <CustomSelect
+                label="프로모션유형"
+                value={promoType}
+                onChange={(val) => {
+                  setPromoType(val);
+                  setPromo("");
+                  setPrepayRate("");
+                }}
+                options={promoTypeList.map((v) => ({
+                  label: v || "",
+                  value: v || "",
+                }))}
+              />
 
-          {/* 🔥 제휴카드 선택 */}
-          {cardDiscounts.length > 0 && (
-            <CustomSelect
-              label="제휴카드"
-              value={selectedCardId}
-              onChange={setSelectedCardId}
-              options={[
-                { label: "선택 안 함", value: "" },
-                ...cardDiscounts.map((card) => ({
-                  value: card.id,
-                  label: `${
-                    card.cardName
-                  } (월 ${card.amount.toLocaleString()}원 할인)`,
-                })),
-              ]}
-            />
-          )}
-        </OptionBox>
+              <CustomSelect
+                label="프로모션명"
+                value={promo}
+                onChange={(val) => {
+                  setPromo(val);
+                  setPrepayRate("");
+                }}
+                options={promoList.map((v) => ({
+                  label: v || "",
+                  value: v || "",
+                }))}
+              />
 
-        {/* 🔥 구독교원 UI */}
-        {teacherPlans.length > 0 && isTeacherAvailable && (
-          <TeacherBox>
-            <TeacherTitle>구독교원</TeacherTitle>
-            {teacherPlans.map((plan) => {
-              const seats = teacherSelections[plan.id] ?? 0;
-              return (
-                <TeacherRow key={plan.id}>
-                  <TeacherType>{plan.type}</TeacherType>
-                  <TeacherControls>
-                    <TeacherButton
-                      disabled={seats <= 0}
-                      onClick={() =>
-                        handleTeacherSeatsChange(
-                          plan.id,
-                          plan.maxSeats,
-                          seats - 1
-                        )
-                      }
-                    >
-                      −
-                    </TeacherButton>
-                    <TeacherSeats>{seats}</TeacherSeats>
-                    <TeacherButton
-                      disabled={seats >= plan.maxSeats}
-                      onClick={() =>
-                        handleTeacherSeatsChange(
-                          plan.id,
-                          plan.maxSeats,
-                          seats + 1
-                        )
-                      }
-                    >
-                      +
-                    </TeacherButton>
-                  </TeacherControls>
-                </TeacherRow>
-              );
-            })}
+              {contractMonths === 72 && prepayAvailableRate && (
+                <CustomSelect
+                  label="선납"
+                  value={prepayRate}
+                  onChange={setPrepayRate}
+                  options={[
+                    { label: "혜택 선택", value: "" },
+                    ...(prepayAvailableRate === "30" ||
+                    prepayAvailableRate === "30_50"
+                      ? [{ label: "30% 선납", value: "30" }]
+                      : []),
+                    ...(prepayAvailableRate === "30_50"
+                      ? [{ label: "50% 선납", value: "50" }]
+                      : []),
+                  ]}
+                />
+              )}
 
-            <TeacherSummary>
-              총 {teacherTotalSeats}구좌 선택, 총 교원 할인액{" "}
-              <b>{teacherTotalDiscount.toLocaleString()}</b>원
-            </TeacherSummary>
-          </TeacherBox>
+              {cardDiscounts.length > 0 && (
+                <CustomSelect
+                  label="제휴카드"
+                  value={selectedCardId}
+                  onChange={setSelectedCardId}
+                  options={[
+                    { label: "혜택 선택", value: "" },
+                    ...cardDiscounts.map((card) => ({
+                      value: card.id,
+                      label: `${
+                        card.cardName
+                      } (월 ${card.amount.toLocaleString()}원 할인)`,
+                    })),
+                  ]}
+                />
+              )}
+            </OptionBox>
+
+            {teacherPlans.length > 0 && isTeacherAvailable && (
+              <TeacherBox>
+                <TeacherTitle>구독교원</TeacherTitle>
+                {teacherPlans.map((plan) => {
+                  const seats = teacherSelections[plan.id] ?? 0;
+                  return (
+                    <TeacherRow key={plan.id}>
+                      <TeacherType>{plan.type}</TeacherType>
+                      <TeacherControls>
+                        <TeacherButton
+                          disabled={seats <= 0}
+                          onClick={() =>
+                            handleTeacherSeatsChange(
+                              plan.id,
+                              plan.maxSeats,
+                              seats - 1,
+                            )
+                          }
+                        >
+                          -
+                        </TeacherButton>
+                        <TeacherSeats>{seats}</TeacherSeats>
+                        <TeacherButton
+                          disabled={seats >= plan.maxSeats}
+                          onClick={() =>
+                            handleTeacherSeatsChange(
+                              plan.id,
+                              plan.maxSeats,
+                              seats + 1,
+                            )
+                          }
+                        >
+                          +
+                        </TeacherButton>
+                      </TeacherControls>
+                    </TeacherRow>
+                  );
+                })}
+              </TeacherBox>
+            )}
+          </OptionsPanel>
         )}
 
         <PriceBox>
@@ -592,13 +807,31 @@ export default function ProductCard({
                     </PrepayText>
                   )}
                   <SalePriceBox>
-                    최대혜택가 월 {finalBestPriceWithTeacher.toLocaleString()}원
+                    총 체감요금 {finalBestPriceWithTeacher.toLocaleString()}원
                   </SalePriceBox>
                 </>
               ) : (
                 <PricePlaceholder>옵션을 선택해주세요</PricePlaceholder>
               )}
             </div>
+            {current && voucher.total > 0 && (
+              <>
+                <PrepayText>
+                  상품권 {voucher.total.toLocaleString()}원 지급
+                </PrepayText>
+                {voucher.details.length > 0 && (
+                  <VoucherDetail>
+                    {voucher.details.map((d, idx) => (
+                      <p
+                        key={`${(product[KEY.modelCode] as string) || ""}-voucher-${idx}`}
+                      >
+                        - {d.type}: {d.amount.toLocaleString()}원
+                      </p>
+                    ))}
+                  </VoucherDetail>
+                )}
+              </>
+            )}
             <Button
               onClick={() => {
                 if (!current) {
@@ -606,20 +839,32 @@ export default function ProductCard({
                   return;
                 }
 
-                // 1️⃣ 기준 월요금: 선납까지 반영된 월요금(finalUsageFee)을 기준으로,
-                //    선납 없으면 그냥 usageFee 사용
-                const baseMonthlyForCompare =
-                  (finalUsageFee && finalUsageFee > 0
-                    ? finalUsageFee
-                    : usageFee) || 0;
+                // 기준 월 요금(선납/카드/교원 할인 제외)
+                // = usageFee (프로모션/계약기간/서비스유형/방문주기/프로모션유형 조합으로 결정)
+                const baseMonthlyForCompare = usageFee || 0;
 
-                // 2️⃣ 혜택가 월요금: 구독교원까지 반영된 최종 값
+                // 선납 월 할인액 (기준월 - 선납반영월)
+                // - 백원 단위 절삭
+                // - 1,000원 이상일 때만 표시
+                const rawPrepayMonthlyDiscount =
+                  contractMonths === 72 && prepayRate
+                    ? Math.max(baseMonthlyForCompare - finalUsageFee, 0)
+                    : 0;
+
+                const truncatedPrepayMonthlyDiscount =
+                  Math.floor(rawPrepayMonthlyDiscount / 100) * 100;
+                const prepayMonthlyDiscount =
+                  truncatedPrepayMonthlyDiscount >= 1000
+                    ? truncatedPrepayMonthlyDiscount
+                    : 0;
+
+                // 최종 혜택가: 선납 + 카드 + 교원 모두 반영
                 const finalMonthlyForCompare =
                   finalBestPriceWithTeacher && finalBestPriceWithTeacher > 0
                     ? finalBestPriceWithTeacher
                     : baseMonthlyForCompare;
 
-                // 3️⃣ 제휴카드 / 구독교원 월 할인 금액
+                // 카드/교원 할인액
                 const monthlyCardDiscount = selectedCard
                   ? selectedCard.amount
                   : 0;
@@ -629,14 +874,41 @@ export default function ProductCard({
 
                 onAdd({
                   ...product,
+                  [KEY.modelCode]: (product[KEY.modelCode] as string) || "",
+                  [KEY.productName]: (product[KEY.productName] as string) || "",
                   thumbnailUrl: product.thumbnailUrl,
                   selectedVariant: current,
-                  baseMonthly: baseMonthlyForCompare,
-                  finalPrice: finalMonthlyForCompare,
+
+                  // 기준/최종
+                  baseMonthly: baseMonthlyForCompare, // 선납/카드/교원 제외 기준 요금
+                  finalPrice: finalMonthlyForCompare, // 총 체감 혜택가(선납 포함)
+
+                  // 할인 내역(상세페이지 표시용)
                   cardDiscount: monthlyCardDiscount,
                   teacherDiscount: monthlyTeacherDiscount,
+                  prepayMonthlyDiscount, // 선납 월 할인(표시 규칙 반영)
+
+                  // 선납 정보
                   prepayRate: prepayRate || "",
                   prepayAmount: prepayAmountDisplay ?? 0,
+
+                  // 제휴카드 정보
+                  selectedCardId: selectedCard?.id || "",
+                  selectedCardName: selectedCard?.cardName || "",
+                  selectedCardAmount: selectedCard?.amount || 0,
+
+                  // 구독교원 정보
+                  teacherSelections: isTeacherAvailable
+                    ? teacherSelections
+                    : {},
+                  teacherTotalSeats: isTeacherAvailable ? teacherTotalSeats : 0,
+                  teacherSelectionDetails: isTeacherAvailable
+                    ? teacherSelectionDetails
+                    : [],
+
+                  voucherTotal: voucher.total,
+                  voucherDetails: voucher.details,
+                  voucherMultiProductCount: multiProductCount,
                 });
               }}
             >
@@ -650,13 +922,16 @@ export default function ProductCard({
 }
 
 //
-// ✅ styled-components 정의
+//  styled-components ??의
 //
 const Card = styled.div`
   padding: 12px 30px 32px;
   background: #fff;
   border-radius: 8px;
   box-shadow: 2px 4px 12px 0 rgba(0, 0, 0, 0.14);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 `;
 
 const ImageBox = styled.div`
@@ -692,6 +967,7 @@ const InfoBox = styled.div`
   margin-top: 16px;
   display: flex;
   flex-direction: column;
+  flex: 1;
 `;
 
 const Title = styled.p`
@@ -738,7 +1014,7 @@ const OptionBox = styled.div`
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-top: 16px;
+  margin-top: 0;
 `;
 
 const PriceText = styled.p`
@@ -747,10 +1023,37 @@ const PriceText = styled.p`
 `;
 
 const PriceBox = styled.div`
-  margin-top: 12px;
+  margin-top: auto;
   display: flex;
   flex-direction: column;
   gap: 4px;
+`;
+
+const OptionsToggle = styled.button`
+  margin-bottom: 12px;
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+  cursor: pointer;
+  white-space: nowrap;
+  width: 100%;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 5px;
+
+  &:hover {
+    color: #333;
+  }
+`;
+
+const OptionsPanel = styled.div`
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 `;
 
 const PriceLabel = styled.span`
@@ -780,6 +1083,16 @@ const PrepayText = styled.div`
   margin-top: 4px;
   font-size: 13px;
   color: #666;
+`;
+
+const VoucherDetail = styled.div`
+  margin-top: 2px;
+  font-size: 12px;
+  color: #666;
+
+  p {
+    margin: 2px 0;
+  }
 `;
 
 const Button = styled.button`
@@ -812,7 +1125,7 @@ const FlexBox = styled.div`
   }
 `;
 
-// 🔥 구독교원 UI 스타일
+// ??? 구독교원 UI ??????
 const TeacherBox = styled.div`
   margin-top: 12px;
   padding: 12px 14px;

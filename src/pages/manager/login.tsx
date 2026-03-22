@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+﻿/* eslint-disable @typescript-eslint/no-explicit-any */
 // pages/manager/login.tsx
 
 "use client";
@@ -39,7 +39,7 @@ const ManagerLoginPage: React.FC = () => {
   const [authChecking, setAuthChecking] = useState(true);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  // ✅ 이미 로그인된 상태면 role 확인 후 매니저면 /manager 로, 아니면 로그아웃
+  // 이미 로그인된 상태면 role 확인 후 매니저면 /manager 로, 아니면 로그아웃
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       if (!fbUser) {
@@ -64,13 +64,17 @@ const ManagerLoginPage: React.FC = () => {
               managerId: data?.managerId ?? "",
               name: data?.name ?? "",
               branch: data?.branch ?? "",
+              region: data?.region ?? "",
+              office: data?.office ?? data?.branch ?? "",
+              position: data?.position ?? "",
+              teamLeaderId: data?.teamLeaderId ?? "",
             };
             localStorage.setItem("managerSession", JSON.stringify(session));
           }
 
           router.replace("/manager");
         } else {
-          // 매니저 전용 페이지이므로, 다른 role 이면 강제 로그아웃
+          // 매니저 전용 페이지이므로 다른 role 이면 강제 로그아웃
           await signOut(auth);
           setCurrentUser(null);
         }
@@ -84,7 +88,7 @@ const ManagerLoginPage: React.FC = () => {
     return () => unsubscribe();
   }, [auth, router]);
 
-  // ✅ 매니저 로그인 처리 (managerId + 개인 비번 → 공통 비번으로 Auth 로그인)
+  // 매니저 로그인 처리 (managerId + 개인 비번 → 공통 비번으로 Auth 로그인)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -104,7 +108,7 @@ const ManagerLoginPage: React.FC = () => {
         collection(db, "users"),
         where("role", "==", "manager"),
         where("managerId", "==", trimmedId),
-        limit(1)
+        limit(1),
       );
 
       const snap = await getDocs(q);
@@ -141,7 +145,7 @@ const ManagerLoginPage: React.FC = () => {
       const cred = await signInWithEmailAndPassword(
         auth,
         authEmail,
-        commonPassword
+        commonPassword,
       );
       const fbUser = cred.user;
 
@@ -167,13 +171,17 @@ const ManagerLoginPage: React.FC = () => {
         return;
       }
 
-      // ✅ managerSession 로컬 스토리지 유지
+      // managerSession 로컬 스토리지 유지
       if (typeof window !== "undefined") {
         const session = {
           id: fbUser.uid,
           managerId: latestUserData.managerId ?? trimmedId,
           name: latestUserData.name ?? "",
           branch: latestUserData.branch ?? "",
+          region: latestUserData.region ?? "",
+          office: latestUserData.office ?? latestUserData.branch ?? "",
+          position: latestUserData.position ?? "",
+          teamLeaderId: latestUserData.teamLeaderId ?? "",
         };
         localStorage.setItem("managerSession", JSON.stringify(session));
       }
@@ -186,7 +194,7 @@ const ManagerLoginPage: React.FC = () => {
       if (err.code === "auth/user-not-found") {
         message = "등록되지 않은 아이디입니다.";
       } else if (err.code === "auth/wrong-password") {
-        // 여기서는 공통 비밀번호가 틀린 경우이므로, 일반 메시지로 처리
+        // 여기서는 공통 비밀번호가 틀린 경우이므로 일반 메시지로 처리
         message = "로그인 정보를 다시 확인해주세요.";
       } else if (err.code === "auth/invalid-email") {
         message = "아이디 형식을 다시 확인해주세요.";
@@ -207,7 +215,7 @@ const ManagerLoginPage: React.FC = () => {
             <br />
             매니저 로그인
           </Title>
-          <LoadingText>로그인 상태를 확인하고 있어요...</LoadingText>
+          <LoadingText>로그인 상태를 확인하고 있어요..</LoadingText>
         </LoginCard>
       </PageWrapper>
     );
@@ -223,25 +231,25 @@ const ManagerLoginPage: React.FC = () => {
         </Title>
         <form onSubmit={handleSubmit}>
           <Field>
-            <Label>매니저 아이디</Label>
+            <Label>업무등록번호</Label>
             <Input
               value={managerId}
-              onChange={(e) => setManagerId(e.target.value)}
-              placeholder="예: manager001"
+              onChange={(e) => setManagerId(e.target.value.toUpperCase())}
+              placeholder="예: H01064"
             />
           </Field>
           <Field>
-            <Label>패스워드</Label>
+            <Label>비밀번호</Label>
             <Input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="매니저 로그인 비밀번호"
+              placeholder="예: 900101"
             />
           </Field>
           {error && <ErrorText>{error}</ErrorText>}
           <SubmitButton type="submit" disabled={loading}>
-            {loading ? "로그인 중..." : "로그인"}
+            {loading ? "로그인 중.." : "로그인"}
           </SubmitButton>
         </form>
       </LoginCard>

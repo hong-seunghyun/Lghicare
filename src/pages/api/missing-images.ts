@@ -2,10 +2,10 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { google, drive_v3 } from "googleapis";
 import { fetchSheetData } from "@/lib/sheet";
 
-// ✅ 시트 데이터 기본 타입 (string | number 허용)
+//  시트 데이터 기본 타입 (string | number 허용)
 type Product = { [key: string]: string | number };
 
-// ✅ 중분류 이미지 캐시 구조
+//  중분류 이미지 캐시 구조
 type MiddleCacheEntry = {
   id: string;
   subFolders: drive_v3.Schema$File[];
@@ -21,14 +21,14 @@ type DriveCacheExtended = {
   pending: Record<string, Promise<ImageCache | null>>;
 };
 
-// ✅ 글로벌 캐시 초기화
+//  글로벌 캐시 초기화
 if (!globalThis.__driveCache) {
   globalThis.__driveCache = { middleCache: {} };
 }
 const driveCache = globalThis.__driveCache as DriveCacheExtended;
 if (!driveCache.pending) driveCache.pending = {};
 
-// ✅ 안전한 Drive API 호출 (쿼터 초과 시 백오프)
+//  안전한 Drive API 호출 (쿼터 초과 시 백오프)
 async function safeDriveList(
   drive: drive_v3.Drive,
   params: drive_v3.Params$Resource$Files$List,
@@ -63,7 +63,7 @@ async function safeDriveList(
   return { files: [] };
 }
 
-// ✅ 폴더·파일명과 모델코드 간 유연한 매칭 함수
+//  폴더·파일명과 모델코드 간 유연한 매칭 함수
 function isFolderMatch(folderName: string, modelId: string): boolean {
   const normFolder = folderName.replace(/[()\s]/g, "").toLowerCase();
   const normModel = modelId.replace(/\s/g, "").toLowerCase();
@@ -84,7 +84,7 @@ function isFolderMatch(folderName: string, modelId: string): boolean {
 }
 
 
-// ✅ 이미지 캐시 (이미지/중분류/모델코드 구조)
+//  이미지 캐시 (이미지/중분류/모델코드 구조)
 async function ensureMiddleCache(
   middleName: string,
   drive: drive_v3.Drive,
@@ -121,7 +121,7 @@ async function ensureMiddleCache(
       images[sf.name || ""] = (res.files || []).map((f) => `/api/image-proxy?fileId=${f.id}`);
     }
 
-    console.log(`✅ 이미지 폴더 조회 완료 (${middleName})`);
+    console.log(` 이미지 폴더 조회 완료 (${middleName})`);
     return { id: middleFolder.id, images };
   } catch (error) {
     console.error(`❌ ensureMiddleCache(${middleName}) Error:`, error);
@@ -130,7 +130,7 @@ async function ensureMiddleCache(
 }
 
 
-// ✅ 상세페이지 캐시 (상세페이지/중분류/모델코드.html 구조)
+//  상세페이지 캐시 (상세페이지/중분류/모델코드.html 구조)
 async function ensureDetailCache(
   middleName: string,
   drive: drive_v3.Drive,
@@ -145,7 +145,7 @@ async function ensureDetailCache(
   try {
     console.log(`🗂️ 상세페이지 실시간 조회 시작 (${middleName})`);
 
-    // ✅ 1. 루트 폴더 내 "상세페이지" 찾기
+    //  1. 루트 폴더 내 "상세페이지" 찾기
     const detailRootRes = await safeDriveList(drive, {
       q: `'${rootFolderId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
       fields: "files(id,name)",
@@ -160,7 +160,7 @@ async function ensureDetailCache(
       return {};
     }
 
-    // ✅ 2. 중분류 폴더 찾기
+    //  2. 중분류 폴더 찾기
     const middleRes = await safeDriveList(drive, {
       q: `'${detailRoot.id}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
       fields: "files(id,name)",
@@ -175,7 +175,7 @@ async function ensureDetailCache(
       return {};
     }
 
-    // ✅ 3. 중분류 폴더 내 HTML 파일 전부 실시간 조회
+    //  3. 중분류 폴더 내 HTML 파일 전부 실시간 조회
     const filesRes = await safeDriveList(drive, {
       q: `'${middleFolder.id}' in parents and trashed = false and mimeType != 'application/vnd.google-apps.folder'`,
       fields: "files(id,name)",
@@ -195,7 +195,7 @@ async function ensureDetailCache(
       files[normalizedKey] = `/api/html-proxy?fileId=${f.id}`;
     }
 
-    // ✅ 디버깅용 로그
+    //  디버깅용 로그
     console.log(`📄 상세페이지 파일 (${middleName}): ${Object.keys(files).length}개`);
     console.log("📁 상세페이지 검색 중분류:", middleName);
 
@@ -215,7 +215,7 @@ async function ensureDetailCache(
 
 
 
-// ✅ 이미지 + 상세페이지 병렬 조회
+//  이미지 + 상세페이지 병렬 조회
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const ROOT_FOLDER_ID = "1x27KNuvpWCc9aUyiaCzPMoF1tDVQrdYD"; // lghicaresolution
@@ -324,8 +324,8 @@ const found = cacheKeys.find((k) =>
                 모델코드: String(product["모델코드"]),
                 상품명: String(product["상품명"]),
                 소분류: String(product["소분류"]),
-                썸네일: product.thumb ? "✅ 있음" : "❌ 없음",
-                상세페이지: product.hasDetailPage ? "✅ 있음" : "❌ 없음",
+                썸네일: product.thumb ? " 있음" : "❌ 없음",
+                상세페이지: product.hasDetailPage ? " 있음" : "❌ 없음",
                 };
             }
         ),

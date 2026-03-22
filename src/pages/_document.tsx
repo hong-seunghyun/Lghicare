@@ -42,7 +42,7 @@ export default class MyDocument extends Document {
     return (
       <Html lang="ko">
         <Head>
-          {/* ✅ Google Fonts - Noto Sans KR */}
+          {/*  Google Fonts - Noto Sans KR */}
           <link
             href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800;900&display=swap"
             rel="stylesheet"

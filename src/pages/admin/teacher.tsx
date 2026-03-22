@@ -102,7 +102,7 @@ export default function TeacherPlanAdminPage() {
     }
 
     const discountStr = prompt(
-      "구좌당 할인 금액을 입력하세요 (쉼표 없이 숫자만, 예: 20000)"
+      "구좌당 할인 금액을 입력하세요 (쉼표 없이 숫자만, 예: 20000)",
     );
     if (!discountStr) return;
 
@@ -144,13 +144,13 @@ export default function TeacherPlanAdminPage() {
   const handleEdit = async (plan: TeacherPlan) => {
     const type = prompt(
       "구독교원 유형을 수정하세요",
-      plan.type || "LG구독교원 144"
+      plan.type || "LG구독교원 144",
     );
     if (!type) return;
 
     const maxSeatsStr = prompt(
       "신청 가능 최대 구좌를 수정하세요 (0~4)",
-      String(plan.maxSeats)
+      String(plan.maxSeats),
     );
     if (!maxSeatsStr) return;
 
@@ -162,7 +162,7 @@ export default function TeacherPlanAdminPage() {
 
     const discountStr = prompt(
       "구좌당 할인 금액을 수정하세요 (쉼표 없이 숫자만)",
-      String(plan.discountPerSeat)
+      String(plan.discountPerSeat),
     );
     if (!discountStr) return;
 
@@ -192,8 +192,8 @@ export default function TeacherPlanAdminPage() {
                 maxSeats,
                 discountPerSeat: discount,
               }
-            : p
-        )
+            : p,
+        ),
       );
     } catch (err) {
       console.error("❌ 구독교원 수정 오류:", err);
@@ -245,7 +245,7 @@ export default function TeacherPlanAdminPage() {
     }
 
     const confirmDelete = window.confirm(
-      `선택된 ${ids.length}개의 구독교원 유형을 삭제하시겠어요?`
+      `선택된 ${ids.length}개의 구독교원 유형을 삭제하시겠어요?`,
     );
     if (!confirmDelete) return;
 
@@ -269,7 +269,7 @@ export default function TeacherPlanAdminPage() {
     }
 
     const confirmDelete = window.confirm(
-      `teacherPlans 컬렉션의 모든 ${plans.length}개 항목을 삭제하시겠어요?\n되돌릴 수 없습니다.`
+      `teacherPlans 컬렉션의 모든 ${plans.length}개 항목을 삭제하시겠어요?\n되돌릴 수 없습니다.`,
     );
     if (!confirmDelete) return;
 
@@ -364,7 +364,6 @@ export default function TeacherPlanAdminPage() {
 }
 
 const Wrapper = styled.div`
-  max-width: 960px;
   margin: 40px auto;
   padding: 0 16px;
 `;

@@ -24,6 +24,7 @@ const MIDDLES = [
   "의류관리기",
   "청소기",
   "가습기",
+  "바스에어시스템",
   "워시콤보",
   "에어컨",
   "제습기",
@@ -38,23 +39,23 @@ export default function MissingImagesPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const requestIdRef = useRef(0); // ✅ 렌더 간에도 유지됨
+  const requestIdRef = useRef(0); //  렌더 간에도 유지됨
 
   const fetchData = async (middle: string) => {
     const requestId = ++requestIdRef.current;
     setLoading(true);
     setError(null);
-    setItems([]); // ✅ 이전 데이터 즉시 제거 → 로딩 중엔 깔끔하게 비워짐
+    setItems([]); //  이전 데이터 즉시 제거 → 로딩 중엔 깔끔하게 비워짐
 
     if (requestId !== requestIdRef.current) return;
     try {
       const res = await fetch(
-        `/api/missing-images?middle=${encodeURIComponent(middle)}`
+        `/api/missing-images?middle=${encodeURIComponent(middle)}`,
       );
       if (!res.ok) throw new Error(`API 요청 실패 (${res.status})`);
       const data = await res.json();
 
-      // ✅ 최신 요청만 반영
+      //  최신 요청만 반영
       if (requestId !== requestIdRef.current) return;
 
       setItems(data.items || []);
@@ -105,7 +106,7 @@ export default function MissingImagesPage() {
       </div>
 
       <div style={{ position: "relative", minHeight: 200 }}>
-        {/* ✅ 로딩 중 오버레이 */}
+        {/*  로딩 중 오버레이 */}
         {loading && (
           <div
             style={{
@@ -136,11 +137,11 @@ export default function MissingImagesPage() {
           </div>
         )}
 
-        {/* ✅ 에러 / 결과 렌더링 */}
+        {/*  에러 / 결과 렌더링 */}
         {!loading && error ? (
           <p style={{ color: "red" }}>{error}</p>
         ) : !loading && items.length === 0 ? (
-          <p>누락된 제품이 없습니다 ✅</p>
+          <p>누락된 제품이 없습니다 </p>
         ) : (
           !loading && (
             <div style={{ overflowX: "auto" }}>

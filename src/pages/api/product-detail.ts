@@ -2,7 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { google } from "googleapis";
 
-// ✅ 글로벌 캐시 선언
+//  글로벌 캐시 선언
 if (!globalThis.__detailCache) {
   globalThis.__detailCache = {
     rootFolderId: null,
@@ -21,7 +21,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: "middle and id required" });
     }
 
-    // ✅ 구글 인증
+    //  구글 인증
     const auth = new google.auth.GoogleAuth({
       credentials: {
         client_email: process.env.GOOGLE_SERVICE_EMAIL,
@@ -31,7 +31,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
     const drive = google.drive({ version: "v3", auth });
 
-    // ✅ 1. 루트 폴더 캐싱
+    //  1. 루트 폴더 캐싱
     let rootFolderId = detailCache.rootFolderId;
     if (!rootFolderId) {
       const rootRes = await drive.files.list({
@@ -53,7 +53,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       detailCache.rootFolderId = rootFolderId;
     }
 
-    // ✅ 2. 중분류 폴더 캐싱
+    //  2. 중분류 폴더 캐싱
     let middleFolderId = detailCache.middleFolders[middle];
     if (!middleFolderId) {
         const middleRes = await drive.files.list({
@@ -76,11 +76,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 
         middleFolderId = foundId;
-        detailCache.middleFolders[middle] = middleFolderId; // ✅ null 들어갈 일 없음
+        detailCache.middleFolders[middle] = middleFolderId; //  null 들어갈 일 없음
       }
 
 
-    // ✅ 3. 모델 상세 HTML 파일 찾기
+    //  3. 모델 상세 HTML 파일 찾기
     const fileRes = await drive.files.list({
       q: `'${middleFolderId}' in parents and name = '${id}_detail.html' and trashed = false`,
       fields: "files(id,name,mimeType)",
@@ -99,7 +99,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).send(fallbackHtml);
     }
 
-    // ✅ 4. 파일 내용을 Buffer로 읽기
+    //  4. 파일 내용을 Buffer로 읽기
     const fileBufferRes = await drive.files.get(
       { fileId: file.id, alt: "media" },
       { responseType: "arraybuffer" }
@@ -107,7 +107,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     let html = Buffer.from(fileBufferRes.data as ArrayBuffer).toString("utf-8");
 
-    // ✅ 5. 자동 높이 조정 스크립트 삽입
+    //  5. 자동 높이 조정 스크립트 삽입
     html += `
     <style>
   html, body {

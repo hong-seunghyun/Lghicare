@@ -93,7 +93,7 @@ const AdminNoticeEditPage: React.FC = () => {
     }
 
     w.nhn.husky.EZCreator.createInIFrame({
-      oAppRef: oEditorsRef.current, // ✅ 그대로 넘기기만 사용
+      oAppRef: oEditorsRef.current, //  그대로 넘기기만 사용
       elPlaceHolder: textareaRef.current.id,
       sSkinURI: "/smarteditor2/SmartEditor2Skin.html",
       fCreator: "createSEditor2",

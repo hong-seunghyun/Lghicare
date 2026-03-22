@@ -3,7 +3,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { google } from "googleapis";
 import type { drive_v3 } from "googleapis";
 
-// ✅ 글로벌 드라이브 클라이언트 캐싱
+//  글로벌 드라이브 클라이언트 캐싱
 if (!globalThis.__driveClient) {
   const auth = new google.auth.GoogleAuth({
     credentials: {
@@ -25,13 +25,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: "fileId required" });
     }
 
-    // ✅ 이미지 스트리밍 (한 번의 호출로 충분)
+    //  이미지 스트리밍 (한 번의 호출로 충분)
     const fileRes = await drive.files.get(
       { fileId, alt: "media" },
       { responseType: "stream" }
     );
 
-    // ✅ Content-Type 안전 설정
+    //  Content-Type 안전 설정
     const headerContentType = fileRes.headers["content-type"] as string | undefined;
     const lowerId = fileId.toLowerCase();
     const mimeType =
@@ -49,7 +49,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Access-Control-Allow-Origin", "*");
 
-    // ✅ Drive 응답 헤더 기반 캐시 힌트 전달 (가능하면)
+    //  Drive 응답 헤더 기반 캐시 힌트 전달 (가능하면)
     const etag = (fileRes.headers["etag"] || fileRes.headers.etag) as string | undefined;
     const lastModified = fileRes.headers["last-modified"] as string | undefined;
 
@@ -60,7 +60,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       res.setHeader("Last-Modified", lastModified);
     }
 
-    // ✅ 브라우저/중간 프록시 캐시 (1일 + 7일 SWR)
+    //  브라우저/중간 프록시 캐시 (1일 + 7일 SWR)
     res.setHeader(
       "Cache-Control",
       "public, max-age=86400, stale-while-revalidate=604800"

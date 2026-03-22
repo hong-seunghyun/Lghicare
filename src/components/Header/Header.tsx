@@ -6,6 +6,11 @@ import styled from "styled-components";
 import { categories } from "@/constants/categories";
 import Image from "next/image";
 import HeaderSearch from "@/components/Search/HeaderSearch";
+import {
+  SALES_HUB_ID,
+  SALES_TALK_BOARD_ID,
+  getBoardCategoryLabel,
+} from "@/config/boardCategories";
 
 // 🔥 Firebase Auth 추가
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
@@ -22,6 +27,8 @@ export default function Header() {
   const router = useRouter();
 
   const auth = getAuth(app);
+  const mobileTalkLabel = getBoardCategoryLabel(SALES_HUB_ID);
+  const salesTalkBoardLabel = getBoardCategoryLabel(SALES_TALK_BOARD_ID);
 
   // ✅ 라우트 변경 시 서브네비 닫기
   useEffect(() => {
@@ -114,10 +121,31 @@ export default function Header() {
             {isLoggedIn && greeting && (
               <>
                 <GreetingText>{greeting}</GreetingText>
+                {userRole === "admin" && (
+                  <>
+                    {mobileTalkLabel && (
+                      <SalesHubLink href={`/admin/boards/${SALES_HUB_ID}`}>
+                        {mobileTalkLabel}
+                      </SalesHubLink>
+                    )}
+                  </>
+                )}
+                {userRole === "manager" && (
+                  <>
+                    {mobileTalkLabel && (
+                      <SalesHubLink href={`/manager/boards/${SALES_HUB_ID}`}>
+                        {mobileTalkLabel}
+                      </SalesHubLink>
+                    )}
+                  </>
+                )}
                 <LogoutButton type="button" onClick={handleLogout}>
                   로그아웃
                 </LogoutButton>
               </>
+            )}
+            {!isLoggedIn && (
+              <ManagerLoginLink href="/portal">로그인</ManagerLoginLink>
             )}
           </div>
         </LogoBox>
@@ -203,7 +231,7 @@ export default function Header() {
                                     {item.label}
                                   </Link>
                                 </li>
-                              )
+                              ),
                             )}
                           </SubList>
                         </SubWrap>
@@ -390,6 +418,35 @@ const LogoutButton = styled.button`
 
   &:hover {
     background: #eee;
+  }
+`;
+
+const SalesHubLink = styled(Link)`
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid #ddd;
+  background: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  margin-right: 5px;
+
+  &:hover {
+    background: #f4f4f4;
+  }
+`;
+
+const ManagerLoginLink = styled(Link)`
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid #ddd;
+  background: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:hover {
+    background: #f4f4f4;
   }
 `;
 

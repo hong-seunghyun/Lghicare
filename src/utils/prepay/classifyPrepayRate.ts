@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+
 // utils/prepay/classifyPrepayRate.ts
 
 export type PrepayRate = "30" | "30_50" | null;

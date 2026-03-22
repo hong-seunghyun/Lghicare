@@ -49,7 +49,7 @@ export function useAdminGuard() {
           return;
         }
 
-        // ✅ 진짜 관리자
+        //  진짜 관리자
         setIsAdmin(true);
         setChecking(false);
       } catch (error) {

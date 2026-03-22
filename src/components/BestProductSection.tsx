@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import styled from "styled-components";
 
-// ✅ API 응답 타입 정의
+//  API 응답 타입 정의
 interface HotProduct {
   modelCode: string;
   productName: string;
@@ -18,12 +18,12 @@ interface Category {
   products: HotProduct[];
 }
 
-// ✅ SWR fetcher
+//  SWR fetcher
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
-// ✅ 컴포넌트
+//  컴포넌트
 export default function BestProductSection() {
-  // ✅ useSWR에 제네릭으로 타입 지정
+  //  useSWR에 제네릭으로 타입 지정
   const { data, error } = useSWR<Category[]>("/api/hot-products", fetcher);
 
   if (error) return <div>불러오기 실패</div>;
@@ -61,7 +61,7 @@ export default function BestProductSection() {
   );
 }
 
-// ✅ styled-components
+//  styled-components
 const Section = styled.section`
   margin-top: 80px;
 `;

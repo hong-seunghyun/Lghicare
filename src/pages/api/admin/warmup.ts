@@ -20,6 +20,7 @@ const MIDDLES_TO_WARM = [
   "의류관리기",
   "청소기",
   "가습기",
+  "바스에어시스템",
   "워시콤보",
   "에어컨",
   "제습기",
@@ -42,11 +43,11 @@ type MiddleCacheEntryWarm = {
   id: string;
   subFolders: drive_v3.Schema$File[];
   images: Record<string, string[]>;      // 폴더 원래 이름 기준
-  imageIndex: Record<string, string[]>;  // ✅ 정규화된 폴더명 기준 (products.ts와 맞춤)
+  imageIndex: Record<string, string[]>;  //  정규화된 폴더명 기준 (products.ts와 맞춤)
   ts: number;
 };
 
-// ✅ 안전한 Drive list 호출 (429, 403 등에 대비한 백오프)
+//  안전한 Drive list 호출 (429, 403 등에 대비한 백오프)
 async function safeDriveList(
   drive: drive_v3.Drive,
   params: drive_v3.Params$Resource$Files$List,
@@ -72,7 +73,7 @@ async function safeDriveList(
   return { files: [] };
 }
 
-// ✅ 폴더별 이미지 리스트 구성 (products.ts와 동일한 구조 유지)
+//  폴더별 이미지 리스트 구성 (products.ts와 동일한 구조 유지)
 async function fetchImagesInBatchesForWarmup(
   subFolders: drive_v3.Schema$File[],
   drive: drive_v3.Drive
@@ -117,7 +118,7 @@ async function fetchImagesInBatchesForWarmup(
   return images;
 }
 
-// ✅ 특정 중분류의 Drive middle 캐시를 미리 채우는 함수
+//  특정 중분류의 Drive middle 캐시를 미리 채우는 함수
 async function warmDriveMiddleCache(
   middleName: string,
   drive: drive_v3.Drive,
@@ -174,7 +175,7 @@ async function warmDriveMiddleCache(
         drive
       );
 
-      // ✅ products.ts 와 동일한 imageIndex 생성
+      //  products.ts 와 동일한 imageIndex 생성
       const imageIndex: Record<string, string[]> = {};
       for (const [folderName, urls] of Object.entries(images)) {
         const key = normalizeName(folderName);
@@ -210,6 +211,55 @@ async function warmDriveMiddleCache(
   return await promise;
 }
 
+const DRIVE_PARENT_FOLDER_ID = "12kbRkg4PREBp6f5_tmXCu0_SYgUngIrw";
+
+const getDriveClient = () => {
+  const auth = new google.auth.GoogleAuth({
+    credentials: {
+      client_email: process.env.GOOGLE_SERVICE_EMAIL,
+      private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+    },
+    scopes: ["https://www.googleapis.com/auth/drive.readonly"],
+  });
+  const drive = google.drive({ version: "v3", auth });
+  return { drive };
+};
+
+const warmSheets = async (): Promise<string[]> => {
+  const warmedSheets: string[] = [];
+  await Promise.all(
+    MIDDLES_TO_WARM.map(async (middle) => {
+      try {
+        await fetchSheetData(middle);
+        warmedSheets.push(middle);
+      } catch (e) {
+        console.warn(`⚠️ [warmup] fetchSheetData(${middle}) 실패`, e);
+      }
+    })
+  );
+  return warmedSheets;
+};
+
+const warmDrive = async (
+  drive: drive_v3.Drive,
+  parentFolderId: string
+): Promise<string[]> => {
+  const warmedDrive: string[] = [];
+  for (const middle of MIDDLES_TO_WARM) {
+    try {
+      const entry = await warmDriveMiddleCache(
+        middle,
+        drive,
+        parentFolderId
+      );
+      if (entry) warmedDrive.push(middle);
+    } catch (e) {
+      console.warn(`⚠️ [warmup] warmDriveMiddleCache(${middle}) 실패`, e);
+    }
+  }
+  return warmedDrive;
+};
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -220,53 +270,36 @@ export default async function handler(
       .json({ ok: false, message: "Method Not Allowed" });
   }
 
+  const target = (req.query.target as string | undefined) ?? "all";
+
   try {
-    const parentFolderId = "12kbRkg4PREBp6f5_tmXCu0_SYgUngIrw";
-
-    // ✅ Sheets warmup + Drive warmup 병렬 실행
-    const auth = new google.auth.GoogleAuth({
-      credentials: {
-        client_email: process.env.GOOGLE_SERVICE_EMAIL,
-        private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-      },
-      scopes: ["https://www.googleapis.com/auth/drive.readonly"],
-    });
-    const drive = google.drive({ version: "v3", auth });
-
-    const warmedSheets: string[] = [];
-    const warmedDrive: string[] = [];
-
-    // 1) 시트 데이터 캐시 선로딩 (병렬)
-    await Promise.all(
-      MIDDLES_TO_WARM.map(async (middle) => {
-        try {
-          await fetchSheetData(middle);
-          warmedSheets.push(middle);
-        } catch (e) {
-          console.warn(`⚠️ [warmup] fetchSheetData(${middle}) 실패`, e);
-        }
-      })
-    );
-
-    // 2) Drive middle 캐시 선로딩 (순차 - quota 보호)
-    for (const middle of MIDDLES_TO_WARM) {
-      try {
-        const entry = await warmDriveMiddleCache(
-          middle,
-          drive,
-          parentFolderId
-        );
-        if (entry) warmedDrive.push(middle);
-      } catch (e) {
-        console.warn(`⚠️ [warmup] warmDriveMiddleCache(${middle}) 실패`, e);
-      }
+    if (target === "sheets") {
+      const warmedSheets = await warmSheets();
+      return res.status(200).json({
+        ok: true,
+        warmedSheets,
+        message: "Sheets warmup 수행 완료",
+      });
     }
 
+    if (target === "drive") {
+      const { drive } = getDriveClient();
+      const warmedDrive = await warmDrive(drive, DRIVE_PARENT_FOLDER_ID);
+      return res.status(200).json({
+        ok: true,
+        warmedDrive,
+        message: "Drive warmup 수행 완료",
+      });
+    }
+
+    const { drive } = getDriveClient();
+    const warmedSheets = await warmSheets();
+    const warmedDrive = await warmDrive(drive, DRIVE_PARENT_FOLDER_ID);
     return res.status(200).json({
       ok: true,
       warmedSheets,
       warmedDrive,
-      message: "Warmup 완료",
+      message: "Warmup 수행 완료",
     });
   } catch (error) {
     console.error("❌ warmup API error:", error);

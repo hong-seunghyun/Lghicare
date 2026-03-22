@@ -56,7 +56,7 @@ export default function ProductSearchPage() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // ✅ 디바운스 검색 트리거 (입력 시 기존 결과 유지)
+  //  디바운스 검색 트리거 (입력 시 기존 결과 유지)
   useEffect(() => {
     const h = setTimeout(() => {
       const url = { pathname: "/search", query: q ? { q } : {} };
@@ -67,7 +67,7 @@ export default function ProductSearchPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
 
-  // ✅ 실제 API 호출 (appliedQ 변경 시 실행)
+  //  실제 API 호출 (appliedQ 변경 시 실행)
   useEffect(() => {
     const doFetch = async () => {
       const trimmed = appliedQ.trim();
@@ -79,7 +79,7 @@ export default function ProductSearchPage() {
       const ttl = 5 * 60 * 1000; // 5분 TTL
 
       if (cached && now - cached.ts < ttl) {
-        // ✅ 캐시된 데이터 즉시 렌더
+        //  캐시된 데이터 즉시 렌더
         setGroups(cached.data.groups || []);
         setTotal(cached.data.total || 0);
         setNextCursor(cached.data.nextCursor || null);
@@ -111,10 +111,10 @@ export default function ProductSearchPage() {
 
         const data: SearchResponse = await res.json();
 
-        // ✅ 캐시 저장
+        //  캐시 저장
         searchCache.set(query, { ts: Date.now(), data });
 
-        // ✅ 상태 반영
+        //  상태 반영
         setGroups(data.groups || []);
         setTotal(data.total || 0);
         setNextCursor(data.nextCursor || null);
@@ -128,7 +128,7 @@ export default function ProductSearchPage() {
     doFetch();
   }, [appliedQ]);
 
-  // ✅ 2️⃣ 무한 스크롤 (cursor 기반 추가 요청)
+  //  2️⃣ 무한 스크롤 (cursor 기반 추가 요청)
   useEffect(() => {
     if (!sentinelRef.current || !appliedQ) return;
 
@@ -153,7 +153,7 @@ export default function ProductSearchPage() {
               `/api/search-products?${params.toString()}`,
               {
                 headers: { Accept: "application/json" },
-              }
+              },
             );
             if (res.ok) {
               const data: SearchResponse = await res.json();
@@ -167,7 +167,7 @@ export default function ProductSearchPage() {
           }
         }, 300);
       },
-      { rootMargin: "600px 0px" }
+      { rootMargin: "600px 0px" },
     );
 
     io.observe(el);
@@ -199,7 +199,7 @@ export default function ProductSearchPage() {
         />
       </SearchBar>
 
-      {/* ✅ 로딩 중엔 기존 목록 유지 + 오버레이 */}
+      {/*  로딩 중엔 기존 목록 유지 + 오버레이 */}
       {loading && <Loading />}
 
       <ListWrap>
@@ -231,17 +231,17 @@ export default function ProductSearchPage() {
 function ProductCardItem({ card }: { card: ProductCard }) {
   const representative = card;
   const [activeThumb, setActiveThumb] = useState(
-    representative.thumbnailUrl || ""
+    representative.thumbnailUrl || "",
   );
   const [selectedCode, setSelectedCode] = useState(
-    representative["모델코드"] || ""
+    representative["모델코드"] || "",
   );
 
   const safeVariants = Array.isArray(representative.variants)
     ? representative.variants
     : [];
 
-  // ✅ 색상 클릭 시 썸네일 변경 함수
+  //  색상 클릭 시 썸네일 변경 함수
   const handleColorClick = async (variant: Variant) => {
     const code = (variant["모델코드"] || "").trim();
     const thumb = variant.thumbnailUrl?.trim();
@@ -263,7 +263,7 @@ function ProductCardItem({ card }: { card: ProductCard }) {
         `/api/product-thumbnail?middle=${middle}&id=${code}`,
         {
           headers: { Accept: "application/json" },
-        }
+        },
       );
       if (res.ok) {
         const data = await res.json();
@@ -289,15 +289,15 @@ function ProductCardItem({ card }: { card: ProductCard }) {
             const color = (v.제품색상 || "").trim();
             return color !== "" && color !== "-" && !color.includes("무드업");
           })
-          .map((v) => [v.제품색상, v])
-      ).values()
+          .map((v) => [v.제품색상, v]),
+      ).values(),
     );
   }, [safeVariants]);
 
   const modelCodes = useMemo(
     () =>
       Array.from(new Set(safeVariants.map((v) => v.모델코드).filter(Boolean))),
-    [safeVariants]
+    [safeVariants],
   );
 
   const prices = useMemo(() => {
@@ -317,7 +317,7 @@ function ProductCardItem({ card }: { card: ProductCard }) {
     <Card>
       <Link
         href={`/products/${representative["중분류"]}/${encodeURIComponent(
-          selectedCode
+          selectedCode,
         )}`}
       >
         {activeThumb ? (
@@ -349,7 +349,7 @@ function ProductCardItem({ card }: { card: ProductCard }) {
                 .split(/[/|]/)
                 .map((c) => c.replace(/\s+/g, ""))
                 .map((c) =>
-                  c.includes("무드업") ? "rainbow" : colorMap[c] || "#fff"
+                  c.includes("무드업") ? "rainbow" : colorMap[c] || "#fff",
                 );
               return (
                 <OptionButton
@@ -373,7 +373,7 @@ function ProductCardItem({ card }: { card: ProductCard }) {
           <Price>
             월 <b>{minPrice.toLocaleString()}</b>원 <br />
             <span style={{ color: "#e60023", fontSize: "15px" }}>
-              최대혜택가 월 <b>{bestPrice.toLocaleString()}</b>원
+              총 체감 혜택 월 <b>{bestPrice.toLocaleString()}</b>원
             </span>
           </Price>
         </Dec>
@@ -601,8 +601,8 @@ const DecInfo = styled.p`
   margin-top: 6px;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap; /* ✅ 한 줄로 제한 */
-  display: block; /* ✅ flex → block으로 변경 */
+  white-space: nowrap; /*  한 줄로 제한 */
+  display: block; /*  flex → block으로 변경 */
 
   @media (max-width: 499px) {
     gap: 2px 4px;
@@ -700,8 +700,8 @@ const ColorChipBox = styled.div<{ colors: string[] }>`
     colors.length === 1
       ? `background: ${colors[0]};`
       : colors.length === 2
-      ? `background: linear-gradient(to bottom, ${colors[0]} 50%, ${colors[1]} 50%);`
-      : `background: linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet);`}
+        ? `background: linear-gradient(to bottom, ${colors[0]} 50%, ${colors[1]} 50%);`
+        : `background: linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet);`}
 
   &:hover::after {
     content: attr(data-colorname);

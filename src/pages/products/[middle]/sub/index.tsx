@@ -26,7 +26,7 @@ type ProductCard = Product & {
 
 export default function Products() {
   const router = useRouter();
-  const { middle, name } = router.query; // ✅ sub → name 으로 변경
+  const { middle, name } = router.query; //  sub → name 으로 변경
 
   const [products, setProducts] = useState<Product[]>([]);
   const [subCategories, setSubCategories] = useState<string[]>([]);
@@ -40,8 +40,8 @@ export default function Products() {
   const [isModalOpen, setIsModalOpen] = useState(true);
 
   useEffect(() => {
-    const middleValue = Array.isArray(middle) ? middle[0] : middle ?? "";
-    const subValue = Array.isArray(name) ? name[0] : name ?? "";
+    const middleValue = Array.isArray(middle) ? middle[0] : (middle ?? "");
+    const subValue = Array.isArray(name) ? name[0] : (name ?? "");
 
     if (!middleValue) return;
 
@@ -49,7 +49,7 @@ export default function Products() {
       setLoading(true);
       const url = subValue
         ? `/api/products?middle=${encodeURIComponent(
-            middleValue
+            middleValue,
           )}&sub=${encodeURIComponent(subValue)}`
         : `/api/products?middle=${encodeURIComponent(middleValue)}`;
 
@@ -59,23 +59,40 @@ export default function Products() {
       setSubCategories(data.subCategories || []);
       setLoading(false);
 
-      // ✅ 새 데이터 로딩 시 그룹 카운트 초기화
+      //  새 데이터 로딩 시 그룹 카운트 초기화
       setVisibleGroupCount(9);
     };
 
     fetchProducts();
   }, [middle, name]);
 
-  // ✅ 동일모델 기준 그룹핑
   const normalizeKey = (val: string | undefined) => {
     if (!val) return "";
     return val.replace(/[\s-/]/g, "").toLowerCase();
   };
 
+  // ✅ (추가) 모델코드는 하이픈을 제거하지 않고, 최소한의 공백만 정리
+  const normalizeModelCodeKey = (val: string | undefined) => {
+    if (!val) return "";
+    return val.trim().toUpperCase(); // 하이픈은 유지
+  };
+
+  // ✅ (추가) 동일모델기준 유효값 체크 (빈값/공백/'-' 등은 무시)
+  const isValidSameModelKey = (val: string | undefined) => {
+    const v = (val ?? "").trim();
+    return v !== "" && v !== "-";
+  };
+
   // 🔹 동일모델 기준으로 그룹핑
   const grouped = products.reduce((acc: Record<string, Product[]>, cur) => {
-    const baseKey =
-      normalizeKey(cur["동일모델기준"]) || normalizeKey(cur["모델코드"]);
+    const sameModelRaw = cur["동일모델기준"];
+    const modelCodeRaw = cur["모델코드"];
+
+    // ✅ 동일모델기준이 있으면 normalizeKey 사용 (포맷 차이 무시하고 묶기)
+    // ✅ 없으면 모델코드 원본 기반(하이픈 유지)으로 묶기
+    const baseKey = isValidSameModelKey(sameModelRaw)
+      ? normalizeKey(sameModelRaw)
+      : normalizeModelCodeKey(modelCodeRaw);
 
     if (!baseKey) return acc;
 
@@ -106,7 +123,7 @@ export default function Products() {
     setSelectedProducts((prev) => prev.filter((p) => p["모델코드"] !== code));
   };
 
-  // ✅ 스크롤 감지 → 9개씩 추가
+  //  스크롤 감지 → 9개씩 추가
   useEffect(() => {
     const handleScroll = () => {
       if (loadingMore || loading) return;
@@ -128,7 +145,7 @@ export default function Products() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, [groups.length, visibleGroupCount, loading, loadingMore]);
 
-  // ✅ 네비 Sticky
+  //  네비 Sticky
   useEffect(() => {
     const onScroll = () => setIsSticky(window.scrollY > 0);
     window.addEventListener("scroll", onScroll);
@@ -137,8 +154,8 @@ export default function Products() {
 
   if (loading) return <Loading />;
 
-  const middleValue = Array.isArray(middle) ? middle[0] : middle ?? "";
-  const subValue = Array.isArray(name) ? name[0] : name ?? "";
+  const middleValue = Array.isArray(middle) ? middle[0] : (middle ?? "");
+  const subValue = Array.isArray(name) ? name[0] : (name ?? "");
 
   function ProductCardItem({
     group,
@@ -153,7 +170,7 @@ export default function Products() {
     const [activeThumb, setActiveThumb] = useState(representative.thumbnailUrl);
 
     const [selectedCode, setSelectedCode] = useState(
-      representative["모델코드"]
+      representative["모델코드"],
     );
 
     const uniqueVariants = Array.from(
@@ -162,14 +179,14 @@ export default function Products() {
           .filter((v) => {
             const color = (v.제품색상 || "").trim();
             return color !== "" && color !== "-" && !color.includes("무드업");
-            // ✅ 공백, '-' 또는 무드업이면 제외
+            //  공백, '-' 또는 무드업이면 제외
           })
-          .map((v) => [v.제품색상, v])
-      ).values()
+          .map((v) => [v.제품색상, v]),
+      ).values(),
     );
 
     const modelCodes = Array.from(
-      new Set(representative.variants.map((v) => v.모델코드).filter(Boolean))
+      new Set(representative.variants.map((v) => v.모델코드).filter(Boolean)),
     );
 
     const prices = (() => {
@@ -181,14 +198,14 @@ export default function Products() {
 
       // ① 정확히 "신규결합"인 variant
       const exactNewJoin = representative.variants.filter(
-        (v) => normalizePromo(v["프로모션유형"]) === "신규결합"
+        (v) => normalizePromo(v["프로모션유형"]) === "신규결합",
       );
 
       // ② 복합형 "신규결합" 포함 variant
       const mixedNewJoin = representative.variants.filter(
         (v) =>
           normalizePromo(v["프로모션유형"]).includes("신규결합") &&
-          normalizePromo(v["프로모션유형"]) !== "신규결합"
+          normalizePromo(v["프로모션유형"]) !== "신규결합",
       );
 
       // ③ 최종 타겟 리스트 결정
@@ -196,8 +213,8 @@ export default function Products() {
         exactNewJoin.length > 0
           ? exactNewJoin
           : mixedNewJoin.length > 0
-          ? mixedNewJoin
-          : representative.variants;
+            ? mixedNewJoin
+            : representative.variants;
 
       // ④ 숫자만 추출
       const extractPrices = (list: Variant[]) =>
@@ -220,7 +237,7 @@ export default function Products() {
       <Card>
         <Link
           href={`/products/${representative["중분류"]}/${encodeURIComponent(
-            selectedCode
+            selectedCode,
           )}`}
         >
           {activeThumb ? (
@@ -248,8 +265,8 @@ export default function Products() {
               {uniqueVariants
                 .filter((v) => {
                   const color = (v.제품색상 || "").trim();
-                  return color !== "" && color !== "-"; // ✅ 조건 추가
-                }) // ✅ 색상 없는 경우 제외
+                  return color !== "" && color !== "-"; //  조건 추가
+                }) //  색상 없는 경우 제외
                 .map((variant) => {
                   const code = (variant["모델코드"] || "").trim();
                   const colorName = variant["제품색상"] || code;
@@ -258,7 +275,7 @@ export default function Products() {
                     .split(/[/|]/)
                     .map((c) => c.replace(/\s+/g, ""))
                     .map((c) =>
-                      c.includes("무드업") ? "rainbow" : colorMap[c] || "#fff"
+                      c.includes("무드업") ? "rainbow" : colorMap[c] || "#fff",
                     );
 
                   return (
@@ -268,7 +285,7 @@ export default function Products() {
                       onClick={(e) => {
                         e.preventDefault();
                         setActiveThumb(
-                          variant.thumbnailUrl || representative.thumbnailUrl
+                          variant.thumbnailUrl || representative.thumbnailUrl,
                         );
                         setSelectedCode(code);
                       }}
@@ -287,13 +304,13 @@ export default function Products() {
             </ButtonGroup>
 
             <DecInfo>주요기능 {representative["제품기능"]}</DecInfo>
-            {/* ✅ 그룹 모델코드 전체 */}
+            {/*  그룹 모델코드 전체 */}
             <Models>{modelCodes.join(", ")}</Models>
 
             <Price>
               월 <b>{minPrice.toLocaleString()}</b>원 <br />
               <span style={{ color: "#e60023", fontSize: "15px" }}>
-                최대혜택가 월 <b>{bestPrice.toLocaleString()}</b>원
+                월 체감요금 <b>{bestPrice.toLocaleString()}</b>원
               </span>
             </Price>
           </Dec>
@@ -304,11 +321,11 @@ export default function Products() {
                 onSelectCompare(representative);
               }}
             >
-              {/* ✅ 선택된 상태에 따라 아이콘과 텍스트 토글 */}
+              {/*  선택된 상태에 따라 아이콘과 텍스트 토글 */}
               <Icon
                 src={
                   selectedProducts.some(
-                    (item) => item["모델코드"] === representative["모델코드"]
+                    (item) => item["모델코드"] === representative["모델코드"],
                   )
                     ? "/images/icon_minus_btn.svg"
                     : "/images/icon_plus_btn.svg"
@@ -316,7 +333,7 @@ export default function Products() {
                 alt="compare-icon"
               />
               {selectedProducts.some(
-                (item) => item["모델코드"] === representative["모델코드"]
+                (item) => item["모델코드"] === representative["모델코드"],
               )
                 ? "제거하기"
                 : "비교하기"}
@@ -342,7 +359,7 @@ export default function Products() {
             <NavItem
               key={s}
               href={`/products/${encodeURIComponent(
-                middleValue
+                middleValue,
               )}/sub?name=${encodeURIComponent(s)}`}
               className={subValue === s ? "active" : ""}
             >
@@ -392,10 +409,10 @@ export default function Products() {
               중분류: p["중분류"],
             }));
 
-            // ✅ 세션스토리지에 저장 후 페이지 이동
+            //  세션스토리지에 저장 후 페이지 이동
             sessionStorage.setItem(
               "compareProducts",
-              JSON.stringify(compareData)
+              JSON.stringify(compareData),
             );
             router.push("/compare");
           }}
@@ -566,7 +583,7 @@ const Thumbnail = styled(Image)`
   object-fit: cover;
   margin: auto;
   display: block;
-  border-radius: 8px; /* ✅ 기존 style에 포함시킴 */
+  border-radius: 8px; /*  기존 style에 포함시킴 */
 
   @media (max-width: 780px) {
     width: 180px;
@@ -626,11 +643,11 @@ const ProductName = styled.h3`
   margin-top: 24px;
   height: 58px;
 
-  display: -webkit-box; /* ✅ 플렉스 기반 박스 */
-  -webkit-line-clamp: 2; /* ✅ 최대 2줄 */
-  -webkit-box-orient: vertical; /* ✅ 수직 방향으로 자르기 */
-  overflow: hidden; /* ✅ 넘친 텍스트 숨김 */
-  text-overflow: ellipsis; /* ✅ ... 표시 */
+  display: -webkit-box; /*  플렉스 기반 박스 */
+  -webkit-line-clamp: 2; /*  최대 2줄 */
+  -webkit-box-orient: vertical; /*  수직 방향으로 자르기 */
+  overflow: hidden; /*  넘친 텍스트 숨김 */
+  text-overflow: ellipsis; /*  ... 표시 */
 
   @media (max-width: 780px) {
     font-size: 16px;
@@ -641,7 +658,7 @@ const ProductName = styled.h3`
 
   @media (max-width: 499px) {
     font-size: 14px;
-    height: auto; /* ✅ 높이 자동 */
+    height: auto; /*  높이 자동 */
     -webkit-line-clamp: 2; /* 모바일에서도 두 줄 처리 유지 */
   }
 `;
@@ -669,8 +686,8 @@ const DecInfo = styled.p`
   margin-top: 6px;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap; /* ✅ 한 줄로 제한 */
-  display: block; /* ✅ flex → block으로 변경 */
+  white-space: nowrap; /*  한 줄로 제한 */
+  display: block; /*  flex → block으로 변경 */
   @media (max-width: 499px) {
     gap: 2px 4px;
     font-size: 10px;
@@ -773,10 +790,10 @@ const ColorChipBox = styled.div<{ colors: string[] }>`
     colors.length === 1
       ? `background: ${colors[0]};`
       : colors.length === 2
-      ? `
+        ? `
         background: linear-gradient(to bottom, ${colors[0]} 50%, ${colors[1]} 50%);
       `
-      : `background: linear-gradient(
+        : `background: linear-gradient(
           to right,
           red, orange, yellow, green, blue, indigo, violet
         );`}

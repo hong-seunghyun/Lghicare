@@ -1,5 +1,6 @@
 // pages/_app.tsx
 import type { AppProps } from "next/app";
+import Script from "next/script";
 import Layout from "@/components/Layout/Layout";
 import { createGlobalStyle, ThemeProvider } from "styled-components";
 import { useRouter } from "next/router";
@@ -55,23 +56,35 @@ export default function App({ Component, pageProps }: AppProps) {
 
   return (
     <ThemeProvider theme={{}}>
+      <Script
+        src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID}`}
+        strategy="afterInteractive"
+      />
+      <Script id="ga4-init" strategy="afterInteractive">
+        {`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){window.dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', '${process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID}');
+        `}
+      </Script>
       <GlobalStyle />
       <UserProvider>
         {isAdminLoginRoute || isManagerLoginRoute ? (
-          // ✅ /admin/login, /manager/login 은 공용/메인 레이아웃 없이 단독 페이지
+          //  /admin/login, /manager/login 은 공용/메인 레이아웃 없이 단독 페이지
           <Component {...pageProps} />
         ) : isAdminRoute ? (
-          // ✅ 관리자 전용 레이아웃
+          //  관리자 전용 레이아웃
           <AdminLayout>
             <Component {...pageProps} />
           </AdminLayout>
         ) : isManagerRoute ? (
-          // ✅ 매니저 전용 레이아웃
+          //  매니저 전용 레이아웃
           <ManagerLayout>
             <Component {...pageProps} />
           </ManagerLayout>
         ) : (
-          // ✅ 일반 사용자 레이아웃
+          //  일반 사용자 레이아웃
           <Layout>
             <Component {...pageProps} />
           </Layout>

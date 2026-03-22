@@ -1,4 +1,4 @@
-// ✅ pages/api/search-products.ts
+//  pages/api/search-products.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { google, drive_v3 } from "googleapis";
 import { fetchSheetData } from "@/lib/sheet";
@@ -55,7 +55,7 @@ async function ensureMiddleCache(drive: drive_v3.Drive, middleName: string) {
   const subFolders = subRes.data.files || [];
   const images: Record<string, string[]> = {};
 
-  // ✅ 이미지 병렬 로딩 (속도 개선)
+  //  이미지 병렬 로딩 (속도 개선)
   await Promise.all(
     subFolders.map(async (sf) => {
       const imgRes = await drive.files.list({
@@ -104,7 +104,7 @@ export default async function handler(
   const { q, limit = "9", cursor } = req.query;
   const search = (q as string)?.trim();
   const limitNum = parseInt(limit as string, 10);
-  const cursorNum = parseInt(cursor as string, 10) || 0; // ✅ 시작 인덱스
+  const cursorNum = parseInt(cursor as string, 10) || 0; //  시작 인덱스
 
   if (!search) {
     return res.status(200).json({ total: 0, groups: [], nextCursor: null });
@@ -120,7 +120,7 @@ export default async function handler(
     });
     const drive = google.drive({ version: "v3", auth });
 
-    // ✅ 중분류 시트 병렬 로딩 (기존 유지)
+    //  중분류 시트 병렬 로딩 (기존 유지)
     const sheetsToSearch = [
       "정수기",
       "TV",
@@ -136,6 +136,7 @@ export default async function handler(
       "의류관리기",
       "청소기",
       "가습기",
+      "바스에어시스템",
       "워시콤보",
       "에어컨",
       "제습기",
@@ -157,7 +158,7 @@ export default async function handler(
 
     const allProducts = allProductsArrays.flat();
 
-    // ✅ 검색 필터
+    //  검색 필터
     const filtered = allProducts.filter((p: Product) => {
       const combined = `
         ${p["상품명"] || ""}
@@ -174,7 +175,7 @@ export default async function handler(
       return combined.includes(keyword);
     });
 
-    // ✅ 전체 그룹화 (기존 로직 유지)
+    //  전체 그룹화 (기존 로직 유지)
 const grouped = (filtered as Product[]).reduce<Record<string, Product[]>>(
   (acc, cur) => {
     const key = ((cur["동일모델기준"] || cur["모델코드"]) ?? "").trim();
@@ -189,14 +190,14 @@ const grouped = (filtered as Product[]).reduce<Record<string, Product[]>>(
     const groupKeys = Object.keys(grouped);
     const totalGroups = groupKeys.length;
 
-    // ✅ 페이지네이션 적용
+    //  페이지네이션 적용
     const pagedKeys = groupKeys.slice(cursorNum, cursorNum + limitNum);
     const nextCursor =
       cursorNum + limitNum < totalGroups ? cursorNum + limitNum : null;
 
     const pagedGroups = pagedKeys.map((key) => grouped[key]);
 
-    // ✅ 썸네일 + 최저가 + variants 구성 (병렬)
+    //  썸네일 + 최저가 + variants 구성 (병렬)
     const cards: ProductCard[] = await Promise.all(
       pagedGroups.map(async (group) => {
         const representative = group[0];
@@ -227,7 +228,7 @@ const grouped = (filtered as Product[]).reduce<Record<string, Product[]>>(
                 : await getThumbnailUrl(
                     drive,
                     representative["중분류"],
-                    v["모델코드"] // ✅ variant별 모델코드 기준으로 탐색
+                    v["모델코드"] //  variant별 모델코드 기준으로 탐색
                   );
             return { ...v, thumbnailUrl: thumb };
           })

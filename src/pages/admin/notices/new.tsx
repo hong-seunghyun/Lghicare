@@ -100,7 +100,7 @@ const AdminNoticeCreatePage: React.FC = () => {
     try {
       const storage = getStorage(app);
 
-      // ✅ 공지 문서 ID 미리 생성
+      //  공지 문서 ID 미리 생성
       const noticesCol = collection(db, "notices");
       const noticeRef = doc(noticesCol);
 

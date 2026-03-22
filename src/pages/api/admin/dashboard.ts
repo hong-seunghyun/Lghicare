@@ -32,14 +32,14 @@ type TopBranch = {
   shareCount: number;
 };
 
-// ✅ 새로 추가: 중분류(estimateType) 통계 타입
+//  새로 추가: 중분류(estimateType) 통계 타입
 type EstimateTypeStat = {
   type: string; // 예: "정수기", "TV"
   estimateCount: number;
   shareCount: number; // 현재는 0으로 두고, 추후 확장 가능
 };
 
-// ✅ 대시보드 응답 타입을 새 구조로 변경
+//  대시보드 응답 타입을 새 구조로 변경
 type DashboardResponse = {
   estimateTypes: EstimateTypeStat[];
   topManagers: TopManager[];
@@ -56,10 +56,13 @@ export default async function handler(
 
   try {
     // 🔥 1) Firestore에서 애널리틱스 컬렉션 2개를 병렬로 가져옴
-    const [estimatesSnap, shareSnap] = await Promise.all([
-      getDocs(collection(db, "estimatesCount")),
-      getDocs(collection(db, "shareCount")),
-    ]);
+    const [estimatesSnap, shareManagerSnap, shareBranchSnap, shareTypeSnap] =
+      await Promise.all([
+        getDocs(collection(db, "estimatesCount")),
+        getDocs(collection(db, "shareCountByManager")),
+        getDocs(collection(db, "shareCountByBranch")),
+        getDocs(collection(db, "shareCountByType")),
+      ]);
 
     // ================== 1. 중분류(estimateType) 통계 ==================
     // type_* 문서를 모아서 타입별 견적 수 집계
@@ -81,13 +84,29 @@ export default async function handler(
       }
     });
 
+    const shareTypeMap = new Map<string, number>();
+
+    shareTypeSnap.docs.forEach((docSnap: QueryDocumentSnapshot<DocumentData>) => {
+      const id = docSnap.id;
+      const data = docSnap.data() as any;
+      if (!id.startsWith("type_")) return;
+
+      const type: string = data.type || id.replace(/^type_/, "") || "unknown";
+      const totalCount: number = data.totalCount ?? data.shareCount ?? 0;
+      const prev = shareTypeMap.get(type) ?? 0;
+      shareTypeMap.set(type, prev + totalCount);
+    });
+
     const estimateTypes: EstimateTypeStat[] = Array.from(typeMap.entries())
-      .map(([type, counts]) => ({
-        type,
-        estimateCount: counts.estimateCount,
-        shareCount: counts.shareCount, // 현재는 0
-        total: counts.estimateCount + counts.shareCount,
-      }))
+      .map(([type, counts]) => {
+        const shareCount = shareTypeMap.get(type) ?? 0;
+        return {
+          type,
+          estimateCount: counts.estimateCount,
+          shareCount,
+          total: counts.estimateCount + shareCount,
+        };
+      })
       .sort((a, b) => b.total - a.total)
       .slice(0, 10)
       .map(({ total, ...rest }) => rest);
@@ -128,7 +147,7 @@ export default async function handler(
       { name: string; branchName: string; shareCount: number }
     >();
 
-    shareSnap.docs.forEach((docSnap: QueryDocumentSnapshot<DocumentData>) => {
+    shareManagerSnap.docs.forEach((docSnap: QueryDocumentSnapshot<DocumentData>) => {
       const id = docSnap.id;
       if (!id.startsWith("manager_")) return;
 
@@ -136,7 +155,7 @@ export default async function handler(
       const managerUid: string = data.managerUid || id.split("_")[1] || "unknown";
       const managerName: string = data.managerName || data.managerId || managerUid;
       const branchName: string = data.branch || "미지정 지점";
-      const shareCount: number = data.shareCount ?? 0;
+      const shareCount: number = data.totalCount ?? data.shareCount ?? 0;
 
       const prev = managerShareMap.get(managerUid) || {
         name: managerName,
@@ -199,13 +218,13 @@ export default async function handler(
     // shareCount: branch_*_* 문서 → shareCount
     const branchShareMap = new Map<string, number>();
 
-    shareSnap.docs.forEach((docSnap: QueryDocumentSnapshot<DocumentData>) => {
+    shareBranchSnap.docs.forEach((docSnap: QueryDocumentSnapshot<DocumentData>) => {
       const id = docSnap.id;
       if (!id.startsWith("branch_")) return;
 
       const data = docSnap.data() as any;
       const branch: string = data.branch || id.split("_")[1] || "미지정 지점";
-      const shareCount: number = data.shareCount ?? 0;
+      const shareCount: number = data.totalCount ?? data.shareCount ?? 0;
 
       const prev = branchShareMap.get(branch) ?? 0;
       branchShareMap.set(branch, prev + shareCount);

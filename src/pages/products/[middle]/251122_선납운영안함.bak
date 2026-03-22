@@ -51,14 +51,14 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
       productName = firstOption?.["상품명"] || id || "";
       imageUrl = firstOption?.thumbnailUrl || imageUrl;
 
-      // ✅ 절대경로 보정
+      //  절대경로 보정
       if (imageUrl && !/^https?:\/\//.test(imageUrl)) {
         imageUrl = `${baseUrl}${
           imageUrl.startsWith("/") ? "" : "/"
         }${imageUrl}`;
       }
 
-      // ✅ 🔹 카카오 대응: /api/image-proxy?fileId=... → Drive 직링크 변환
+      //  🔹 카카오 대응: /api/image-proxy?fileId=... → Drive 직링크 변환
       if (imageUrl.includes("/api/image-proxy")) {
         const match = imageUrl.match(/fileId=([^&]+)/);
         if (match && match[1]) {
@@ -168,7 +168,7 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
     fetchDetail();
   }, [router.isReady, router.query.middle, router.query.id]);
 
-  // ✅ 최저가 자동 선택
+  //  최저가 자동 선택
   useEffect(() => {
     if (!options.length) return;
     if (router.query.opt) return;
@@ -220,7 +220,7 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
     setPromoName(cheapest["프로모션명"] || "");
   }, [options, router.query.opt]);
 
-  // ✅ URL opt 파라미터 → 옵션 자동 선택
+  //  URL opt 파라미터 → 옵션 자동 선택
   useEffect(() => {
     if (!options.length || !router.query.opt) return;
 
@@ -336,7 +336,7 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
     return parseInt(cleaned, 10);
   };
 
-  // ✅ 기존 usageFee, bestPrice 부분 교체
+  //  기존 usageFee, bestPrice 부분 교체
   const usageFee = current ? getPriceValue(current, !!promoName) : 0;
   const bestPrice = current ? Math.max(usageFee - 13000, 0) : 0;
 
@@ -401,7 +401,7 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
     }
   };
 
-  // ✅ URL → 옵션 자동 세팅
+  //  URL → 옵션 자동 세팅
   useEffect(() => {
     if (!options.length || !router.query.opt) return;
 
@@ -531,7 +531,7 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
             <Section>
               {options[0]?.images?.length ? (
                 <>
-                  {/* ✅ 메인 슬라이드 */}
+                  {/*  메인 슬라이드 */}
                   <Swiper
                     modules={[Navigation, Thumbs]}
                     slidesPerView={1}
@@ -575,7 +575,7 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
                       ))}
                   </Swiper>
 
-                  {/* ✅ 썸네일 슬라이드 */}
+                  {/*  썸네일 슬라이드 */}
                   <ThumbnailSwiper>
                     <Swiper
                       modules={[Thumbs]}
@@ -656,7 +656,7 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
                   );
                   if (!currentModel) return null;
 
-                  // ✅ 동일모델기준 없으면 "" 처리
+                  //  동일모델기준 없으면 "" 처리
                   const currentCode = (currentModel["모델코드"] || "").trim();
                   const groupKey =
                     (currentModel["동일모델기준"] || "").trim() ===
@@ -665,8 +665,8 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
                       : (currentModel["동일모델기준"] || "").trim() ||
                         currentCode;
 
-                  // ✅ 그룹에 포함되는 모델 찾기
-                  // ✅ API에서 전달된 relatedModels를 우선 사용
+                  //  그룹에 포함되는 모델 찾기
+                  //  API에서 전달된 relatedModels를 우선 사용
                   let groupModels = relatedModels.length
                     ? relatedModels
                     : options.filter((o) => {
@@ -681,14 +681,14 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
                         );
                       });
 
-                  // ✅ 중복 제거 (API 응답에도 혹시 중복이 있을 수 있으니)
+                  //  중복 제거 (API 응답에도 혹시 중복이 있을 수 있으니)
                   groupModels = Array.from(
                     new Map(
                       groupModels.map((m) => [(m["모델코드"] || "").trim(), m])
                     ).values()
                   );
 
-                  // ✅ 버튼 렌더링
+                  //  버튼 렌더링
                   return groupModels.map((item) => {
                     if (!item) return null;
 
@@ -1045,7 +1045,7 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
             </PriceWrapper>
 
             <PriceWrapper>
-              <p>최대혜택가</p>
+              <p>총 체감 혜택</p>
               <span
                 style={{
                   fontSize: "14px",
@@ -1066,7 +1066,7 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
 
             <InfoText>
               혜택은 적용되는 할인 혜택, 제휴 카드사에 따라 다르게 계산되어,
-              실제 청약 신청 시 최대 혜택가와 다를 수 있습니다. 상세 내용은
+              실제 청약 신청 시 총 체감 혜택와 다를 수 있습니다. 상세 내용은
               가전구독 혜택 안내에서 확인이 가능합니다.
             </InfoText>
 
@@ -1082,7 +1082,7 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
           </ProductInfo>
         </ProductDetailWrap>
 
-        {/* ✅ 상세페이지 HTML embed */}
+        {/*  상세페이지 HTML embed */}
         <ResponsiveSection style={{ marginTop: "240px" }}>
           {id ? (
             <AutoHeightIframe

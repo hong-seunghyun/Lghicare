@@ -1,9 +1,9 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+﻿/* eslint-disable @typescript-eslint/no-explicit-any */
 // pages/manager/index.tsx
 
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
 import { useRouter } from "next/router";
 import { db } from "@/lib/firebase";
@@ -17,23 +17,15 @@ import {
   getDocs,
 } from "firebase/firestore";
 
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  LabelList,
-} from "recharts";
-
 interface ManagerSession {
-  id: string; // auth uid
+  id: string;
   managerId: string;
   name: string;
   branch: string;
+  region: string;
+  office: string;
+  position: string;
+  teamLeaderId: string;
 }
 
 type Notice = {
@@ -42,8 +34,9 @@ type Notice = {
   createdAt?: any;
 };
 
-type CategoryStat = {
-  categoryName: string;
+type StatRow = {
+  key: string;
+  label: string;
   estimateCount: number;
   shareCount: number;
 };
@@ -53,12 +46,18 @@ const ManagerDashboardPage: React.FC = () => {
   const [session, setSession] = useState<ManagerSession | null>(null);
 
   const [notices, setNotices] = useState<Notice[]>([]);
-  const [categoryStats, setCategoryStats] = useState<CategoryStat[]>([]);
+  const [categoryStats, setCategoryStats] = useState<StatRow[]>([]);
+  const [productStats, setProductStats] = useState<StatRow[]>([]);
+
+  const [teamCategoryStats, setTeamCategoryStats] = useState<StatRow[]>([]);
+  const [teamProductStats, setTeamProductStats] = useState<StatRow[]>([]);
+
+  const [regionCategoryStats, setRegionCategoryStats] = useState<StatRow[]>([]);
+  const [regionProductStats, setRegionProductStats] = useState<StatRow[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // ✅ 매니저 세션 읽기
   useEffect(() => {
     if (typeof window === "undefined") return;
     const stored = localStorage.getItem("managerSession");
@@ -75,7 +74,37 @@ const ManagerDashboardPage: React.FC = () => {
     }
   }, [router]);
 
-  // ✅ 대시보드 데이터 불러오기
+  const isTeamLeader =
+    session?.position && session.position.includes("팀장") &&
+    !session.position.includes("사무소장");
+  const isOfficeHead = session?.position?.includes("사무소장");
+
+  const aggregateStats = (items: any[], keyField: string, labelField: string) => {
+    const map = new Map<string, StatRow>();
+    items.forEach((item) => {
+      const key = String(item[keyField] ?? "unknown");
+      const label = String(item[labelField] ?? key);
+      const estimate = Number(item.estimateCount ?? 0);
+      const share = Number(item.shareCount ?? 0);
+
+      const prev = map.get(key) || {
+        key,
+        label,
+        estimateCount: 0,
+        shareCount: 0,
+      };
+      map.set(key, {
+        key,
+        label,
+        estimateCount: prev.estimateCount + estimate,
+        shareCount: prev.shareCount + share,
+      });
+    });
+    return Array.from(map.values()).sort(
+      (a, b) => b.estimateCount + b.shareCount - (a.estimateCount + a.shareCount),
+    );
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       if (!session) return;
@@ -84,34 +113,28 @@ const ManagerDashboardPage: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        // 🔹 1) 최근 공지 5개
         const noticesQuery = query(
-          collection(db, "notices"),
+          collection(db, "boardPosts"),
+          where("categoryId", "==", "notice"),
           orderBy("createdAt", "desc"),
-          limit(5)
+          limit(5),
         );
 
-        // 🔹 2) 이 매니저가 보낸 "카테고리별 견적" 카운트
-        // estimatesCount 컬렉션에서 managerUid == session.id 인 문서들
-        const estimatesQuery = query(
-          collection(db, "estimatesCount"),
-          where("managerUid", "==", session.id)
+        const categoryQuery = query(
+          collection(db, "managerCategoryStats"),
+          where("managerUid", "==", session.id),
+        );
+        const productQuery = query(
+          collection(db, "managerProductStats"),
+          where("managerUid", "==", session.id),
         );
 
-        // 🔹 3) 이 매니저가 공유한 "카테고리별 링크공유" 카운트
-        // shareCount 컬렉션에서 managerUid == session.id 인 문서들
-        const sharesQuery = query(
-          collection(db, "shareCount"),
-          where("managerUid", "==", session.id)
-        );
-
-        const [noticesSnap, estimatesSnap, sharesSnap] = await Promise.all([
+        const [noticesSnap, categorySnap, productSnap] = await Promise.all([
           getDocs(noticesQuery),
-          getDocs(estimatesQuery),
-          getDocs(sharesQuery),
+          getDocs(categoryQuery),
+          getDocs(productQuery),
         ]);
 
-        // ====== 공지 리스트 ======
         const noticeList: Notice[] = noticesSnap.docs.map((d) => {
           const data = d.data() as any;
           return {
@@ -121,81 +144,84 @@ const ManagerDashboardPage: React.FC = () => {
           };
         });
 
-        // ====== 카테고리(중분류)별 통계 ======
-        // estimatesCount: manager_${uid}_${type} 형태 문서
-        //   { type, managerUid, managerId, managerName, branch, managerCount, ... }
-        // shareCount: manager_${uid}_${type} 형태 문서
-        //   { type, managerUid, managerId, managerName, branch, managerShareCount, ... }
-
-        const categoryMap = new Map<
-          string,
-          { estimateCount: number; shareCount: number }
-        >();
-
-        // 👉 견적 카운트 합산
-        estimatesSnap.docs.forEach((docSnap) => {
-          const data = docSnap.data() as any;
-          const type = (data.type as string) || "unknown";
-
-          const estimateCount =
-            (data.managerCount as number | undefined) ??
-            (data.totalCount as number | undefined) ??
-            0;
-
-          const prev = categoryMap.get(type) || {
-            estimateCount: 0,
-            shareCount: 0,
-          };
-
-          categoryMap.set(type, {
-            estimateCount: prev.estimateCount + estimateCount,
-            shareCount: prev.shareCount,
-          });
-        });
-
-        // 👉 공유 카운트 합산
-        sharesSnap.docs.forEach((docSnap) => {
-          const data = docSnap.data() as any;
-          const type = (data.type as string) || "unknown";
-
-          const shareCount =
-            (data.managerShareCount as number | undefined) ??
-            (data.shareCount as number | undefined) ??
-            0;
-
-          const prev = categoryMap.get(type) || {
-            estimateCount: 0,
-            shareCount: 0,
-          };
-
-          categoryMap.set(type, {
-            estimateCount: prev.estimateCount,
-            shareCount: prev.shareCount + shareCount,
-          });
-        });
-
-        // Map → 배열로 변환 + 상위 5개만 정렬
-        const categories: CategoryStat[] = Array.from(
-          categoryMap.entries()
-        ).map(([type, counts]) => ({
-          categoryName: type,
-          estimateCount: counts.estimateCount,
-          shareCount: counts.shareCount,
+        const categoryItems = categorySnap.docs.map((docSnap) => ({
+          ...docSnap.data(),
+        }));
+        const productItems = productSnap.docs.map((docSnap) => ({
+          ...docSnap.data(),
         }));
 
-        const topCategories = categories
-          .map((c) => ({
-            ...c,
-            total: (c.estimateCount ?? 0) + (c.shareCount ?? 0),
-          }))
-          .sort((a, b) => b.total - a.total)
-          .slice(0, 5)
-          .map(({ total, ...rest }) => rest);
-
         setNotices(noticeList);
-        setCategoryStats(topCategories);
+        setCategoryStats(aggregateStats(categoryItems, "type", "type"));
+        setProductStats(
+          aggregateStats(productItems, "modelCode", "productName"),
+        );
+
+        if (isTeamLeader || isOfficeHead) {
+          const managerQuery = isOfficeHead
+            ? query(
+                collection(db, "users"),
+                where("role", "==", "manager"),
+                where("region", "==", session.region),
+              )
+            : query(
+                collection(db, "users"),
+                where("role", "==", "manager"),
+                where("teamLeaderId", "==", session.managerId),
+              );
+
+          const managerSnap = await getDocs(managerQuery);
+          const managerUids = managerSnap.docs
+            .map((docSnap) => ({
+              uid: docSnap.id,
+              name: docSnap.data().name ?? "",
+            }))
+            .filter((m) => m.uid !== session.id)
+            .map((m) => m.uid);
+
+          const teamCategoryRows: any[] = [];
+          const teamProductRows: any[] = [];
+
+          await Promise.all(
+            managerUids.map(async (uid) => {
+              const [catSnap, prodSnap] = await Promise.all([
+                getDocs(
+                  query(
+                    collection(db, "managerCategoryStats"),
+                    where("managerUid", "==", uid),
+                  ),
+                ),
+                getDocs(
+                  query(
+                    collection(db, "managerProductStats"),
+                    where("managerUid", "==", uid),
+                  ),
+                ),
+              ]);
+
+              catSnap.docs.forEach((docSnap) => teamCategoryRows.push(docSnap.data()));
+              prodSnap.docs.forEach((docSnap) => teamProductRows.push(docSnap.data()));
+            }),
+          );
+
+          if (isOfficeHead) {
+            setRegionCategoryStats(
+              aggregateStats(teamCategoryRows, "type", "type"),
+            );
+            setRegionProductStats(
+              aggregateStats(teamProductRows, "modelCode", "productName"),
+            );
+          } else {
+            setTeamCategoryStats(
+              aggregateStats(teamCategoryRows, "type", "type"),
+            );
+            setTeamProductStats(
+              aggregateStats(teamProductRows, "modelCode", "productName"),
+            );
+          }
+        }
       } catch (err: any) {
-        console.error("매니저 대시보드 데이터 오류:", err);
+        console.error("매니저 대시보드 오류:", err);
         setError("대시보드 데이터를 불러오는 중 오류가 발생했습니다.");
       } finally {
         setLoading(false);
@@ -203,24 +229,28 @@ const ManagerDashboardPage: React.FC = () => {
     };
 
     fetchData();
-  }, [session]);
+  }, [session, isTeamLeader, isOfficeHead]);
 
-  // ✅ 차트용 데이터 (+ total 필드)
-  const chartData = categoryStats.map((item) => {
-    const total = item.estimateCount + item.shareCount;
-    return {
-      name: item.categoryName,
-      estimateCount: item.estimateCount,
-      shareCount: item.shareCount,
-      total,
-    };
-  });
+  const topCategoryStats = useMemo(() => categoryStats.slice(0, 8), [categoryStats]);
+  const topProductStats = useMemo(() => productStats.slice(0, 8), [productStats]);
 
-  const labelStyle: React.CSSProperties = {
-    fontSize: 11,
-    fill: "#555",
-    fontWeight: 500,
-  };
+  const teamTopCategoryStats = useMemo(
+    () => teamCategoryStats.slice(0, 8),
+    [teamCategoryStats],
+  );
+  const teamTopProductStats = useMemo(
+    () => teamProductStats.slice(0, 8),
+    [teamProductStats],
+  );
+
+  const regionTopCategoryStats = useMemo(
+    () => regionCategoryStats.slice(0, 8),
+    [regionCategoryStats],
+  );
+  const regionTopProductStats = useMemo(
+    () => regionProductStats.slice(0, 8),
+    [regionProductStats],
+  );
 
   return (
     <PageWrapper>
@@ -228,8 +258,8 @@ const ManagerDashboardPage: React.FC = () => {
         <Title>대시보드</Title>
         {session && (
           <SubTitle>
-            {session.branch && <span>{session.branch} · </span>}
-            <strong>{session.name}</strong> 매니저님의 활동 요약이에요.
+            {session.office && <span>{session.office} · </span>}
+            <strong>{session.name}</strong> 매니저님의 활동 요약입니다.
           </SubTitle>
         )}
       </HeaderRow>
@@ -239,11 +269,10 @@ const ManagerDashboardPage: React.FC = () => {
 
       {!loading && !error && (
         <Grid>
-          {/* 최근 공지사항 */}
           <Card>
             <CardHeader>
               <CardTitle>최근 공지사항</CardTitle>
-              <CardSubTitle>최신 공지 5개</CardSubTitle>
+              <CardSubTitle>최근 게시글 5건</CardSubTitle>
             </CardHeader>
             <CardBody>
               {notices.length === 0 ? (
@@ -253,7 +282,7 @@ const ManagerDashboardPage: React.FC = () => {
                   {notices.map((n) => (
                     <NoticeItem
                       key={n.id}
-                      onClick={() => router.push(`/manager/notices/${n.id}`)}
+                      onClick={() => router.push(`/manager/boards/notice/${n.id}`)}
                     >
                       <NoticeTitle>{n.title}</NoticeTitle>
                     </NoticeItem>
@@ -263,78 +292,211 @@ const ManagerDashboardPage: React.FC = () => {
             </CardBody>
           </Card>
 
-          {/* 내가 많이 내보낸 카테고리 */}
           <Card>
             <CardHeader>
-              <CardTitle>내가 많이 내보낸 카테고리</CardTitle>
-              <CardSubTitle>견적내기 · 링크공유 상위 5개</CardSubTitle>
+              <CardTitle>내 활동 통계 (카테고리별)</CardTitle>
+              <CardSubTitle>견적/공유 합산 상위</CardSubTitle>
             </CardHeader>
-            <ChartWrapper>
-              {chartData.length === 0 ? (
-                <EmptyText>아직 통계 데이터가 없습니다.</EmptyText>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={chartData}
-                    barSize={30}
-                    margin={{ top: 16, right: 16, left: 0, bottom: 40 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis
-                      dataKey="name"
-                      interval={0}
-                      angle={0}
-                      textAnchor="middle"
-                      height={40}
-                      tick={{ fontSize: 11, fill: "#666" }}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      tick={{ fontSize: 11, fill: "#666" }}
-                      tickLine={false}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        borderRadius: 8,
-                        border: "1px solid #eee",
-                        boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
-                        fontSize: 12,
-                      }}
-                    />
-                    <Legend
-                      wrapperStyle={{
-                        fontSize: 11,
-                      }}
-                    />
-                    {/* 아래 막대: 견적 */}
-                    <Bar
-                      dataKey="estimateCount"
-                      name="견적내기"
-                      stackId="a"
-                      fill="#2854b9ff"
-                    />
-                    {/* 위 막대: 공유 + 상단 라운드 + 합계 라벨 */}
-                    <Bar
-                      dataKey="shareCount"
-                      name="링크공유"
-                      stackId="a"
-                      radius={[4, 4, 0, 0]}
-                      fill="#f0b381ff"
-                    >
-                      <LabelList
-                        dataKey="total"
-                        position="top"
-                        style={labelStyle}
-                        formatter={(value: any) =>
-                          value == null ? "" : String(value)
-                        }
-                      />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </ChartWrapper>
+            <StatsTable>
+              <thead>
+                <tr>
+                  <th>카테고리</th>
+                  <th>견적</th>
+                  <th>공유</th>
+                  <th>합계</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topCategoryStats.length === 0 ? (
+                  <tr>
+                    <td colSpan={4}>통계 데이터가 없습니다.</td>
+                  </tr>
+                ) : (
+                  topCategoryStats.map((row) => (
+                    <tr key={row.key}>
+                      <td>{row.label}</td>
+                      <td>{row.estimateCount}</td>
+                      <td>{row.shareCount}</td>
+                      <td>{row.estimateCount + row.shareCount}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </StatsTable>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>내 활동 통계 (제품별)</CardTitle>
+              <CardSubTitle>견적/공유 합산 상위</CardSubTitle>
+            </CardHeader>
+            <StatsTable>
+              <thead>
+                <tr>
+                  <th>제품</th>
+                  <th>견적</th>
+                  <th>공유</th>
+                  <th>합계</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topProductStats.length === 0 ? (
+                  <tr>
+                    <td colSpan={4}>통계 데이터가 없습니다.</td>
+                  </tr>
+                ) : (
+                  topProductStats.map((row) => (
+                    <tr key={row.key}>
+                      <td>{row.label || row.key}</td>
+                      <td>{row.estimateCount}</td>
+                      <td>{row.shareCount}</td>
+                      <td>{row.estimateCount + row.shareCount}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </StatsTable>
+          </Card>
+
+          {isTeamLeader && (
+            <Card>
+              <CardHeader>
+                <CardTitle>담당 매니저 통계 (카테고리별)</CardTitle>
+                <CardSubTitle>담당팀장 기준 합산</CardSubTitle>
+              </CardHeader>
+              <StatsTable>
+                <thead>
+                  <tr>
+                    <th>카테고리</th>
+                    <th>견적</th>
+                    <th>공유</th>
+                    <th>합계</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {teamTopCategoryStats.length === 0 ? (
+                    <tr>
+                      <td colSpan={4}>통계 데이터가 없습니다.</td>
+                    </tr>
+                  ) : (
+                    teamTopCategoryStats.map((row) => (
+                      <tr key={row.key}>
+                        <td>{row.label}</td>
+                        <td>{row.estimateCount}</td>
+                        <td>{row.shareCount}</td>
+                        <td>{row.estimateCount + row.shareCount}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </StatsTable>
+            </Card>
+          )}
+
+          {isTeamLeader && (
+            <Card>
+              <CardHeader>
+                <CardTitle>담당 매니저 통계 (제품별)</CardTitle>
+                <CardSubTitle>담당팀장 기준 합산</CardSubTitle>
+              </CardHeader>
+              <StatsTable>
+                <thead>
+                  <tr>
+                    <th>제품</th>
+                    <th>견적</th>
+                    <th>공유</th>
+                    <th>합계</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {teamTopProductStats.length === 0 ? (
+                    <tr>
+                      <td colSpan={4}>통계 데이터가 없습니다.</td>
+                    </tr>
+                  ) : (
+                    teamTopProductStats.map((row) => (
+                      <tr key={row.key}>
+                        <td>{row.label || row.key}</td>
+                        <td>{row.estimateCount}</td>
+                        <td>{row.shareCount}</td>
+                        <td>{row.estimateCount + row.shareCount}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </StatsTable>
+            </Card>
+          )}
+
+          {isOfficeHead && (
+            <Card>
+              <CardHeader>
+                <CardTitle>권역 통계 (카테고리별)</CardTitle>
+                <CardSubTitle>사무소장 권한</CardSubTitle>
+              </CardHeader>
+              <StatsTable>
+                <thead>
+                  <tr>
+                    <th>카테고리</th>
+                    <th>견적</th>
+                    <th>공유</th>
+                    <th>합계</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {regionTopCategoryStats.length === 0 ? (
+                    <tr>
+                      <td colSpan={4}>통계 데이터가 없습니다.</td>
+                    </tr>
+                  ) : (
+                    regionTopCategoryStats.map((row) => (
+                      <tr key={row.key}>
+                        <td>{row.label}</td>
+                        <td>{row.estimateCount}</td>
+                        <td>{row.shareCount}</td>
+                        <td>{row.estimateCount + row.shareCount}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </StatsTable>
+            </Card>
+          )}
+
+          {isOfficeHead && (
+            <Card>
+              <CardHeader>
+                <CardTitle>권역 통계 (제품별)</CardTitle>
+                <CardSubTitle>사무소장 권한</CardSubTitle>
+              </CardHeader>
+              <StatsTable>
+                <thead>
+                  <tr>
+                    <th>제품</th>
+                    <th>견적</th>
+                    <th>공유</th>
+                    <th>합계</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {regionTopProductStats.length === 0 ? (
+                    <tr>
+                      <td colSpan={4}>통계 데이터가 없습니다.</td>
+                    </tr>
+                  ) : (
+                    regionTopProductStats.map((row) => (
+                      <tr key={row.key}>
+                        <td>{row.label || row.key}</td>
+                        <td>{row.estimateCount}</td>
+                        <td>{row.shareCount}</td>
+                        <td>{row.estimateCount + row.shareCount}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </StatsTable>
+            </Card>
+          )}
         </Grid>
       )}
     </PageWrapper>
@@ -342,8 +504,6 @@ const ManagerDashboardPage: React.FC = () => {
 };
 
 export default ManagerDashboardPage;
-
-// =============== styled-components ===============
 
 const PageWrapper = styled.div`
   display: flex;
@@ -392,7 +552,7 @@ const ErrorText = styled.div`
 
 const Grid = styled.div`
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 20px;
 
   @media (max-width: 960px) {
@@ -458,7 +618,20 @@ const EmptyText = styled.div`
   padding: 16px 0;
 `;
 
-const ChartWrapper = styled.div`
-  flex: 1;
-  min-height: 250px;
+const StatsTable = styled.table`
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+
+  th,
+  td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #eee;
+    text-align: left;
+  }
+
+  th {
+    background: #f5f5f5;
+    font-weight: 600;
+  }
 `;

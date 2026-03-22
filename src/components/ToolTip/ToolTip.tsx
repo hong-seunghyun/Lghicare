@@ -64,7 +64,7 @@ export default function TipButton({ title, children }: TipButtonProps) {
             alt="close"
             width={16}
             height={16}
-            onClick={() => setOpen(false)} // ✅ 닫기 이벤트 추가
+            onClick={() => setOpen(false)} //  닫기 이벤트 추가
             style={{
               position: "absolute",
               top: 20,

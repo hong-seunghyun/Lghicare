@@ -34,7 +34,7 @@ export default function ComparePage() {
     const parsed: ProductInfo[] = JSON.parse(data);
     setProducts(parsed);
 
-    // ✅ 병렬로 API 호출
+    //  병렬로 API 호출
     Promise.all(
       parsed.map(async (p) => {
         console.log("🚨 중분류", p.중분류, "모델코드", p.모델코드);
@@ -102,7 +102,7 @@ export default function ComparePage() {
       <ScrollWrap>
         <Grid>
           {products.map((p) => {
-            // ✅ 숫자로 변환 후 13,000원 할인 계산
+            //  숫자로 변환 후 13,000원 할인 계산
             const numericPrice = Number(String(p.가격).replace(/[^0-9]/g, ""));
             const discountPrice =
               numericPrice > 0 ? Math.max(numericPrice - 13000, 0) : null;
@@ -172,7 +172,7 @@ export default function ComparePage() {
   );
 }
 
-/* ✅ 스타일 */
+/*  스타일 */
 const Container = styled.div`
   width: 95%;
   max-width: 1380px;

@@ -31,6 +31,7 @@ const categories = [
   "의류관리기",
   "청소기",
   "가습기",
+  "바스에어시스템",
   "워시콤보",
   "에어컨",
   "제습기",
@@ -107,7 +108,7 @@ export default function EstimatePage() {
   const [isLoading, setIsLoading] = useState(false);
 
   const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>(
-    []
+    [],
   );
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -277,6 +278,7 @@ const SubTitle = styled.div`
 
   @media (max-width: 1000px) {
     font-size: 14px;
+    width: 100%;
   }
 
   @media (max-width: 499px) {
@@ -289,6 +291,8 @@ const SearchSection = styled.section`
   margin-bottom: 64px;
   display: none;
   justify-content: center;
+  align-items: center;
+  width: 100%;
 `;
 
 const SearchInput = styled.input`
@@ -298,6 +302,10 @@ const SearchInput = styled.input`
   border-radius: 99px;
   border: 1px solid #ddd;
   font-size: 16px;
+
+  @media (max-width: 1000px) {
+    max-width: 100%;
+  }
 `;
 
 const GridSection = styled.section`

@@ -35,7 +35,7 @@ export default function useInfiniteProducts(category: string, search: string) {
   const currentSearchRef = useRef<string>("");
   const isFetchingRef = useRef(false);
 
-  // ✅ 검색/카테고리 변경 시 초기화
+  //  검색/카테고리 변경 시 초기화
   useEffect(() => {
     setProducts([]);
     setPage(0);
@@ -62,7 +62,7 @@ export default function useInfiniteProducts(category: string, search: string) {
 			map.set(code, {
 				...prev,
 				...item,
-				// ✅ variants 누적
+				//  variants 누적
 				variants: [...prevVariants, ...nextVariants],
 			});
 		}
@@ -73,7 +73,7 @@ export default function useInfiniteProducts(category: string, search: string) {
 	
   const fetchProducts = useCallback(
     async (pageToLoad: number, reset = false) => {
-      // ✅ 검색어 추적 (검색어가 바뀌면 캐시 무시)
+      //  검색어 추적 (검색어가 바뀌면 캐시 무시)
       const keyword = search.trim();
       const currentKeyword = currentSearchRef.current;
 
@@ -90,17 +90,17 @@ export default function useInfiniteProducts(category: string, search: string) {
         const data: ApiResponse = await res.json();
 				const allProductsRaw = data.options || [];
 
-        // ✅ 검색어가 도중에 바뀐 경우 — 중간 요청 취소
+        //  검색어가 도중에 바뀐 경우 — 중간 요청 취소
         if (keyword !== currentKeyword) {
           isFetchingRef.current = false;
           setIsLoading(false);
           return;
         }
 
-        // ✅ 모델코드 기준으로 중복 제거 + variants 합치기
+        //  모델코드 기준으로 중복 제거 + variants 합치기
         const dedupedAllProducts = dedupeProductsByModelCode(allProductsRaw);
 
-        // ✅ 페이지 슬라이싱
+        //  페이지 슬라이싱
         const start = pageToLoad * PAGE_SIZE;
         const end = start + PAGE_SIZE;
         const nextChunk = dedupedAllProducts.slice(start, end);
@@ -123,12 +123,12 @@ export default function useInfiniteProducts(category: string, search: string) {
     [category, search]
   );
 
-  // ✅ 첫 페이지 로드 (검색어 변경 시마다)
+  //  첫 페이지 로드 (검색어 변경 시마다)
   useEffect(() => {
     fetchProducts(0, true);
   }, [category, search, fetchProducts]);
 
-  // ✅ 스크롤 시 다음 페이지 로드
+  //  스크롤 시 다음 페이지 로드
   const loadMore = useCallback(() => {
     if (hasMore && !isFetchingRef.current) {
       fetchProducts(page, false);
