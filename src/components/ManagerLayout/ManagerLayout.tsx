@@ -155,8 +155,18 @@ export default function ManagerLayout({ children }: Props) {
 
   const boardChildren = useMemo(() => getManagerSalesHubNavigationItems(), []);
 
-  const navItems: NavItemType[] = useMemo(
-    () => [
+  const hasManagerManagementAccess = useMemo(() => {
+    if (!manager?.position) return false;
+    const position = manager.position;
+    return (
+      position.includes("리더사무소장") ||
+      position.includes("사무소장") ||
+      position.includes("팀장")
+    );
+  }, [manager]);
+
+  const navItems: NavItemType[] = useMemo(() => {
+    const items: NavItemType[] = [
       { type: "link", label: "대시보드", path: "/manager" },
 
       { type: "link", label: "견적내기", path: "/estimate" },
@@ -167,9 +177,14 @@ export default function ManagerLayout({ children }: Props) {
         children: boardChildren,
       },
       { type: "link", label: "비밀번호 변경", path: "/manager/password" },
-    ],
-    [boardChildren],
-  );
+    ];
+
+    if (hasManagerManagementAccess) {
+      items.push({ type: "link", label: "매니저 관리", path: "/manager/management" });
+    }
+
+    return items;
+  }, [boardChildren, hasManagerManagementAccess]);
 
   useEffect(() => {
     const isBoardRoute =

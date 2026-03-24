@@ -1,10 +1,9 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+﻿/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState } from "react";
 import CategoryTabs from "@/components/Tabs/CategoryTabs";
 import ProductGrid from "@/components/Grid/ProductGrid";
 import EstimateModal from "@/components/Modal/EstimateModal";
 import Loading from "@/components/loading/Loading";
-import { useDebounce } from "../../hooks/useDebounce";
 import { useRouter } from "next/navigation";
 import styled from "styled-components";
 
@@ -103,8 +102,8 @@ export default function EstimatePage() {
 
   const [selectedCategory, setSelectedCategory] = useState("정수기");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 300);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>(
@@ -212,9 +211,18 @@ export default function EstimatePage() {
         <SearchInput
           type="text"
           placeholder="상품명 또는 모델명을 입력하세요"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              setSearchQuery(searchTerm.trim());
+            }
+          }}
         />
+        <SearchButton type="button" onClick={() => setSearchQuery(searchTerm.trim())}>
+          검색
+        </SearchButton>
       </SearchSection>
 
       <CategoryTabs
@@ -226,7 +234,7 @@ export default function EstimatePage() {
       <GridSection>
         <ProductGrid
           category={selectedCategory}
-          search={debouncedSearch}
+          search={searchQuery}
           onOpenModal={handleAddCompare}
           teacherPlans={teacherPlans}
           cardDiscounts={cardDiscounts}
@@ -289,10 +297,11 @@ const SubTitle = styled.div`
 
 const SearchSection = styled.section`
   margin-bottom: 64px;
-  display: none;
+  display: flex;
   justify-content: center;
   align-items: center;
   width: 100%;
+  gap: 12px;
 `;
 
 const SearchInput = styled.input`
@@ -307,7 +316,27 @@ const SearchInput = styled.input`
     max-width: 100%;
   }
 `;
+const SearchButton = styled.button`
+  border-radius: 99px;
+  border: none;
+  background: #1f2933;
+  color: #fff;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+
+  &:hover {
+    background: #111827;
+  }
+
+  @media (max-width: 1000px) {
+    padding: 12px 18px;
+  }
+`;
 
 const GridSection = styled.section`
   margin-top: 32px;
 `;
+

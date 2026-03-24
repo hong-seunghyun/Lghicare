@@ -14,6 +14,7 @@ import {
   deleteDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import promoRulesWithTargetsLatest from "@/data/promo_rules_with_targets_latest.json";
 
 type VoucherRules = {
   version?: number;
@@ -78,6 +79,16 @@ const MODELS_COLLECTION = "voucherModels";
 const safeNumber = (v: any) => {
   const num = Number(v);
   return Number.isFinite(num) ? num : 0;
+};
+
+const normalizeKeyword = (value: string | null | undefined) =>
+  (value || "").toString().replace(/\s+/g, "").toLowerCase();
+
+const matchesKeyword = (text: string, keywords: string[]) => {
+  const normalized = normalizeKeyword(text);
+  return keywords.some((keyword) =>
+    normalized.includes(normalizeKeyword(keyword)),
+  );
 };
 
 const normalizeNumberMap = (input: any): Record<string, number> => {
@@ -438,128 +449,224 @@ const getThemePromoLabel = (
     }
   };
 
+  const deleteMissingModels = async (keepSet: Set<string>) => {
+    if (keepSet.size === 0) return;
+    try {
+      const colRef = collection(db, MODELS_COLLECTION);
+      const snap = await getDocs(colRef);
+      const toDelete = snap.docs.filter((doc) => !keepSet.has(doc.id));
+      const chunkSize = 400;
+      for (let i = 0; i < toDelete.length; i += chunkSize) {
+        const batch = writeBatch(db);
+        toDelete
+          .slice(i, i + chunkSize)
+          .forEach((doc) => batch.delete(doc.ref));
+        await batch.commit();
+      }
+    } catch (err) {
+      console.error("상품권 모델 정리 오류:", err);
+    }
+  };
+
+  const importJsonData = async (data: any) => {
+    const hasLegacyShape = data?.rules && data?.models;
+    const hasNewShape = data?.products;
+    const hasExcelRulesShape =
+      data?.models &&
+      !data?.rules &&
+      !data?.products &&
+      (data?.promoNameKeywordMap ||
+        data?.baseDefaultKeyword ||
+        data?.baseResubscribeKeyword);
+
+    if (!hasLegacyShape && !hasNewShape && !hasExcelRulesShape) {
+      return false;
+    }
+
+    if (hasLegacyShape) {
+      await setDoc(
+        doc(db, RULES_COLLECTION, RULES_DOC_ID),
+        {
+          ...data.rules,
+          version: data.version ?? 1,
+          generatedFrom: data.generatedFrom ?? "",
+          updatedAt: new Date(),
+          createdAt: new Date(),
+        },
+        { merge: true },
+      );
+    }
+
+    if (hasNewShape) {
+      const rulesPayload = {
+        version: data.version ?? 1,
+        generatedFrom: data.meta?.source_file ?? data.generatedFrom ?? "",
+        basePromoTypeKeywords: data.basePromoTypeKeywords ?? undefined,
+        baseDefaultKeyword: "기본",
+        baseResubscribeKeyword: "재구독",
+        combineKeywords: ["신규결합", "기존결합", "기존결합/신규결합"],
+        normalPromoTypeKeyword: "일반(N)",
+        promoNameKeywordMap: data.promoNameKeywordMap ?? undefined,
+        stackingPolicy: data.stackingPolicy ?? undefined,
+        multiProductRule: data.multiProductRule ?? undefined,
+        themePromo: data.themePromo ?? undefined,
+        updatedAt: new Date(),
+        createdAt: new Date(),
+      };
+      await setDoc(doc(db, RULES_COLLECTION, RULES_DOC_ID), rulesPayload, {
+        merge: true,
+      });
+    }
+
+    if (hasExcelRulesShape) {
+      const rulesPayload = {
+        version: data.version ?? 1,
+        generatedFrom: data.generatedFrom ?? "",
+        basePromoTypeKeywords: data.basePromoTypeKeywords ?? undefined,
+        baseDefaultKeyword: data.baseDefaultKeyword ?? "기본",
+        baseResubscribeKeyword: data.baseResubscribeKeyword ?? "재구독",
+        combineKeywords:
+          data.combineKeywords ?? ["신규결합", "기존결합", "기존결합/신규결합"],
+        normalPromoTypeKeyword: data.normalPromoTypeKeyword ?? "일반(N)",
+        promoNameKeywordMap: data.promoNameKeywordMap ?? undefined,
+        stackingPolicy: data.stackingPolicy ?? undefined,
+        multiProductRule: data.multiProductRule ?? undefined,
+        themePromo: data.themePromo ?? undefined,
+        updatedAt: new Date(),
+        createdAt: new Date(),
+      };
+      await setDoc(doc(db, RULES_COLLECTION, RULES_DOC_ID), rulesPayload, {
+        merge: true,
+      });
+    }
+
+    const baseDefaultKeyword =
+      data.baseDefaultKeyword ||
+      data?.rules?.baseDefaultKeyword ||
+      "기본";
+    const baseResubscribeKeyword =
+      data.baseResubscribeKeyword ||
+      data?.rules?.baseResubscribeKeyword ||
+      "재구독";
+    const combineKeywords =
+      data.combineKeywords ||
+      data?.rules?.combineKeywords ||
+      ["신규결합", "기존결합", "기존결합/신규결합"];
+
+    const entries = Object.entries<any>(
+      hasLegacyShape
+        ? data.models
+        : hasNewShape
+        ? data.products
+        : data.models,
+    );
+    const importedModelCodes = new Set<string>();
+    const batchSize = 400;
+
+    for (let i = 0; i < entries.length; i += batchSize) {
+      const slice = entries.slice(i, i + batchSize);
+      const batch = writeBatch(db);
+      slice.forEach(([key, value]) => {
+        const modelCode = (value?.modelCode || key || "").toString().trim();
+        if (!modelCode) return;
+        importedModelCodes.add(modelCode);
+        const baseSource =
+          value?.base && typeof value.base === "object" && !Array.isArray(value.base)
+            ? { ...value.base }
+            : {};
+        const basePriority = Array.isArray(baseSource.priority)
+          ? baseSource.priority
+          : undefined;
+        if (basePriority) {
+          delete baseSource.priority;
+        }
+        const basePayload: Record<string, number | string | string[] | undefined> = {
+          default: safeNumber(baseSource.default),
+          combine_new_existing: safeNumber(baseSource.combine_new_existing),
+          resubscribe: safeNumber(baseSource.resubscribe),
+        };
+        Object.entries(baseSource)
+          .filter(
+            ([baseKey]) =>
+              !["default", "combine_new_existing", "resubscribe", "priority"].includes(
+                baseKey,
+              ),
+          )
+          .forEach(([baseKey, baseAmount]) => {
+            const amount = safeNumber(baseAmount);
+            if (!amount) return;
+            if (matchesKeyword(baseKey, [baseDefaultKeyword])) {
+              basePayload.default = amount;
+            }
+            if (matchesKeyword(baseKey, combineKeywords)) {
+              basePayload.combine_new_existing = amount;
+            }
+            if (matchesKeyword(baseKey, [baseResubscribeKeyword])) {
+              basePayload.resubscribe = amount;
+            }
+          });
+        if (basePriority) {
+          basePayload.priority = basePriority;
+        }
+        batch.set(
+          doc(db, MODELS_COLLECTION, modelCode),
+          {
+            modelCode,
+            base: {
+              ...basePayload,
+            },
+            serviceCycle: normalizeNumberMap(value?.serviceCycle),
+            promo: normalizePromoMap(value?.promo),
+            themePromo: normalizeThemePromo(value?.themePromo),
+            multiProductCount: safeNumber(
+              value?.multiProductCount ?? value?.multiProduct?.recognizedUnits,
+            ),
+            excludeWhenPromoTypeIsNormalN:
+              value?.excludeWhenPromoTypeIsNormalN ?? false,
+            updatedAt: new Date(),
+            createdAt: new Date(),
+          },
+          { merge: true },
+        );
+      });
+      await batch.commit();
+    }
+
+    await deleteMissingModels(importedModelCodes);
+    await loadRules();
+    await loadModels();
+    return true;
+  };
+
   const handleImport = async (file: File) => {
     try {
       setImporting(true);
       const text = await file.text();
       const data = JSON.parse(text) as any;
 
-      const hasLegacyShape = data?.rules && data?.models;
-      const hasNewShape = data?.products;
-      const hasExcelRulesShape =
-        data?.models &&
-        !data?.rules &&
-        !data?.products &&
-        (data?.promoNameKeywordMap ||
-          data?.baseDefaultKeyword ||
-          data?.baseResubscribeKeyword);
-
-      if (!hasLegacyShape && !hasNewShape && !hasExcelRulesShape) {
+      const success = await importJsonData(data);
+      if (!success) {
         alert("JSON 형식이 올바르지 않습니다.");
         return;
       }
 
-      if (hasLegacyShape) {
-        await setDoc(
-          doc(db, RULES_COLLECTION, RULES_DOC_ID),
-          {
-            ...data.rules,
-            version: data.version ?? 1,
-            generatedFrom: data.generatedFrom ?? "",
-            updatedAt: new Date(),
-            createdAt: new Date(),
-          },
-          { merge: true },
-        );
+      alert("가져오기가 완료되었습니다.");
+    } catch (err) {
+      console.error("상품권 JSON 가져오기 오류:", err);
+      alert("가져오기 중 오류가 발생했습니다.");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const importFromPromoRulesWithTargets = async () => {
+    try {
+      setImporting(true);
+      const success = await importJsonData(promoRulesWithTargetsLatest);
+      if (!success) {
+        alert("JSON 형식이 올바르지 않습니다.");
+        return;
       }
-
-      if (hasNewShape) {
-        const rulesPayload = {
-          version: data.version ?? 1,
-          generatedFrom: data.meta?.source_file ?? data.generatedFrom ?? "",
-          basePromoTypeKeywords: data.basePromoTypeKeywords ?? undefined,
-          baseDefaultKeyword: "기본",
-          baseResubscribeKeyword: "재구독",
-          combineKeywords: ["신규결합", "기존결합", "기존결합/신규결합"],
-          normalPromoTypeKeyword: "일반(N)",
-          promoNameKeywordMap: data.promoNameKeywordMap ?? undefined,
-          stackingPolicy: data.stackingPolicy ?? undefined,
-          multiProductRule: data.multiProductRule ?? undefined,
-          themePromo: data.themePromo ?? undefined,
-          updatedAt: new Date(),
-          createdAt: new Date(),
-        };
-        await setDoc(doc(db, RULES_COLLECTION, RULES_DOC_ID), rulesPayload, {
-          merge: true,
-        });
-      }
-
-      if (hasExcelRulesShape) {
-        const rulesPayload = {
-          version: data.version ?? 1,
-          generatedFrom: data.generatedFrom ?? "",
-          basePromoTypeKeywords: data.basePromoTypeKeywords ?? undefined,
-          baseDefaultKeyword: data.baseDefaultKeyword ?? "기본",
-          baseResubscribeKeyword: data.baseResubscribeKeyword ?? "재구독",
-          combineKeywords:
-            data.combineKeywords ?? ["신규결합", "기존결합", "기존결합/신규결합"],
-          normalPromoTypeKeyword: data.normalPromoTypeKeyword ?? "일반(N)",
-          promoNameKeywordMap: data.promoNameKeywordMap ?? undefined,
-          stackingPolicy: data.stackingPolicy ?? undefined,
-          multiProductRule: data.multiProductRule ?? undefined,
-          themePromo: data.themePromo ?? undefined,
-          updatedAt: new Date(),
-          createdAt: new Date(),
-        };
-        await setDoc(doc(db, RULES_COLLECTION, RULES_DOC_ID), rulesPayload, {
-          merge: true,
-        });
-      }
-
-      const entries = Object.entries<any>(
-        hasLegacyShape ? data.models : hasNewShape ? data.products : data.models,
-      );
-      const batchSize = 400;
-
-      for (let i = 0; i < entries.length; i += batchSize) {
-        const slice = entries.slice(i, i + batchSize);
-        const batch = writeBatch(db);
-        slice.forEach(([key, value]) => {
-          const modelCode = (value?.modelCode || key || "").toString().trim();
-          if (!modelCode) return;
-          batch.set(
-            doc(db, MODELS_COLLECTION, modelCode),
-            {
-              modelCode,
-              base: {
-                default: safeNumber(value?.base?.default),
-                combine_new_existing: safeNumber(
-                  value?.base?.combine_new_existing,
-                ),
-                resubscribe: safeNumber(value?.base?.resubscribe),
-                priority: Array.isArray(value?.base?.priority)
-                  ? value.base.priority
-                  : undefined,
-              },
-              serviceCycle: normalizeNumberMap(value?.serviceCycle),
-              promo: normalizePromoMap(value?.promo),
-              themePromo: normalizeThemePromo(value?.themePromo),
-              multiProductCount: safeNumber(
-                value?.multiProductCount ?? value?.multiProduct?.recognizedUnits,
-              ),
-              excludeWhenPromoTypeIsNormalN:
-                value?.excludeWhenPromoTypeIsNormalN ?? false,
-              updatedAt: new Date(),
-              createdAt: new Date(),
-            },
-            { merge: true },
-          );
-        });
-        await batch.commit();
-      }
-
-      await loadRules();
-      await loadModels();
       alert("가져오기가 완료되었습니다.");
     } catch (err) {
       console.error("상품권 JSON 가져오기 오류:", err);
@@ -599,17 +706,25 @@ const getThemePromoLabel = (
       <Section>
         <SectionTitle>JSON 가져오기</SectionTitle>
         <SectionHelp>
-          기존 voucherMaster.json을 선택하면 규칙 + 모델을 파이어베이스에 저장합니다.
+          기존 voucherMaster.json 또는 promo_rules_with_targets_latest.json을 선택하거나 버튼을 눌러 규칙 + 모델을 파이어베이스에 저장합니다.
         </SectionHelp>
-        <input
-          type="file"
-          accept="application/json"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) handleImport(file);
-          }}
-          disabled={importing}
-        />
+        <ImportRow>
+          <input
+            type="file"
+            accept="application/json"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleImport(file);
+            }}
+            disabled={importing}
+          />
+          <SecondaryButton
+            onClick={importFromPromoRulesWithTargets}
+            disabled={importing}
+          >
+            promo_rules_with_targets_latest.json 불러오기
+          </SecondaryButton>
+        </ImportRow>
       </Section>
 
       <Section>
@@ -933,6 +1048,18 @@ const FilterRow = styled.div`
     padding: 6px 10px;
     border-radius: 4px;
     border: 1px solid #ddd;
+    min-width: 220px;
+  }
+`;
+
+const ImportRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+
+  input {
+    flex: 1;
     min-width: 220px;
   }
 `;

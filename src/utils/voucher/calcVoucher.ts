@@ -100,6 +100,56 @@ const applyRounding = (value: number, mode?: "floor" | "round" | "ceil") => {
   return Math.floor(value);
 };
 
+type ServiceCycleMetadata = {
+  key: string;
+  cycleText: string;
+  targetKeywords: string[];
+};
+
+const parseServiceCycleMetadata = (key: string): ServiceCycleMetadata => {
+  const cycleMatch = key.match(/(\d+\s*개월)/);
+  const cycleText = cycleMatch?.[1]?.replace(/\s+/g, "") || key;
+  const remainder = key.replace(cycleMatch?.[0] ?? "", "").trim();
+  const targetKeywords = remainder
+    ? remainder
+        .replace(/[/,]+/g, " ")
+        .split(/\s+/)
+        .map((token) => token.trim())
+        .filter(Boolean)
+    : [];
+  return {
+    key,
+    cycleText,
+    targetKeywords,
+  };
+};
+
+const matchesServiceCycleMetadata = (
+  metadata: ServiceCycleMetadata,
+  serviceCycleInput: string,
+  promoTypeInput: string,
+) => {
+  const normalizedServiceCycle = serviceCycleInput.trim();
+  if (!normalizedServiceCycle) return false;
+  const cycleDigits = metadata.cycleText.replace(/[^0-9]/g, "");
+  const serviceDigits = normalizedServiceCycle.replace(/[^0-9]/g, "");
+
+  const cycleMatches =
+    (metadata.cycleText &&
+      includesAny(normalizedServiceCycle, [metadata.cycleText])) ||
+    (cycleDigits &&
+      serviceDigits &&
+      cycleDigits.length > 0 &&
+      cycleDigits === serviceDigits) ||
+    includesAny(normalizedServiceCycle, [metadata.key]);
+
+  if (!cycleMatches) return false;
+
+  if (metadata.targetKeywords.length === 0) return true;
+  if (!promoTypeInput) return false;
+  return includesAny(promoTypeInput, metadata.targetKeywords);
+};
+
 export function calcVoucher(params: {
   voucherMaster: VoucherMaster;
   modelCode: string;
@@ -186,14 +236,33 @@ export function calcVoucher(params: {
   // 2) 서비스주기 상품권
   let cycleAmt = 0;
   if (serviceCycle) {
-    cycleAmt = model.serviceCycle[serviceCycle] || 0;
+    const matches = Object.entries(model.serviceCycle || {})
+      .map(([key, value]) => ({
+        metadata: parseServiceCycleMetadata(key),
+        amount: Number(value) || 0,
+      }))
+      .filter(
+        (entry) =>
+          entry.amount > 0 &&
+          matchesServiceCycleMetadata(entry.metadata, serviceCycle, promoType),
+      );
+
+    if (matches.length > 0) {
+      const best = matches.reduce((max, entry) =>
+        entry.amount > max.amount ? entry : max,
+      );
+      cycleAmt = best.amount;
+    }
     if (!cycleAmt) {
-      const target = serviceCycle.replace(/[^0-9]/g, "");
-      if (target) {
-        const matched = Object.entries(model.serviceCycle || {}).find(
-          ([key]) => key.replace(/[^0-9]/g, "") === target,
-        );
-        cycleAmt = matched ? Number(matched[1]) || 0 : 0;
+      cycleAmt = model.serviceCycle[serviceCycle] || 0;
+      if (!cycleAmt) {
+        const target = serviceCycle.replace(/[^0-9]/g, "");
+        if (target) {
+          const matched = Object.entries(model.serviceCycle || {}).find(
+            ([key]) => key.replace(/[^0-9]/g, "") === target,
+          );
+          cycleAmt = matched ? Number(matched[1]) || 0 : 0;
+        }
       }
     }
   }

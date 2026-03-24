@@ -1,0 +1,881 @@
+﻿/* eslint-disable @typescript-eslint/no-explicit-any */
+"use client";
+
+import React, { useEffect, useMemo, useState } from "react";
+import styled from "styled-components";
+import { db } from "@/lib/firebase";
+import {
+  collection,
+  doc,
+  getDocs,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where,
+} from "firebase/firestore";
+
+interface ManagerSession {
+  id: string;
+  managerId: string;
+  name: string;
+  branch: string;
+  region: string;
+  office: string;
+  position: string;
+  teamLeaderId: string;
+}
+
+type Tier = "regionLeader" | "officeHead" | "teamLeader" | "member";
+
+type ManagerRecord = {
+  id: string;
+  managerId: string;
+  name: string;
+  position: string;
+  region: string;
+  office: string;
+  teamLeaderId: string;
+  password?: string;
+  isActive: boolean;
+};
+
+const getTier = (position?: string): Tier => {
+  if (!position) return "member";
+  if (position.includes("리더사무소장")) return "regionLeader";
+  if (position.includes("사무소장")) return "officeHead";
+  if (position.includes("팀장")) return "teamLeader";
+  return "member";
+};
+
+const tierLabelMap: Record<Tier, string> = {
+  regionLeader: "리더사무소장",
+  officeHead: "사무소장",
+  teamLeader: "팀장",
+  member: "팀원",
+};
+
+const ManagerManagementPage: React.FC = () => {
+  const [session, setSession] = useState<ManagerSession | null>(null);
+  const [tier, setTier] = useState<Tier>("member");
+  const [loading, setLoading] = useState(false);
+  const [managedManagers, setManagedManagers] = useState<ManagerRecord[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const [selectedManagerId, setSelectedManagerId] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalManager, setModalManager] = useState<ManagerRecord | null>(null);
+  const [modalForm, setModalForm] = useState({
+    name: "",
+    password: "",
+    region: "",
+    office: "",
+    teamLeaderId: "",
+  });
+  const [modalSaving, setModalSaving] = useState(false);
+  const [modalFeedback, setModalFeedback] = useState<string | null>(null);
+  const [modalFeedbackError, setModalFeedbackError] = useState<string | null>(null);
+  const PAGE_SIZE = 10;
+  const [pageByTier, setPageByTier] = useState<Record<Tier, number>>({
+    regionLeader: 1,
+    officeHead: 1,
+    teamLeader: 1,
+    member: 1,
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = localStorage.getItem("managerSession");
+    if (!stored) return;
+    try {
+      const parsed = JSON.parse(stored) as ManagerSession;
+      setSession(parsed);
+      setTier(getTier(parsed.position));
+    } catch {
+      setError("세션 정보를 불러오는 중 오류가 발생했습니다.");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!session) return;
+    if (tier === "member") {
+      setManagedManagers([]);
+      setError("현재 권한으로는 매니저 관리 페이지를 사용할 수 없습니다.");
+      setLoading(false);
+      return;
+    }
+
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        let managerQuery;
+        if (tier === "regionLeader") {
+          if (!session.region) {
+            throw new Error("지역 정보가 없어 매니저를 불러올 수 없습니다.");
+          }
+          managerQuery = query(
+            collection(db, "users"),
+            where("role", "==", "manager"),
+            where("region", "==", session.region),
+          );
+        } else if (tier === "officeHead") {
+          if (!session.office) {
+            throw new Error("사무소 정보가 없어 매니저를 불러올 수 없습니다.");
+          }
+          managerQuery = query(
+            collection(db, "users"),
+            where("role", "==", "manager"),
+            where("office", "==", session.office),
+          );
+        } else {
+          if (!session.managerId) {
+            throw new Error("팀장 아이디가 없어 팀원을 불러올 수 없습니다.");
+          }
+          managerQuery = query(
+            collection(db, "users"),
+            where("role", "==", "manager"),
+            where("teamLeaderId", "==", session.managerId),
+          );
+        }
+
+        const snap = await getDocs(managerQuery);
+        const list: ManagerRecord[] = snap.docs
+          .map((docSnap) => {
+            const data = docSnap.data() as any;
+            return {
+              id: docSnap.id,
+              managerId: data.managerId ?? "",
+              name: data.name ?? "",
+              position: data.position ?? "",
+              region: data.region ?? "",
+              office: data.office ?? data.branch ?? "",
+              teamLeaderId: data.teamLeaderId ?? "",
+              password: data.password ?? "",
+              isActive: data.isActive ?? true,
+            };
+          })
+          .filter((item) => item.id !== session.id);
+
+        setManagedManagers(list);
+      } catch (err: any) {
+        setManagedManagers([]);
+        setError(
+          err instanceof Error
+            ? err.message
+            : "매니저 목록을 불러오는 중 오류가 발생했습니다.",
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [session, tier]);
+
+  const officeHeadManagers = useMemo(
+    () =>
+      managedManagers.filter(
+        (manager) => getTier(manager.position) === "officeHead",
+      ),
+    [managedManagers],
+  );
+
+  const teamLeaderManagers = useMemo(
+    () =>
+      managedManagers.filter(
+        (manager) => getTier(manager.position) === "teamLeader",
+      ),
+    [managedManagers],
+  );
+
+  const teamMemberManagers = useMemo(
+    () =>
+      managedManagers.filter(
+        (manager) => getTier(manager.position) === "member",
+      ),
+    [managedManagers],
+  );
+
+  const regionOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          managedManagers
+            .map((manager) => manager.region)
+            .filter((value) => Boolean(value)),
+        ),
+      ),
+    [managedManagers],
+  );
+
+  const officeOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          managedManagers
+            .map((manager) => manager.office)
+            .filter((value) => Boolean(value)),
+        ),
+      ),
+    [managedManagers],
+  );
+
+  const teamLeaderOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    teamLeaderManagers.forEach((leader) => {
+      if (leader.managerId) {
+        map.set(leader.managerId, leader.name);
+      }
+    });
+    if (tier === "teamLeader" && session?.managerId) {
+      map.set(session.managerId, session.name);
+    }
+    return Array.from(map.entries()).map(([value, label]) => ({
+      value,
+      label,
+    }));
+  }, [session, teamLeaderManagers, tier]);
+
+  const teamLeaderNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    teamLeaderManagers.forEach((leader) => {
+      if (leader.managerId) {
+        map.set(leader.managerId, leader.name);
+      }
+    });
+    if (tier === "teamLeader" && session?.managerId) {
+      map.set(session.managerId, session.name);
+    }
+    return map;
+  }, [session, teamLeaderManagers, tier]);
+
+  const handleRowClick = (managerId: string) => {
+    setSelectedManagerId((prev) => (prev === managerId ? null : managerId));
+  };
+
+  const handlePageChange = (section: Tier, nextPage: number, totalPages: number) => {
+    setPageByTier((prev) => ({
+      ...prev,
+      [section]: Math.min(Math.max(nextPage, 1), totalPages),
+    }));
+  };
+
+  const openModal = (manager: ManagerRecord) => {
+    setSelectedManagerId(manager.id);
+    setModalManager(manager);
+    setModalForm({
+      name: manager.name,
+      password: "",
+      region: manager.region,
+      office: manager.office,
+      teamLeaderId: manager.teamLeaderId,
+    });
+    setModalFeedback(null);
+    setModalFeedbackError(null);
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    if (modalSaving) return;
+    setModalOpen(false);
+    setModalManager(null);
+  };
+
+  const handleModalFormChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = event.target;
+    setModalForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleModalSave = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!modalManager) return;
+
+    const trimmedName = modalForm.name.trim();
+    if (!trimmedName) {
+      setModalFeedbackError("이름을 입력해 주세요.");
+      return;
+    }
+
+    const currentTier = getTier(modalManager.position);
+    const allowRegionEdit = tier === "regionLeader" && currentTier !== "regionLeader";
+    const allowOfficeEdit =
+      (tier === "regionLeader" || tier === "officeHead") &&
+      currentTier !== "regionLeader";
+    const allowTeamLeaderEdit = tier !== "teamLeader" && currentTier === "member";
+
+    const updates: Partial<ManagerRecord> = {};
+    if (trimmedName !== modalManager.name) updates.name = trimmedName;
+    if (modalForm.password.trim()) updates.password = modalForm.password.trim();
+    if (allowRegionEdit && modalForm.region.trim() !== modalManager.region) {
+      updates.region = modalForm.region.trim();
+    }
+    if (allowOfficeEdit && modalForm.office.trim() !== modalManager.office) {
+      updates.office = modalForm.office.trim();
+    }
+    if (
+      allowTeamLeaderEdit &&
+      modalForm.teamLeaderId.trim() !== modalManager.teamLeaderId
+    ) {
+      updates.teamLeaderId = modalForm.teamLeaderId.trim();
+    }
+
+    if (Object.keys(updates).length === 0) {
+      setModalFeedback("변경된 내용이 없습니다.");
+      return;
+    }
+
+    setModalSaving(true);
+    setModalFeedback(null);
+    setModalFeedbackError(null);
+
+    try {
+      const payload = {
+        ...updates,
+        updatedAt: serverTimestamp(),
+      };
+      await updateDoc(doc(db, "users", modalManager.id), payload);
+      setManagedManagers((prev) =>
+        prev.map((manager) =>
+          manager.id === modalManager.id ? { ...manager, ...updates } : manager,
+        ),
+      );
+      setModalManager((prev) => (prev ? { ...prev, ...updates } : prev));
+      setModalFeedback("저장되었습니다.");
+      setModalForm((prev) => ({ ...prev, password: "" }));
+    } catch (err) {
+      console.error("매니저 관리 저장 오류:", err);
+      setModalFeedbackError("저장 중 오류가 발생했습니다.");
+    } finally {
+      setModalSaving(false);
+    }
+  };
+
+  const renderSection = (
+    title: string,
+    description: string,
+    list: ManagerRecord[],
+    sectionTier: Tier,
+  ) => {
+    const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+    const currentPage = pageByTier[sectionTier] ?? 1;
+    const paginatedList = list.slice(
+      (currentPage - 1) * PAGE_SIZE,
+      currentPage * PAGE_SIZE,
+    );
+
+    return (
+      <SectionWrapper key={sectionTier}>
+        <SectionHeader>
+          <SectionTitle>{title}</SectionTitle>
+          <SectionDescription>{description}</SectionDescription>
+        </SectionHeader>
+
+        {list.length === 0 ? (
+          <EmptyState>해당 범위의 하위 매니저가 없습니다.</EmptyState>
+        ) : (
+          <>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableHeaderCell>매니저ID</TableHeaderCell>
+                  <TableHeaderCell>이름</TableHeaderCell>
+                  <TableHeaderCell>직급</TableHeaderCell>
+                  <TableHeaderCell>지역</TableHeaderCell>
+                  <TableHeaderCell>사무소</TableHeaderCell>
+                  <TableHeaderCell>담당 팀장</TableHeaderCell>
+                  <TableHeaderCell>상태</TableHeaderCell>
+                  <TableHeaderCell>작업</TableHeaderCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {paginatedList.map((manager) => {
+                  const tierLabel = tierLabelMap[getTier(manager.position)];
+                  const teamLeaderLabel =
+                    manager.teamLeaderId && teamLeaderNameMap.get(manager.teamLeaderId)
+                      ? `${teamLeaderNameMap.get(manager.teamLeaderId)} (${manager.teamLeaderId})`
+                      : manager.teamLeaderId || "-";
+                  return (
+                    <TableRow
+                      key={manager.id}
+                      $selected={selectedManagerId === manager.id}
+                      onClick={() => handleRowClick(manager.id)}
+                    >
+                      <TableCell>{manager.managerId || "-"}</TableCell>
+                      <TableCell>
+                        {manager.name || "-"}
+                        <TierBadge>{tierLabel}</TierBadge>
+                      </TableCell>
+                      <TableCell>{manager.position || "-"}</TableCell>
+                      <TableCell>{manager.region || "-"}</TableCell>
+                      <TableCell>{manager.office || "-"}</TableCell>
+                      <TableCell>{teamLeaderLabel}</TableCell>
+                      <TableCell>{manager.isActive ? "활성" : "비활성"}</TableCell>
+                      <TableCell>
+                        <ActionButton type="button" onClick={() => openModal(manager)}>
+                          편집
+                        </ActionButton>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+            <PaginationRow>
+              <PageButton
+                type="button"
+                disabled={currentPage <= 1}
+                onClick={() => handlePageChange(sectionTier, currentPage - 1, totalPages)}
+              >
+                이전
+              </PageButton>
+              <PageInfo>
+                {currentPage} / {totalPages}
+              </PageInfo>
+              <PageButton
+                type="button"
+                disabled={currentPage >= totalPages}
+                onClick={() => handlePageChange(sectionTier, currentPage + 1, totalPages)}
+              >
+                다음
+              </PageButton>
+            </PaginationRow>
+          </>
+        )}
+      </SectionWrapper>
+    );
+  };
+
+  return (
+    <PageWrapper>
+      <Heading>
+        <PageTitle>매니저 관리</PageTitle>
+        <PageSubtitle>
+          본 페이지에서는 리더 사무소장, 사무소장, 팀장님께서 담당 하위 매니저의
+          이름·비밀번호·소속을 변경하실 수 있습니다.
+        </PageSubtitle>
+      </Heading>
+
+      {error && <ErrorText>{error}</ErrorText>}
+      {loading && !error && (
+        <InfoText>하위 매니저 정보를 불러오는 중입니다.</InfoText>
+      )}
+
+      {!loading && !error && (
+        <>
+          {tier === "regionLeader" && (
+            <>
+              {renderSection(
+                "사무소장",
+                "권역 내 사무소장(리더 아래)을 관리합니다.",
+                officeHeadManagers,
+                "officeHead",
+              )}
+              {renderSection(
+                "팀장",
+                "전체 사무소의 팀장을 관리합니다.",
+                teamLeaderManagers,
+                "teamLeader",
+              )}
+            </>
+          )}
+          {(tier === "regionLeader" || tier === "officeHead") &&
+            renderSection(
+              "팀원",
+              "팀장의 팀원(일반 매니저)을 확인하고 소속을 조정합니다.",
+              teamMemberManagers,
+              "member",
+            )}
+          {tier === "teamLeader" &&
+            renderSection(
+              "팀원",
+              "현재 팀에 속한 매니저만 표시됩니다.",
+              teamMemberManagers,
+              "member",
+            )}
+        </>
+      )}
+
+      {modalOpen && modalManager && (
+        <ModalOverlay onClick={closeModal}>
+          <ModalContent
+            onSubmit={handleModalSave}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <ModalHeader>
+              <ModalTitle>
+                {modalManager.name} ({modalManager.managerId}) 편집
+              </ModalTitle>
+              <ModalCloseButton type="button" onClick={closeModal}>
+                ×
+              </ModalCloseButton>
+            </ModalHeader>
+            <EditorInfo>
+              <span>직급: {modalManager.position || "-"}</span>
+              <span>사무소: {modalManager.office || "-"}</span>
+              <span>담당 팀장: {modalManager.teamLeaderId || "-"}</span>
+            </EditorInfo>
+
+            <Fields>
+              <Field>
+                <FieldLabel>이름</FieldLabel>
+                <FieldInput
+                  name="name"
+                  value={modalForm.name}
+                  onChange={handleModalFormChange}
+                />
+              </Field>
+              <Field>
+                <FieldLabel>비밀번호</FieldLabel>
+                <FieldInput
+                  name="password"
+                  type="password"
+                  value={modalForm.password}
+                  onChange={handleModalFormChange}
+                  placeholder="변경할 비밀번호를 입력하세요"
+                />
+              </Field>
+            </Fields>
+
+            <Divider />
+
+            <Fields>
+              <Field>
+                <FieldLabel>지역</FieldLabel>
+                <FieldInput
+                  name="region"
+                  value={modalForm.region}
+                  onChange={handleModalFormChange}
+                  placeholder="지역명을 입력하세요"
+                  list="manager-management-region-options"
+                />
+              </Field>
+              <Field>
+                <FieldLabel>사무소</FieldLabel>
+                <FieldInput
+                  name="office"
+                  value={modalForm.office}
+                  onChange={handleModalFormChange}
+                  placeholder="사무소명을 입력하세요"
+                  list="manager-management-office-options"
+                />
+              </Field>
+              <Field>
+                <FieldLabel>담당 팀장</FieldLabel>
+                <FieldInput
+                  name="teamLeaderId"
+                  value={modalForm.teamLeaderId}
+                  onChange={handleModalFormChange}
+                  placeholder="할당할 팀장 ID를 입력하세요"
+                  list="manager-management-teamleader-options"
+                />
+              </Field>
+            </Fields>
+
+            <ButtonRow>
+              <SaveButton type="submit" disabled={modalSaving}>
+                {modalSaving ? "저장 중..." : "변경사항 저장"}
+              </SaveButton>
+              {modalFeedback && <FeedbackSuccess>{modalFeedback}</FeedbackSuccess>}
+              {modalFeedbackError && (
+                <FeedbackError>{modalFeedbackError}</FeedbackError>
+              )}
+            </ButtonRow>
+          </ModalContent>
+        </ModalOverlay>
+      )}
+
+      <datalist id="manager-management-region-options">
+        {regionOptions.map((value) => (
+          <option value={value} key={`region-${value}`} />
+        ))}
+      </datalist>
+      <datalist id="manager-management-office-options">
+        {officeOptions.map((value) => (
+          <option value={value} key={`office-${value}`} />
+        ))}
+      </datalist>
+      <datalist id="manager-management-teamleader-options">
+        {teamLeaderOptions.map((option) => (
+          <option
+            value={option.value}
+            key={`teamleader-${option.value}`}
+            label={option.label}
+          />
+        ))}
+      </datalist>
+    </PageWrapper>
+  );
+};
+
+export default ManagerManagementPage;
+
+const PageWrapper = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+`;
+
+const Heading = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+`;
+
+const PageTitle = styled.h1`
+  font-size: 24px;
+  font-weight: 700;
+`;
+
+const PageSubtitle = styled.p`
+  font-size: 14px;
+  color: #555;
+`;
+
+const InfoText = styled.div`
+  font-size: 14px;
+  color: #555;
+`;
+
+const ErrorText = styled.div`
+  font-size: 13px;
+  color: #e74c3c;
+`;
+
+const SectionWrapper = styled.section`
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid #e1e1e1;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+`;
+
+const SectionHeader = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+`;
+
+const SectionTitle = styled.div`
+  font-size: 18px;
+  font-weight: 600;
+`;
+
+const SectionDescription = styled.div`
+  font-size: 13px;
+  color: #777;
+`;
+
+const EmptyState = styled.div`
+  font-size: 13px;
+  color: #777;
+  padding: 10px 0;
+`;
+
+const Table = styled.table`
+  width: 100%;
+  border-collapse: collapse;
+`;
+
+const TableHead = styled.thead`
+  background: #f9fafc;
+`;
+
+const TableBody = styled.tbody``;
+
+const TableRow = styled.tr<{ $selected?: boolean }>`
+  background: ${({ $selected }) => ($selected ? "#f4f7ff" : "#fff")};
+  &:hover {
+    background: #f4f7ff;
+  }
+`;
+
+const TableCell = styled.td`
+  padding: 12px 10px;
+  font-size: 13px;
+  border-bottom: 1px solid #ececec;
+  &:first-child {
+    font-weight: 600;
+  }
+`;
+
+const TableHeaderCell = styled.th`
+  padding: 12px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+  color: #555;
+  border-bottom: 2px solid #e5e5e5;
+`;
+
+const TierBadge = styled.span`
+  display: inline-flex;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  background: #e9ecff;
+  color: #2f7ff9;
+`;
+
+const ActionButton = styled.button`
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #2c8fff;
+  background: #fff;
+  color: #2c8fff;
+  font-size: 13px;
+  cursor: pointer;
+  &:hover {
+    background: #2c8fff;
+    color: #fff;
+  }
+`;
+
+const PaginationRow = styled.div`
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+`;
+
+const PageButton = styled.button`
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #d3d3d3;
+  background: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  &:disabled {
+    color: #aaa;
+    border-color: #eee;
+    cursor: default;
+  }
+`;
+
+const PageInfo = styled.span`
+  font-size: 12px;
+  color: #666;
+`;
+
+const ModalOverlay = styled.div`
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+`;
+
+const ModalContent = styled.form`
+  width: min(520px, 100%);
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+`;
+
+const ModalHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+`;
+
+const ModalTitle = styled.div`
+  font-size: 18px;
+  font-weight: 600;
+`;
+
+const ModalCloseButton = styled.button`
+  background: transparent;
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+`;
+
+const EditorInfo = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 13px;
+  color: #555;
+`;
+
+const Fields = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+`;
+
+const Field = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+`;
+
+const FieldLabel = styled.label`
+  font-size: 12px;
+  color: #555;
+`;
+
+const FieldInput = styled.input`
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #dcdcdc;
+  font-size: 14px;
+  &:disabled {
+    background: #f7f7f7;
+    border-color: #e0e0e0;
+  }
+`;
+
+const Divider = styled.div`
+  height: 1px;
+  background: #f0f0f0;
+  margin: 6px 0 10px;
+`;
+
+const HelperText = styled.div`
+  font-size: 11px;
+  color: #888;
+`;
+
+const ButtonRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+`;
+
+const SaveButton = styled.button`
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: none;
+  background: #111;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  &:disabled {
+    background: #999;
+    cursor: default;
+  }
+`;
+
+const FeedbackSuccess = styled.div`
+  font-size: 13px;
+  color: #0b9150;
+`;
+
+const FeedbackError = styled.div`
+  font-size: 13px;
+  color: #e74c3c;
+`;
