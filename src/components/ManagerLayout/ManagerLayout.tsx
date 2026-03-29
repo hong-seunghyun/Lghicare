@@ -159,6 +159,9 @@ export default function ManagerLayout({ children }: Props) {
     if (!manager?.position) return false;
     const position = manager.position;
     return (
+      position.includes("지역담당") ||
+      position.includes("지역행정") ||
+      position.includes("CSA") ||
       position.includes("리더사무소장") ||
       position.includes("사무소장") ||
       position.includes("팀장")

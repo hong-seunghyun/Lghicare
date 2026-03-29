@@ -25,7 +25,12 @@ interface ManagerSession {
   teamLeaderId: string;
 }
 
-type Tier = "regionLeader" | "officeHead" | "teamLeader" | "member";
+type Tier =
+  | "areaAdmin"
+  | "regionLeader"
+  | "officeHead"
+  | "teamLeader"
+  | "member";
 
 type ManagerRecord = {
   id: string;
@@ -41,17 +46,38 @@ type ManagerRecord = {
 
 const getTier = (position?: string): Tier => {
   if (!position) return "member";
+  if (
+    position.includes("지역행정") ||
+    position.includes("지역담당") ||
+    position.includes("CSA")
+  ) {
+    return "areaAdmin";
+  }
   if (position.includes("리더사무소장")) return "regionLeader";
   if (position.includes("사무소장")) return "officeHead";
   if (position.includes("팀장")) return "teamLeader";
   return "member";
 };
 
+const getAreaFromRegion = (region?: string) => {
+  const trimmed = String(region ?? "").trim();
+  if (!trimmed) return "";
+  if (trimmed.includes("_")) {
+    return trimmed.split("_")[0]?.trim() ?? trimmed;
+  }
+  if (/[가-힣]/u.test(trimmed)) {
+    const normalized = trimmed.replace(/[A-Z0-9]+$/u, "").trim();
+    return normalized || trimmed;
+  }
+  return trimmed;
+};
+
 const tierLabelMap: Record<Tier, string> = {
+  areaAdmin: "지역 관리자",
   regionLeader: "리더사무소장",
   officeHead: "사무소장",
   teamLeader: "팀장",
-  member: "팀원",
+  member: "매니저",
 };
 
 const ManagerManagementPage: React.FC = () => {
@@ -60,6 +86,7 @@ const ManagerManagementPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [managedManagers, setManagedManagers] = useState<ManagerRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [searchKeyword, setSearchKeyword] = useState("");
 
   const [selectedManagerId, setSelectedManagerId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -76,6 +103,7 @@ const ManagerManagementPage: React.FC = () => {
   const [modalFeedbackError, setModalFeedbackError] = useState<string | null>(null);
   const PAGE_SIZE = 10;
   const [pageByTier, setPageByTier] = useState<Record<Tier, number>>({
+    areaAdmin: 1,
     regionLeader: 1,
     officeHead: 1,
     teamLeader: 1,
@@ -108,8 +136,39 @@ const ManagerManagementPage: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
-        let managerQuery;
-        if (tier === "regionLeader") {
+        let list: ManagerRecord[] = [];
+
+        if (tier === "areaAdmin") {
+          const area = getAreaFromRegion(session.region);
+          if (!area) {
+            throw new Error("지역 정보가 없어 매니저를 불러올 수 없습니다.");
+          }
+          const managerQuery = query(
+            collection(db, "users"),
+            where("role", "==", "manager"),
+          );
+          const snap = await getDocs(managerQuery);
+          list = snap.docs
+            .map((docSnap) => {
+              const data = docSnap.data() as any;
+              return {
+                id: docSnap.id,
+                managerId: data.managerId ?? "",
+                name: data.name ?? "",
+                position: data.position ?? "",
+                region: data.region ?? "",
+                office: data.office ?? data.branch ?? "",
+                teamLeaderId: data.teamLeaderId ?? "",
+                password: data.password ?? "",
+                isActive: data.isActive ?? true,
+              };
+            })
+            .filter(
+              (item) => item.id !== session.id && getAreaFromRegion(item.region) === area,
+            );
+        } else {
+          let managerQuery;
+          if (tier === "regionLeader") {
           if (!session.region) {
             throw new Error("지역 정보가 없어 매니저를 불러올 수 없습니다.");
           }
@@ -118,7 +177,7 @@ const ManagerManagementPage: React.FC = () => {
             where("role", "==", "manager"),
             where("region", "==", session.region),
           );
-        } else if (tier === "officeHead") {
+          } else if (tier === "officeHead") {
           if (!session.office) {
             throw new Error("사무소 정보가 없어 매니저를 불러올 수 없습니다.");
           }
@@ -127,34 +186,35 @@ const ManagerManagementPage: React.FC = () => {
             where("role", "==", "manager"),
             where("office", "==", session.office),
           );
-        } else {
+          } else {
           if (!session.managerId) {
-            throw new Error("팀장 아이디가 없어 팀원을 불러올 수 없습니다.");
+            throw new Error("팀장 아이디가 없어 매니저을 불러올 수 없습니다.");
           }
           managerQuery = query(
             collection(db, "users"),
             where("role", "==", "manager"),
             where("teamLeaderId", "==", session.managerId),
           );
-        }
+          }
 
-        const snap = await getDocs(managerQuery);
-        const list: ManagerRecord[] = snap.docs
-          .map((docSnap) => {
-            const data = docSnap.data() as any;
-            return {
-              id: docSnap.id,
-              managerId: data.managerId ?? "",
-              name: data.name ?? "",
-              position: data.position ?? "",
-              region: data.region ?? "",
-              office: data.office ?? data.branch ?? "",
-              teamLeaderId: data.teamLeaderId ?? "",
-              password: data.password ?? "",
-              isActive: data.isActive ?? true,
-            };
-          })
-          .filter((item) => item.id !== session.id);
+          const snap = await getDocs(managerQuery);
+          list = snap.docs
+            .map((docSnap) => {
+              const data = docSnap.data() as any;
+              return {
+                id: docSnap.id,
+                managerId: data.managerId ?? "",
+                name: data.name ?? "",
+                position: data.position ?? "",
+                region: data.region ?? "",
+                office: data.office ?? data.branch ?? "",
+                teamLeaderId: data.teamLeaderId ?? "",
+                password: data.password ?? "",
+                isActive: data.isActive ?? true,
+              };
+            })
+            .filter((item) => item.id !== session.id);
+        }
 
         setManagedManagers(list);
       } catch (err: any) {
@@ -172,28 +232,62 @@ const ManagerManagementPage: React.FC = () => {
     fetchData();
   }, [session, tier]);
 
+  const filteredManagedManagers = useMemo(() => {
+    const keyword = searchKeyword.trim().toLowerCase();
+    if (!keyword) return managedManagers;
+
+    return managedManagers.filter((manager) =>
+      [
+        manager.managerId,
+        manager.name,
+        manager.position,
+        manager.region,
+        manager.office,
+        manager.teamLeaderId,
+      ].some((value) => String(value ?? "").toLowerCase().includes(keyword)),
+    );
+  }, [managedManagers, searchKeyword]);
+
+  useEffect(() => {
+    setPageByTier({
+      areaAdmin: 1,
+      regionLeader: 1,
+      officeHead: 1,
+      teamLeader: 1,
+      member: 1,
+    });
+  }, [searchKeyword]);
+
+  const regionLeaderManagers = useMemo(
+    () =>
+      filteredManagedManagers.filter(
+        (manager) => getTier(manager.position) === "regionLeader",
+      ),
+    [filteredManagedManagers],
+  );
+
   const officeHeadManagers = useMemo(
     () =>
-      managedManagers.filter(
+      filteredManagedManagers.filter(
         (manager) => getTier(manager.position) === "officeHead",
       ),
-    [managedManagers],
+    [filteredManagedManagers],
   );
 
   const teamLeaderManagers = useMemo(
     () =>
-      managedManagers.filter(
+      filteredManagedManagers.filter(
         (manager) => getTier(manager.position) === "teamLeader",
       ),
-    [managedManagers],
+    [filteredManagedManagers],
   );
 
   const teamMemberManagers = useMemo(
     () =>
-      managedManagers.filter(
+      filteredManagedManagers.filter(
         (manager) => getTier(manager.position) === "member",
       ),
-    [managedManagers],
+    [filteredManagedManagers],
   );
 
   const regionOptions = useMemo(
@@ -300,10 +394,13 @@ const ManagerManagementPage: React.FC = () => {
     }
 
     const currentTier = getTier(modalManager.position);
-    const allowRegionEdit = tier === "regionLeader" && currentTier !== "regionLeader";
+    const allowRegionEdit =
+      (tier === "areaAdmin" && currentTier !== "areaAdmin") ||
+      (tier === "regionLeader" && currentTier !== "regionLeader");
     const allowOfficeEdit =
-      (tier === "regionLeader" || tier === "officeHead") &&
-      currentTier !== "regionLeader";
+      (tier === "areaAdmin" && currentTier !== "areaAdmin") ||
+      ((tier === "regionLeader" || tier === "officeHead") &&
+        currentTier !== "regionLeader");
     const allowTeamLeaderEdit = tier !== "teamLeader" && currentTier === "member";
 
     const updates: Partial<ManagerRecord> = {};
@@ -453,10 +550,21 @@ const ManagerManagementPage: React.FC = () => {
       <Heading>
         <PageTitle>매니저 관리</PageTitle>
         <PageSubtitle>
-          본 페이지에서는 리더 사무소장, 사무소장, 팀장님께서 담당 하위 매니저의
-          이름·비밀번호·소속을 변경하실 수 있습니다.
+          본 페이지에서는 지역행정, 지역담당, CSA, 리더 사무소장, 사무소장,
+          팀장님께서 담당 범위 내 매니저의 이름·비밀번호·소속을 변경하실 수
+          있습니다.
         </PageSubtitle>
       </Heading>
+
+      <SearchPanel>
+        <SearchLabel htmlFor="manager-management-search">검색</SearchLabel>
+        <SearchInput
+          id="manager-management-search"
+          value={searchKeyword}
+          onChange={(event) => setSearchKeyword(event.target.value)}
+          placeholder="이름, 직급, 권역, 사무소, 업무등록번호, 담당팀장 검색"
+        />
+      </SearchPanel>
 
       {error && <ErrorText>{error}</ErrorText>}
       {loading && !error && (
@@ -465,6 +573,34 @@ const ManagerManagementPage: React.FC = () => {
 
       {!loading && !error && (
         <>
+          {tier === "areaAdmin" && (
+            <>
+              {renderSection(
+                "리더 사무소장",
+                "담당 지역에 속한 권역 리더를 관리합니다.",
+                regionLeaderManagers,
+                "regionLeader",
+              )}
+              {renderSection(
+                "사무소장",
+                "담당 지역 전체의 사무소장을 관리합니다.",
+                officeHeadManagers,
+                "officeHead",
+              )}
+              {renderSection(
+                "팀장",
+                "담당 지역 전체의 팀장을 관리합니다.",
+                teamLeaderManagers,
+                "teamLeader",
+              )}
+              {renderSection(
+                "매니저",
+                "담당 지역 전체의 일반 매니저를 관리합니다.",
+                teamMemberManagers,
+                "member",
+              )}
+            </>
+          )}
           {tier === "regionLeader" && (
             <>
               {renderSection(
@@ -483,14 +619,14 @@ const ManagerManagementPage: React.FC = () => {
           )}
           {(tier === "regionLeader" || tier === "officeHead") &&
             renderSection(
-              "팀원",
-              "팀장의 팀원(일반 매니저)을 확인하고 소속을 조정합니다.",
+              "매니저",
+              "팀장의 매니저(일반 매니저)을 확인하고 소속을 조정합니다.",
               teamMemberManagers,
               "member",
             )}
           {tier === "teamLeader" &&
             renderSection(
-              "팀원",
+              "매니저",
               "현재 팀에 속한 매니저만 표시됩니다.",
               teamMemberManagers,
               "member",
@@ -634,6 +770,31 @@ const PageSubtitle = styled.p`
   color: #555;
 `;
 
+const SearchPanel = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid #e1e1e1;
+  padding: 16px;
+`;
+
+const SearchLabel = styled.label`
+  font-size: 12px;
+  font-weight: 600;
+  color: #555;
+`;
+
+const SearchInput = styled.input`
+  width: 100%;
+  max-width: 420px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #dcdcdc;
+  font-size: 14px;
+`;
+
 const InfoText = styled.div`
   font-size: 14px;
   color: #555;
@@ -775,6 +936,7 @@ const ModalOverlay = styled.div`
 
 const ModalContent = styled.form`
   width: min(520px, 100%);
+  max-height: 80vh;
   background: #fff;
   border-radius: 16px;
   padding: 24px;
@@ -782,6 +944,7 @@ const ModalContent = styled.form`
   flex-direction: column;
   gap: 12px;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+  overflow-y: auto;
 `;
 
 const ModalHeader = styled.div`
@@ -843,11 +1006,6 @@ const Divider = styled.div`
   height: 1px;
   background: #f0f0f0;
   margin: 6px 0 10px;
-`;
-
-const HelperText = styled.div`
-  font-size: 11px;
-  color: #888;
 `;
 
 const ButtonRow = styled.div`

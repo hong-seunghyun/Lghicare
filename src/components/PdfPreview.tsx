@@ -2,11 +2,29 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import styled from "styled-components";
-import type { PDFDocumentLoadingTask } from "pdfjs-dist/types/src/display/api";
 
 type PdfPreviewProps = {
   url: string;
   name: string;
+};
+
+type PdfLoadingTask = {
+  promise: Promise<{
+    getPage: (pageNumber: number) => Promise<{
+      getViewport: (options: { scale: number }) => {
+        width: number;
+        height: number;
+      };
+      render: (options: {
+        canvasContext: CanvasRenderingContext2D;
+        viewport: {
+          width: number;
+          height: number;
+        };
+      }) => { promise: Promise<void> };
+    }>;
+  }>;
+  destroy?: () => void;
 };
 
 const mobileUserAgentRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
@@ -34,7 +52,7 @@ const MobilePdfPreview: React.FC<PdfPreviewProps> = ({ url, name }) => {
 
   useEffect(() => {
     let cancelled = false;
-    let loadingTask: PDFDocumentLoadingTask | null = null;
+    let loadingTask: PdfLoadingTask | null = null;
 
     const renderPreview = async () => {
       try {
@@ -43,13 +61,10 @@ const MobilePdfPreview: React.FC<PdfPreviewProps> = ({ url, name }) => {
 
         const pdfjs = (await import("pdfjs-dist/legacy/build/pdf.mjs")) as typeof import("pdfjs-dist/legacy/build/pdf.mjs");
         if (typeof window !== "undefined") {
-          pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-            "pdfjs-dist/legacy/build/pdf.worker.min.mjs",
-            import.meta.url,
-          ).toString();
+          pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/legacy/build/pdf.worker.min.mjs`;
         }
 
-        loadingTask = pdfjs.getDocument({ url });
+        loadingTask = pdfjs.getDocument({ url }) as unknown as PdfLoadingTask;
         const pdf = await loadingTask.promise;
         const page = await pdf.getPage(1);
         const viewport = page.getViewport({ scale: 1.2 });

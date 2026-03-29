@@ -13,10 +13,18 @@ import {
 export type ManagerDashboardRequest = {
   managerUid: string;
   managerId: string;
-  role: "teamLeader" | "officeHead" | "regionLeader";
+  position: string;
   region?: string;
   office?: string;
 };
+
+export type ManagerDashboardScope =
+  | "national"
+  | "area"
+  | "region"
+  | "office"
+  | "team"
+  | "self";
 
 export type ManagerSummary = {
   id: string;
@@ -30,40 +38,60 @@ export type ManagerSummary = {
   shareCount: number;
 };
 
-export type TeamTop = {
-  teamLeaderId: string;
-  teamLeaderName: string;
-  estimateTop: ManagerSummary[];
-  shareTop: ManagerSummary[];
-};
-
-export type OfficeTop = {
-  office: string;
-  estimateTop: ManagerSummary[];
-  shareTop: ManagerSummary[];
-};
-
 export type ManagerDashboardResponse = {
-  estimateTop: ManagerSummary[];
-  shareTop: ManagerSummary[];
-  teamTops: TeamTop[];
-  officeTops: OfficeTop[];
+  scope: ManagerDashboardScope;
+  managers: ManagerSummary[];
+};
+
+const getAreaFromRegion = (region: string) => {
+  const trimmed = String(region ?? "").trim();
+  if (!trimmed) return "";
+  if (trimmed.includes("_")) {
+    return trimmed.split("_")[0]?.trim() ?? trimmed;
+  }
+  if (/[가-힣]/u.test(trimmed)) {
+    const normalized = trimmed.replace(/[A-Z0-9]+$/u, "").trim();
+    return normalized || trimmed;
+  }
+  return trimmed;
+};
+
+const getDashboardScope = (position: string): ManagerDashboardScope => {
+  if (position.includes("지역담당") || position.includes("CSA")) {
+    return "national";
+  }
+  if (position.includes("지역행정")) {
+    return "area";
+  }
+  if (position.includes("리더사무소장")) {
+    return "region";
+  }
+  if (position.includes("사무소장")) {
+    return "office";
+  }
+  if (position.includes("팀장")) {
+    return "team";
+  }
+  return "self";
 };
 
 const getScopeQuery = (
-  role: ManagerDashboardRequest["role"],
+  scope: ManagerDashboardScope,
   region?: string,
   office?: string,
   managerId?: string,
 ) => {
   const baseQuery = query(collection(db, "users"), where("role", "==", "manager"));
-  if (role === "teamLeader" && managerId) {
+  if (scope === "self" && managerId) {
+    return query(baseQuery, where("managerId", "==", managerId));
+  }
+  if (scope === "team" && managerId) {
     return query(baseQuery, where("teamLeaderId", "==", managerId));
   }
-  if (role === "officeHead" && office) {
+  if (scope === "office" && office) {
     return query(baseQuery, where("office", "==", office));
   }
-  if (role === "regionLeader" && region) {
+  if (scope === "region" && region) {
     return query(baseQuery, where("region", "==", region));
   }
   return baseQuery;
@@ -104,15 +132,6 @@ const fetchManagerTotals = async () => {
   return totals;
 };
 
-const topN = (
-  list: ManagerSummary[],
-  field: "estimateCount" | "shareCount",
-  limit: number,
-) =>
-  [...list]
-    .sort((a, b) => b[field] - a[field])
-    .slice(0, limit);
-
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ManagerDashboardResponse | { message: string }>,
@@ -122,19 +141,20 @@ export default async function handler(
   }
 
   const body = req.body as ManagerDashboardRequest;
-  if (!body.managerUid || !body.role) {
+  if (!body.managerUid || !body.position) {
     return res.status(400).json({ message: "Missing required fields" });
   }
 
   try {
+    const scope = getDashboardScope(body.position);
     const managerQuery = getScopeQuery(
-      body.role,
+      scope,
       body.region,
       body.office,
       body.managerId,
     );
     const managerSnap = await getDocs(managerQuery);
-    const subordinates = managerSnap.docs
+    const scopedManagers = managerSnap.docs
       .map((docSnap) => {
         const data = docSnap.data() as any;
         return {
@@ -146,12 +166,17 @@ export default async function handler(
           region: String(data.region ?? ""),
           teamLeaderId: String(data.teamLeaderId ?? ""),
         };
-      })
-      .filter((item) => item.id !== body.managerUid);
+      });
+
+    const scopedArea = getAreaFromRegion(body.region ?? "");
+    const filteredManagers = scopedManagers.filter((manager) => {
+      if (scope !== "area") return true;
+      return getAreaFromRegion(manager.region) === scopedArea;
+    });
 
     const totalMap = await fetchManagerTotals();
 
-    const enriched = subordinates.map((manager) => {
+    const enriched = filteredManagers.map((manager) => {
       const totals = totalMap.get(manager.id) ?? { estimate: 0, share: 0 };
       return {
         ...manager,
@@ -160,55 +185,9 @@ export default async function handler(
       };
     });
 
-    const teamLeaderRegistry = new Map<string, string>();
-    enriched.forEach((manager) => {
-      if (manager.position.includes("팀장")) {
-        teamLeaderRegistry.set(manager.managerId, manager.name);
-      }
-    });
-
-    const groupBy = (
-      keySelector: (manager: ManagerSummary) => string,
-    ): Map<string, ManagerSummary[]> => {
-      const map = new Map<string, ManagerSummary[]>();
-      enriched.forEach((manager) => {
-        const key = keySelector(manager) || "unknown";
-        const list = map.get(key) ?? [];
-        list.push(manager);
-        map.set(key, list);
-      });
-      return map;
-    };
-
-    const teamGroups = groupBy((manager) => manager.teamLeaderId || "unknown");
-    const teamTops: TeamTop[] = Array.from(teamGroups.entries())
-      .map(([teamLeaderId, members]) => ({
-        teamLeaderId,
-        teamLeaderName:
-          teamLeaderRegistry.get(teamLeaderId) || teamLeaderId || "팀장 미지정",
-        estimateTop: topN(members, "estimateCount", 5),
-        shareTop: topN(members, "shareCount", 5),
-      }))
-      .filter((group) => group.teamLeaderId && group.estimateTop.length > 0);
-
-    const officeGroups = groupBy((manager) => manager.office || "unknown");
-    const officeTops: OfficeTop[] = Array.from(officeGroups.entries()).map(
-      ([office, members]) => ({
-        office,
-        estimateTop: topN(members, "estimateCount", 10),
-        shareTop: topN(members, "shareCount", 10),
-      }),
-    );
-
-    const limit = body.role === "teamLeader" ? 5 : 10;
-    const estimateTop = topN(enriched, "estimateCount", limit);
-    const shareTop = topN(enriched, "shareCount", limit);
-
     return res.status(200).json({
-      estimateTop,
-      shareTop,
-      teamTops,
-      officeTops,
+      scope,
+      managers: enriched,
     });
   } catch (err) {
     console.error("manager dashboard stats error:", err);
