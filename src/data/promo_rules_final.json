@@ -1,0 +1,8187 @@
+{
+  "version": 2,
+  "generatedFrom": "ddddd.xlsx",
+  "basePromoTypeKeywords": [
+    "신규결합",
+    "기존결합",
+    "재구독"
+  ],
+  "promoNameKeywordMap": {
+    "케어십전환": [
+      "케어십"
+    ],
+    "듀얼전환": [
+      "듀얼"
+    ],
+    "미사용전환": [
+      "미사용"
+    ],
+    "타사보상": [
+      "타사"
+    ],
+    "제안타겟": [
+      "제안타겟"
+    ],
+    "중고": [
+      "중고"
+    ]
+  },
+  "models": {
+    "WD722RK": {
+      "base": {
+        "재구독": 50000
+      },
+      "serviceCycle": {
+        "4개월 신규, 결합": 100000
+      },
+      "promo": {
+        "케어십전환": 50000,
+        "타사보상": 100000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "WD722RH": {
+      "base": {
+        "재구독": 50000
+      },
+      "serviceCycle": {
+        "4개월 신규, 결합": 100000
+      },
+      "promo": {
+        "케어십전환": 50000,
+        "타사보상": 100000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "WD722RE": {
+      "base": {
+        "재구독": 50000
+      },
+      "serviceCycle": {
+        "4개월 신규, 결합": 100000
+      },
+      "promo": {
+        "케어십전환": 50000,
+        "타사보상": 100000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "WD723RK": {},
+    "WD723RH": {},
+    "WD723RE": {},
+    "WD524VC": {
+      "base": {
+        "재구독": 50000
+      },
+      "promo": {
+        "케어십전환": 50000,
+        "타사보상": 100000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "WD524VH": {
+      "base": {
+        "재구독": 50000
+      },
+      "promo": {
+        "케어십전환": 50000,
+        "타사보상": 100000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "WD524VS": {
+      "base": {
+        "재구독": 50000
+      },
+      "promo": {
+        "케어십전환": 50000,
+        "타사보상": 100000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "WU923ACB": {
+      "base": {
+        "재구독": 50000
+      },
+      "promo": {
+        "케어십전환": 50000,
+        "타사보상": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "WU923AWB": {
+      "base": {
+        "재구독": 50000
+      },
+      "promo": {
+        "케어십전환": 50000,
+        "타사보상": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "WU923ANB": {
+      "base": {
+        "재구독": 50000
+      },
+      "promo": {
+        "케어십전환": 50000,
+        "타사보상": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "WU923ABB": {
+      "base": {
+        "재구독": 50000
+      },
+      "promo": {
+        "케어십전환": 50000,
+        "타사보상": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "WU923AS": {
+      "base": {
+        "재구독": 50000
+      },
+      "promo": {
+        "케어십전환": 50000,
+        "타사보상": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "WU823AS": {
+      "base": {
+        "재구독": 50000
+      },
+      "promo": {
+        "케어십전환": 50000,
+        "타사보상": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "WD523VC": {
+      "promo": {
+        "타사보상": 50000
+      }
+    },
+    "WD523VH": {
+      "promo": {
+        "타사보상": 50000
+      }
+    },
+    "WD523VS": {
+      "promo": {
+        "타사보상": 50000
+      }
+    },
+    "WD523VP": {
+      "promo": {
+        "타사보상": 50000
+      }
+    },
+    "WD523VM": {
+      "promo": {
+        "타사보상": 50000
+      }
+    },
+    "WD323ACB": {},
+    "WD323AWB": {},
+    "WU523ACB": {},
+    "WU523AWB": {},
+    "WD525ACB": {},
+    "WD525AGB": {},
+    "WD525AS": {},
+    "WD325AS": {},
+    "WD520VC": {
+      "promo": {
+        "케어십전환": 30000
+      }
+    },
+    "WD520ACB": {
+      "promo": {
+        "케어십전환": 30000
+      }
+    },
+    "WD521ACB": {
+      "promo": {
+        "케어십전환": 30000
+      }
+    },
+    "WD521AWB": {
+      "promo": {
+        "케어십전환": 30000
+      }
+    },
+    "WD321ACB": {
+      "promo": {
+        "케어십전환": 30000
+      }
+    },
+    "WD321AWB": {
+      "promo": {
+        "케어십전환": 30000
+      }
+    },
+    "WD220MCB": {},
+    "WD220MNB": {},
+    "WD120MCB": {},
+    "WD120MNB": {},
+    "WD526ARB": {},
+    "WD526AHB": {},
+    "WD326ARB": {},
+    "WD326AHB": {},
+    "WS513SH": {},
+    "WS511SH": {},
+    "SC5GMR80S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SC5MBR80S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SC5GMR70S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SC5GMR60S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SC5MBR60S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SC5MSR40S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SC3GME50": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SC3GNE50": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SC3RBE50": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SS4RHS60E": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SS4RWS60E": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "MH81RR": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "MH67BR": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "themePromo": {
+        "events": [
+          {
+            "amount": 50000,
+            "startDate": "2026-04-01",
+            "endDate": "2026-04-10"
+          }
+        ]
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "MH20BR": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "MH21BBY": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "MH21RRY": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "MX91WR": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "MH65CC": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "AS155GWDL": {
+      "themePromo": {
+        "events": [
+          {
+            "amount": 50000,
+            "startDate": "2026-04-01",
+            "endDate": "2026-04-10"
+          }
+        ]
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "AS322DSFAM": {
+      "themePromo": {
+        "events": [
+          {
+            "amount": 50000,
+            "startDate": "2026-04-01",
+            "endDate": "2026-04-10"
+          }
+        ]
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "AS235DWSAM": {
+      "themePromo": {
+        "events": [
+          {
+            "amount": 50000,
+            "startDate": "2026-04-01",
+            "endDate": "2026-04-10"
+          }
+        ]
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "AS206NSHAM": {
+      "promo": {
+        "케어십전환": 50000,
+        "중고": 100000,
+        "미사용전환": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "AS206NGHAM": {
+      "promo": {
+        "케어십전환": 50000,
+        "중고": 100000,
+        "미사용전환": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "AS356NSMAM": {
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "AS356NGMAM": {
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "AS205NSJAM": {
+      "promo": {
+        "케어십전환": 100000,
+        "중고": 100000,
+        "미사용전환": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "AS205NGJAM": {
+      "promo": {
+        "케어십전환": 100000,
+        "중고": 100000,
+        "미사용전환": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "AS355NSNAM": {
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "AS355NGNAM": {
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "AS186LSAA": {
+      "themePromo": {
+        "events": [
+          {
+            "amount": 50000,
+            "startDate": "2026-04-01",
+            "endDate": "2026-04-10"
+          }
+        ]
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "AS192DSFAM": {
+      "promo": {
+        "케어십전환": 100000,
+        "중고": 100000,
+        "미사용전환": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "AS195DWWAM": {
+      "promo": {
+        "케어십전환": 100000,
+        "중고": 100000,
+        "미사용전환": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "AS305DWWAM": {
+      "promo": {
+        "케어십전환": 100000,
+        "중고": 100000,
+        "미사용전환": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "AS285DWWAM": {
+      "promo": {
+        "케어십전환": 100000,
+        "중고": 100000,
+        "미사용전환": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FS065PSKAM": {
+      "promo": {
+        "케어십전환": 100000,
+        "중고": 100000,
+        "미사용전환": 50000
+      }
+    },
+    "AS065PWHA": {
+      "promo": {
+        "케어십전환": 100000,
+        "중고": 100000,
+        "미사용전환": 50000
+      }
+    },
+    "AS065CWHA": {
+      "promo": {
+        "케어십전환": 100000,
+        "중고": 100000,
+        "미사용전환": 50000
+      }
+    },
+    "HY705RSUABM": {
+      "promo": {
+        "케어십전환": 100000,
+        "중고": 100000,
+        "미사용전환": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "HY505RWLAHM": {
+      "promo": {
+        "케어십전환": 100000,
+        "중고": 100000,
+        "미사용전환": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "DQ235MEGAWS": {},
+    "DQ235MWGAWS": {},
+    "DQ185MEGAWS": {},
+    "DQ185MWGAWS": {},
+    "AS405BWRR": {},
+    "FQ25GN9BE2": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ25GN9HE2": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ25GN9BE2M": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ25GN9HE2M": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ22GN9BE2": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ22GN9HE2": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ22GN9BE2M": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ22GN9HE2M": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN9BE2": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN9HE2": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN9BE2M": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN9HE2M": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN9BA2": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN9HA2": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN9BA2M": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN9HA2M": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ25GN9BE1": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ25GN9HE1": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ25GN9BE1M": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ25GN9HE1M": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ22GN9BE1": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ22GN9HE1": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ22GN9BE1M": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ22GN9HE1M": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN9BE1": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN9HE1": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN9BE1M": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN9HE1M": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN9BA1": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN9HA1": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN9BA1M": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN9HA1M": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN7BA2": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN7HA2": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN7BA2M": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN7HA2M": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN7BA1": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN7HA1": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN7BA1M": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN7HA1M": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ25FN5BA2": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ25FN5HA2": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ25FN5BA2M": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ25FN5HA2M": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN5BA2": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN5HA2": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN5BA2M": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN5HA2M": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ25FN5BA1": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ25FN5HA1": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ25FN5BA1M": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ25FN5HA1M": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN5BA1": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN5HA1": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN5BA1M": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GN5HA1M": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ22GV6EA2": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ22GV6EA2M": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV6EE2": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV6EE2M": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV6EA2": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV6EA2M": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV6BA2": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV6BA2M": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ22GV6EA1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ22GV6EA1M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV6EE1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV6EE1M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV6EA1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV6EA1M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV6BA1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV6BA1M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV5EA2": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV5EA2M": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV5BA2": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV5BA2M": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV5EA1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV5EA1M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV5BA1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV5BA1M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FN5BU2": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FN5BU2M": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FV6ES2": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FV6ES2M": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV4EA2": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV4EA2M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV4EA1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV4EA1M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV3EE2": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV3EE2M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ22GV3EA2": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ22GV3EA2M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV3EA2": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV3EA2M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV3BA2": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV3BA2M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV3EE1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV3EE1M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ22GV3EA1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ22GV3EA1M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV3EA1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV3EA1M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV3BA1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GV3BA1M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GC4EA2": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GC4EA2M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GC4EA1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GC4EA1M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GC3EA2": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GC3EA2M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GC3EA1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18GC3EA1M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ22FV3EA2": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ22FV3EA2M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FV3EE2": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FV3EE2M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FV3BA2": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FV3BA2M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FV3EA2": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FV3EA2M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ22FV3EA1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ22FV3EA1M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FV3EE1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FV3EE1M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FV3BA1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FV3BA1M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FV3EA1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FV3EA1M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ22FU2EA2": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ22FU2EA2M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FU2EA2": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FU2EA2M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ22FU2EA1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ22FU2EA1M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FU2EA1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FU2EA1M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FU1EA2": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FU1EA2M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FU1EA1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FU1EA1M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ20FC2EA2": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ20FC2EA2M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FC2EA2": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FC2EA2M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ20FC2EA1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ20FC2EA1M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FC2EA1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FC2EA1M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FC1EA2": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FC1EA2M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FC1EA1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FQ18FC1EA1M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FW20HDNBM2": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FW20HDNBM2M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FW19SETBA2": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FW19SETBA2M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FW18EV3EA1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FW18EV3EA1M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FW16HDWWA1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FW16HDWWA1M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FW16FC1EU2": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FW16FC1EU2M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FW16FC1EA2": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FW16FC1EA2M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FW16FC1EU1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FW16FC1EU1M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FW16FC1EA1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FW16FC1EA1M": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SQ06GJ1WES": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SQ07GS9EES": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SQ07GS8EAS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SQ07GS7EAS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SQ07GJ3WES": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SQ07GA3WBS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SW07GK1WES": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SW07FK1WBS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SQ07FA3WBS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SQ11EK1WES": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SQ13EK1WAS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SQ07EJ3WES": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SQ16EK1WAS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SQ09EK1WES": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SQ09EJ1WAS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SQ06EJ1WES": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SW09FS1EES": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SW07FK1WAS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SW09FK1WAS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SW11EK1WAS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SW13EK1WAS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SW07EK1WES": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "SW16EK1WAS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "MX0120BASV": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M-X0120BASV": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED97G6KS": {
+      "base": {
+        "기존결합/신규결합": 2000000,
+        "재구독": 2000000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED97G6KW": {
+      "base": {
+        "기존결합/신규결합": 2000000,
+        "재구독": 2000000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED97G6KL": {
+      "base": {
+        "기존결합/신규결합": 2000000,
+        "재구독": 2000000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED77G6KS": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED77G6KW": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED77G6KL": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED77C6SS": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED77C6SW": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED77C6SL": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED77C6QS": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED77C6QW": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED77C6QL": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED77B6SS": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED77B6SW": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED65G6KS": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED65G6KW": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED65C6SS": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED65C6SW": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED65C6SL": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED65B6SS.AS20A": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED65B6SW.AS20A": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED55G6KS.AS20A": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED55G6KW.AS20A": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED55G6KL.AS20A": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED55C6KS.AS20A": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED55C6KW.AS20A": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED55C6SL.AS20A": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED55B6KS.AS20A": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED55B6KW.AS20A": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED48C6KS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED48C6KW": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED77C6SWP": {
+      "base": {
+        "기존결합/신규결합": 250000,
+        "재구독": 250000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED77C6QSP": {
+      "base": {
+        "기존결합/신규결합": 250000,
+        "재구독": 250000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED77C6QWP": {
+      "base": {
+        "기존결합/신규결합": 250000,
+        "재구독": 250000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED77B6SSP": {
+      "base": {
+        "기존결합/신규결합": 250000,
+        "재구독": 250000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED77B6SWP": {
+      "base": {
+        "기존결합/신규결합": 250000,
+        "재구독": 250000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED65G6KSP": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED65G6KWP": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED65C6SSP": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED65C6SWP": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED97G5KS": {
+      "base": {
+        "기존결합/신규결합": 2000000,
+        "재구독": 2000000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED97G5KW": {
+      "base": {
+        "기존결합/신규결합": 2000000,
+        "재구독": 2000000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED97G5KL": {
+      "base": {
+        "기존결합/신규결합": 2000000,
+        "재구독": 2000000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED83G5KS": {
+      "base": {
+        "기존결합/신규결합": 1000000,
+        "재구독": 1000000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED83G5KW": {
+      "base": {
+        "기존결합/신규결합": 1000000,
+        "재구독": 1000000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED83G5KL": {
+      "base": {
+        "기존결합/신규결합": 1000000,
+        "재구독": 1000000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED83C5KS": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED83C5KW": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED83C5SS": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED83C5SW": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED83C5QS": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED83C5QW": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED83B5KS": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED83B5KW": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED77G5KS": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED77G5KW": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED77G5KL": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED77B5SS": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED77B5SW": {
+      "base": {
+        "기존결합/신규결합": 150000,
+        "재구독": 150000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED55G5KS": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED55G5KW": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED55G5KL": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED55C5SS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED55C5SW": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED55B5KS.AS20A": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED55B5KW.AS20A": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED48C5KS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED48C5KW": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED42C5KS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "OLED42C5KW": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "85QNED70BKS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "85QNED70BKW": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "75QNED70BKS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "75QNED70BKW": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "65QNED70BKS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "65QNED70BKW": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "55QNED70BKS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "55QNED70BKW": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "50QNED70BKS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "50QNED70BKW": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "43QNED70BKS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "43QNED70BKW": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "100QNED86AS": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "100QNED86AW": {
+      "base": {
+        "기존결합/신규결합": 200000,
+        "재구독": 200000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "86QNED9MAKW": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "86QNED86AKS": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "86QNED86AKW": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "75QNED85AK1": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "75QNED85AK2": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "75QNED9MAKW": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "65QNED85AK1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "65QNED85AK2": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "86NANO90AKS": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "86NANO90AKW": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "75NANO90AKS.AS20A": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "75NANO90AKW.AS20A": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "65NANO90AKS.AS20A": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "65NANO90AKW.AS20A": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "50NANO90AKS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "50NANO90AKW": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "43NANO90AKS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "43NANO90AKW": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "86UT9300KS": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "86UT9300KW": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "55UT9300KS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "55UT9300KW": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "55UT9300KGB": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "42LX3QKNA": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "27LX6TEGA": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "27LX6TPGA": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "27LX5QKNA": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "W826SVV482S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "W826SKV482S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "W826GBB482": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "W826GQQ482S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "W826GGG482S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "W826GGA482S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "W826MQQ482S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "W826MNQ482S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "W826GBB182": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "J816MEE17-F": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "J825GBB442": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "J825GBB142": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "J825MEE142": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M876SVV582S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M876SKV582S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M876GBB582S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M876GQQ582S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M876GGG582S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M876GGA582S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M876MQQ582S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M876MNQ582S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M876GBB282": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "H875GBB442": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "H875GBB141": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "H875GBC141": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "T875MHH141": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "T875MEE141": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "T875MHH042": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626SVV352S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626SGS352S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626SKV352S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626GBB352": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626GQQ352S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626GGG352S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626GGA352S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626GAG352S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626GCB352S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626GYQ352S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626MQQ352S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626MRQ352S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626MNQ352S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626SVV052S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626SGS052S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626SKV052S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626GBB052": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626GQQ052S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626GGG052S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626GGA052S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626GAG052S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626GCB052S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626GYQ052S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626MQQ052S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626MRQ052S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626MNQ052S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M876GBB431": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M876GBB231": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M876GGA231": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M876GQQ231": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M876GBB131": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M876GGG132": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M876MQQ132": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "S836GBB142": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "S836MQQ142": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "S656GBB143": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M874GNN3A1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M874GNN0A1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M624GNN3A2": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M624GNN0A2": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "H875GBB111": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "H875GBB031": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "H875GBB012": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "H875GCB012": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "T875MHH412": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "T875MEE012": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "S834MEE141": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M616SVV0J1S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M616SKV0J1S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M616GBB0J1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M616GQQ0J1": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M616GGG0J1S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M616MQQ0J1S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M616MNQ0J1S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626SVV332S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626SGS332S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626SKV332S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626GBB332S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626GQQ332S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626GGG332S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626GGA332S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626GAG332S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626GCB332S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626GYQ332S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626MQQ332S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626MRQ332S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626MNQ332S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626SVV032S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626SGS032S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626SKV032S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626GBB032": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626GQQ032S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626GGG032S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626GGA032S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626GAG032S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626GCB032S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626GYQ032S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626MQQ032S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626MRQ032S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626MNQ032S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626GBB022S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626GGA022S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "M626GAG022S": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z495SVV271": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z495GBB271": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z495GCB271": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z495GQQ271": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z495GGA271": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z495MQQ271": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z495MWW271": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z495GBB212": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z495GGG212": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z490MEEF11": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z490MPSF12": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z331GNN153": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z564GBB343": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z509MEEF33": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z509MHHF23": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z323MEF": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z484SGS172S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z484SVV172S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z484GBB172": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z484GCB172S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z484GGG172S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z484GAG172S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z484GGA172S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z484GQQ172S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z484MQQ172S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z484MRR172S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z484MNR172S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z334SGS171": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z334SVV171S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z334GBB171": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z334GCB171S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z334GGG171S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z334GGA171S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z334GQQ171S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z334MQQ171S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z334MNR171S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z334MRR171S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z330MEEF21": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z225MEE151": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "K225MB131": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "K225LW121": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z135MEE123": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "K135SS123": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Q343GIB183": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Q343GIP183S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Q343GIC183S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Q343GIL183S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Q343GIH183S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Q343GIN183S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Q343GIY183S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Q343GIW183S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Q342GBB153": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Q342GPP153S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Q342GPB153S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Q342GPC153S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Q342GCC153S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Q342GCB153S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Q342GLL153S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Q342GHH153S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Q342GNN153S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Q342GYY153S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Q342GWW153S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "X324SS7S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "X324SM7S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "X324SV7S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "X324GB7": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "X324GH7S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "X324GN7S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "X324GQ7S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "X324GG7S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Y324SS7S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Y324SM7S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Y324SV7S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Y324GB7": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Y324GH7S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Y324GN7S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Y324GQ7S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Y324GG7S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z324SS7S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z324SM7S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z324SV7S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z324GB7": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z324GH7S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z324GN7S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z324GQ7S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Z324GG7S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "Q344GIN493": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "Q343MEEF53": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "Q343MHHF33": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "Q343MPSF33": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "M451SS53": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "M451MC53": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "M451PS53": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "M344MB14": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "D604MEE52": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "D502MEE53": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "B502S53": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "D315MPS31": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "D312MBE31": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "D312MCT31": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "D312MCK31": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "B312S31": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "D265MEE22": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "B182DS13": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "B182W13": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "R321S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "A320S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "A202S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "A202W": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "BEF3ANHLE": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEF3ANBLE": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEF3ANPLE": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEF3ANSLE": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEF3ANHLEA": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEF3ANBLEA": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEF3ANPLEA": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEF3ANSLEA": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEF3ANHLEC": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEF3ANBLEC": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEF3ANPLEC": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEF3ANSLEC": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEF3AMB4E": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEF3AMB4EA": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEF3AMB4EC": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEF3ASMLE": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEF3ASMLEA": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEF3ASMLEC": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEI3ANHLE": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEI3ANBLE": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEI3ANPLE": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEI3ANHLEA": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEI3ANBLEA": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEI3ANPLEA": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEI3ANHLEC": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEI3ANBLEC": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEI3ANPLEC": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEI3ASMLE": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEI3ASMLEA": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEI3ASMLEC": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEI3ASS4E": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEI3ASS4EA": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEI3ASS4EC": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEI3AMB4E": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEI3AMB4EA": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEI3AMB4EC": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEI3ASB4E": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEI3ASB4EA": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEI3ASB4EC": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEI3QMBLOE": {
+      "base": {
+        "기존결합/신규결합": 50000,
+        "재구독": 50000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEI3QMBLOEA": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEI3QMBLOEC": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEY3MSE": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEY3MSEA": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEY3MSEC": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEY3GS2E": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEY3GS2EA": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEY3GS2EC": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEF3ANHLOE": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEI3ANBLOE": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEF3ANHLOEA": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEF3ANHLOEC": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEI3ANBLOEA": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "BEI3ANBLOEC": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "MLJ32ERS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "MLJ32HRS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "MLJ32PRS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "MLJ32MRS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "DUE6BGE": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "DFE6BGE": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "DUE6GLE": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "DEE6BGE": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "DEE6EWE": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "DUE6BGLE": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "DUE6BGL1E": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "DUE5BGE": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "DFE5BGE": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "DUE5BGL1E": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "DUE2BGE": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "CA1MB": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FH25GSG": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FH25ESE": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FH25GSGF": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FH25ESEF": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FH25GSGX": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FH25ESEFX": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FH25EAE": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FH25GAG": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FH25EAEF": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FH25GAGF": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FH25EAEX": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FH25GAGX": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FH24ENE": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FH24ENEF": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FH24ENEX": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FX4GC.BKOR": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "FX4KCQ.BKOR": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "FX4KC.BKOR": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "FX4VC.BKOR": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "FX4VCQ.BKOR": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "FX4WC.BKOR": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "FX4GC.CKOR": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "FX4EC.CKOR": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "FX4KCQ.CKOR": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "FX4VCQ.CKOR": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "FX4WC.CKOR": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      }
+    },
+    "WA2525EGZF": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "WA2525GEZF": {
+      "base": {
+        "기존결합/신규결합": 100000,
+        "재구독": 100000
+      },
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "WA2525GGZF": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "WA2525EEZF": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "WA2525MYZF": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "WA2525YMZF": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "WA2525MMZF": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "WA2525YYZF": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "WA2525KDF": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "WA2525IIHF": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "WA2525YEZF": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "WA2525EYZF": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "WA2323EGZN": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "WA2323IIAN": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "WA2323GEZN": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "WL21GGN": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "WL21GEN": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "WL21EGN": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "W2520WZM": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "W20WHN": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "W1310EGN": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "TA25GZ9": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "T21GZ9": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "T21EZ0": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "T21OZ0": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "T19OZ0": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "T19MX7A": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "T18MX7": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "T17DX3A": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FX25TF": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FX25AF": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FX25EFE": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FX25GFG": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FX25IF": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FX25KF": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FX25VF": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FX25GAR": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FX25EAR": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FX25GNR": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FX25ENR": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FG24EN": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FG24KN": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "FG21KNR": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "F17HTP": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "F12VVA": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "F12WVA": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "RD25TS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "RD25AS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "RD25ESE": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "RD25GSG": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "RD25IS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "RD25KS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "RD25VS": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "RD21GN": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "RG20GN": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "RG20EN": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "RG20KN": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "RG20VN": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "RG19KN": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "RG18EN": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "RG18WNT": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "RH10VTA": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "RH10WTA": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "AI958WB-S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "AI927BA-S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "A730WA-S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "AS527WA": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "AS520HA": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "B94AHB-S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "B95AWBH-S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "B95AWBTH-S": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    },
+    "MO972WA": {
+      "promo": {
+        "타사보상": 50000,
+        "중고": 50000
+      },
+      "multiProduct": {
+        "recognizedUnits": 1
+      }
+    }
+  }
+}

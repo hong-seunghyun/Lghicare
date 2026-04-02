@@ -5,6 +5,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
+import ManagerEditModal from "@/components/ManagerEditModal";
 import { useRouter } from "next/router";
 import { db } from "@/lib/firebase";
 import { SALES_HUB_ID } from "@/config/boardCategories";
@@ -25,6 +26,11 @@ import type {
   ManagerDashboardResponse,
   ManagerSummary,
 } from "@/pages/api/manager/dashboard";
+import {
+  fetchManagerLearningDetails,
+  type LearningActivityRow,
+  type LearningActivityTotals,
+} from "@/lib/learning";
 
 interface ManagerSession {
   id: string;
@@ -138,6 +144,14 @@ const formatPostDate = (value: any) => {
   return parsed.toLocaleDateString("ko-KR");
 };
 
+const toIsoInput = (date: Date) => date.toISOString().slice(0, 10);
+
+const formatRangeLabel = (start: string, end: string) => {
+  if (!start && !end) return "조회 기간 미지정";
+  if (start === end) return start;
+  return `${start} ~ ${end}`;
+};
+
 const ManagerDashboardPage: React.FC = () => {
   const router = useRouter();
   const [session, setSession] = useState<ManagerSession | null>(null);
@@ -169,14 +183,37 @@ const ManagerDashboardPage: React.FC = () => {
   });
   const [editSaving, setEditSaving] = useState(false);
   const [editFeedback, setEditFeedback] = useState<string | null>(null);
-  const [editFeedbackError, setEditFeedbackError] = useState<string | null>(null);
-  const [editActivityLoading, setEditActivityLoading] = useState(false);
-  const [editActivityError, setEditActivityError] = useState<string | null>(null);
-  const [editCategoryActivity, setEditCategoryActivity] = useState<StatRow[]>([]);
-  const [editProductActivity, setEditProductActivity] = useState<StatRow[]>([]);
+  const [editFeedbackError, setEditFeedbackError] = useState<string | null>(
+    null,
+  );
+    const [editActivityLoading, setEditActivityLoading] = useState(false);
+    const [editActivityError, setEditActivityError] = useState<string | null>(
+      null,
+    );
+    const [editCategoryActivity, setEditCategoryActivity] = useState<StatRow[]>(
+      [],
+    );
+    const [editProductActivity, setEditProductActivity] = useState<StatRow[]>([]);
+    const [editLearningTotals, setEditLearningTotals] =
+      useState<LearningActivityTotals>({ views: 0, shares: 0 });
+    const [editLearningLoading, setEditLearningLoading] = useState(false);
+    const [editLearningError, setEditLearningError] = useState<string | null>(
+      null,
+    );
+    const [editLearningDetails, setEditLearningDetails] = useState<
+      LearningActivityRow[]
+    >([]);
 
+  const [rangeStart, setRangeStart] = useState(() => {
+    const today = new Date();
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    return toIsoInput(startOfMonth);
+  });
+  const [rangeEnd, setRangeEnd] = useState(() => toIsoInput(new Date()));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const summaryRangeLabel = formatRangeLabel(rangeStart, rangeEnd);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -334,6 +371,8 @@ const ManagerDashboardPage: React.FC = () => {
             position: session.position,
             region: session.region,
             office: session.office,
+            startDate: rangeStart,
+            endDate: rangeEnd,
           }),
         });
         if (!response.ok) {
@@ -358,7 +397,7 @@ const ManagerDashboardPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [session, dashboardScope]);
+  }, [session, dashboardScope, rangeStart, rangeEnd]);
 
   const topCategoryStats = useMemo(
     () => categoryStats.slice(0, 8),
@@ -379,7 +418,9 @@ const ManagerDashboardPage: React.FC = () => {
 
     const fetchScopedStats = async () => {
       try {
-        const managerIds = new Set(dashboardStats.managers.map((item) => item.id));
+        const managerIds = new Set(
+          dashboardStats.managers.map((item) => item.id),
+        );
         const [categorySnap, productSnap] = await Promise.all([
           getDocs(collection(db, "managerCategoryStats")),
           getDocs(collection(db, "managerProductStats")),
@@ -428,7 +469,8 @@ const ManagerDashboardPage: React.FC = () => {
       return `${getAreaFromRegion(session.region) || session.region} 지역 단위 조회`;
     }
     if (dashboardScope === "region") return `${session.region} 권역 단위 조회`;
-    if (dashboardScope === "office") return `${session.office} 사무소 단위 조회`;
+    if (dashboardScope === "office")
+      return `${session.office} 사무소 단위 조회`;
     if (dashboardScope === "team") return `${session.managerId} 팀장 단위 조회`;
     return "본인 활동내역 조회";
   }, [dashboardScope, session]);
@@ -504,7 +546,9 @@ const ManagerDashboardPage: React.FC = () => {
     () =>
       Array.from(
         new Set(
-          scopedManagers.map((manager) => manager.region).filter((value) => Boolean(value)),
+          scopedManagers
+            .map((manager) => manager.region)
+            .filter((value) => Boolean(value)),
         ),
       ),
     [scopedManagers],
@@ -514,7 +558,9 @@ const ManagerDashboardPage: React.FC = () => {
     () =>
       Array.from(
         new Set(
-          scopedManagers.map((manager) => manager.office).filter((value) => Boolean(value)),
+          scopedManagers
+            .map((manager) => manager.office)
+            .filter((value) => Boolean(value)),
         ),
       ),
     [scopedManagers],
@@ -534,7 +580,8 @@ const ManagerDashboardPage: React.FC = () => {
 
   const getManagerFieldLabel = React.useCallback(
     (manager: ManagerSummary, field: DashboardFilterField) => {
-      if (field === "area") return getAreaFromRegion(manager.region) || "지역 미정";
+      if (field === "area")
+        return getAreaFromRegion(manager.region) || "지역 미정";
       if (field === "region") return manager.region || "권역 미정";
       if (field === "office") return manager.office || "사무소 미정";
       if (field === "team") {
@@ -557,7 +604,9 @@ const ManagerDashboardPage: React.FC = () => {
     (manager: ManagerSummary, field: DashboardFilterField) => {
       if (field === "team") {
         const teamLeaderId = manager.teamLeaderId || "";
-        return teamLeaderNameRegistry.get(teamLeaderId) || teamLeaderId || "팀장";
+        return (
+          teamLeaderNameRegistry.get(teamLeaderId) || teamLeaderId || "팀장"
+        );
       }
       if (field === "manager") {
         return manager.name || manager.managerId || "매니저";
@@ -614,7 +663,9 @@ const ManagerDashboardPage: React.FC = () => {
       ];
 
       return searchTargets.some((value) =>
-        String(value ?? "").toLowerCase().includes(keyword),
+        String(value ?? "")
+          .toLowerCase()
+          .includes(keyword),
       );
     });
   }, [scopeFilteredManagers, searchKeyword]);
@@ -743,7 +794,10 @@ const ManagerDashboardPage: React.FC = () => {
   const teamLeaderOptions = useMemo(() => {
     const map = new Map<string, string>();
     scopedManagers.forEach((manager) => {
-      if (getManagementTier(manager.position) === "teamLeader" && manager.managerId) {
+      if (
+        getManagementTier(manager.position) === "teamLeader" &&
+        manager.managerId
+      ) {
         map.set(manager.managerId, manager.name || manager.managerId);
       }
     });
@@ -813,6 +867,10 @@ const ManagerDashboardPage: React.FC = () => {
       setEditCategoryActivity([]);
       setEditProductActivity([]);
       setEditActivityError(null);
+      setEditLearningTotals({ views: 0, shares: 0 });
+      setEditLearningDetails([]);
+      setEditLearningError(null);
+      setEditLearningLoading(false);
       return;
     }
 
@@ -822,6 +880,8 @@ const ManagerDashboardPage: React.FC = () => {
       try {
         setEditActivityLoading(true);
         setEditActivityError(null);
+        setEditLearningLoading(true);
+        setEditLearningError(null);
 
         const [categorySnap, productSnap] = await Promise.all([
           getDocs(
@@ -854,16 +914,36 @@ const ManagerDashboardPage: React.FC = () => {
             "productName",
           ),
         );
+
+        try {
+          const { totals, details } = await fetchManagerLearningDetails(
+            editManager.id,
+          );
+          if (cancelled) return;
+          setEditLearningTotals(totals);
+          setEditLearningDetails(details);
+        } catch (learningError) {
+          console.error("학습현황 조회 오류:", learningError);
+          if (!cancelled) {
+            setEditLearningError("학습 활동을 불러오는 중 오류가 발생했습니다.");
+            setEditLearningTotals({ views: 0, shares: 0 });
+            setEditLearningDetails([]);
+          }
+        }
       } catch (error) {
         console.error("매니저 활동내역 조회 오류:", error);
         if (!cancelled) {
           setEditCategoryActivity([]);
           setEditProductActivity([]);
           setEditActivityError("활동내역을 불러오는 중 오류가 발생했습니다.");
+          setEditLearningError("학습 활동을 불러오는 중 오류가 발생했습니다.");
+          setEditLearningTotals({ views: 0, shares: 0 });
+          setEditLearningDetails([]);
         }
       } finally {
         if (!cancelled) {
           setEditActivityLoading(false);
+          setEditLearningLoading(false);
         }
       }
     };
@@ -962,6 +1042,22 @@ const ManagerDashboardPage: React.FC = () => {
     router.push(`/manager/boards/${categoryId ?? "notice"}/${postId}`);
   };
 
+  const handleRangeStartInputChange = (value: string) => {
+    if (!value) return;
+    if (rangeEnd && new Date(value) > new Date(rangeEnd)) {
+      setRangeEnd(value);
+    }
+    setRangeStart(value);
+  };
+
+  const handleRangeEndInputChange = (value: string) => {
+    if (!value) return;
+    if (rangeStart && new Date(value) < new Date(rangeStart)) {
+      setRangeStart(value);
+    }
+    setRangeEnd(value);
+  };
+
   const categorySliderRef = React.useRef<HTMLDivElement | null>(null);
   const productSliderRef = React.useRef<HTMLDivElement | null>(null);
 
@@ -986,6 +1082,26 @@ const ManagerDashboardPage: React.FC = () => {
           </SubTitle>
         )}
       </HeaderRow>
+
+      <ManagerDateRangeSection>
+        <ManagerDateRangeLabel>조회 기간</ManagerDateRangeLabel>
+        <ManagerDateRangeControls>
+          <ManagerDateInput
+            type="date"
+            value={rangeStart}
+            onChange={(event) =>
+              handleRangeStartInputChange(event.target.value)
+            }
+          />
+          <span>~</span>
+          <ManagerDateInput
+            type="date"
+            value={rangeEnd}
+            onChange={(event) => handleRangeEndInputChange(event.target.value)}
+          />
+        </ManagerDateRangeControls>
+        <ManagerDateHint>{summaryRangeLabel}</ManagerDateHint>
+      </ManagerDateRangeSection>
 
       {loading && <InfoText>대시보드 데이터를 불러오는 중입니다...</InfoText>}
       {error && <ErrorText>{error}</ErrorText>}
@@ -1129,7 +1245,6 @@ const ManagerDashboardPage: React.FC = () => {
                 </SliderTrack>
               </Card>
             </StatsPairGrid>
-
           </Grid>
           {dashboardScope && dashboardScope !== "self" && (
             <StatsSection>
@@ -1150,7 +1265,9 @@ const ManagerDashboardPage: React.FC = () => {
                         <FilterSelect
                           value={filterField}
                           onChange={(e) =>
-                            setFilterField(e.target.value as DashboardFilterField)
+                            setFilterField(
+                              e.target.value as DashboardFilterField,
+                            )
                           }
                         >
                           {filterOptions.map((option) => (
@@ -1186,11 +1303,15 @@ const ManagerDashboardPage: React.FC = () => {
                       조회 범위: {scopeLabel(dashboardScope)} 단위
                       {filterField !== "all" && filterValue !== "all"
                         ? ` · 선택 조건: ${
-                            filterOptions.find((option) => option.value === filterField)
-                              ?.label ?? ""
+                            filterOptions.find(
+                              (option) => option.value === filterField,
+                            )?.label ?? ""
                           }`
                         : ""}
-                      {searchKeyword.trim() ? ` · 검색어: ${searchKeyword.trim()}` : ""}
+                      {searchKeyword.trim()
+                        ? ` · 검색어: ${searchKeyword.trim()}`
+                        : ""}
+                      {summaryRangeLabel ? ` · 기간: ${summaryRangeLabel}` : ""}
                     </FilterSummary>
                   </FilterPanel>
 
@@ -1200,24 +1321,27 @@ const ManagerDashboardPage: React.FC = () => {
                         <CardTitle>
                           {selectedTargetTitle} 견적 순위 Top {rankingLimit}
                         </CardTitle>
-                        <CardSubTitle>매니저를 클릭하면 정보 수정과 활동내역을 확인할 수 있습니다.</CardSubTitle>
+                        <CardSubTitle>
+                          매니저를 클릭하면 정보 수정과 활동내역을 확인할 수
+                          있습니다.
+                        </CardSubTitle>
                       </CardHeader>
                       <RankList>
                         {topEstimateManagers.map((row, index) => (
-                            <ClickableRankingRow
-                              key={row.id}
-                              onClick={() => openEditModal(row)}
-                            >
-                              <RankIndex>{index + 1}</RankIndex>
-                              <RankDetails>
-                                <RankName>{row.name || row.managerId}</RankName>
-                                <RankMeta>
-                                  {row.managerId} · {row.office || "사무소 미정"}
-                                </RankMeta>
-                              </RankDetails>
-                              <RankValue>{row.estimateCount}</RankValue>
-                            </ClickableRankingRow>
-                          ))}
+                          <ClickableRankingRow
+                            key={row.id}
+                            onClick={() => openEditModal(row)}
+                          >
+                            <RankIndex>{index + 1}</RankIndex>
+                            <RankDetails>
+                              <RankName>{row.name || row.managerId}</RankName>
+                              <RankMeta>
+                                {row.managerId} · {row.office || "사무소 미정"}
+                              </RankMeta>
+                            </RankDetails>
+                            <RankValue>{row.estimateCount}</RankValue>
+                          </ClickableRankingRow>
+                        ))}
                         {topEstimateManagers.length === 0 && (
                           <RankingRow>
                             <RankIndex>–</RankIndex>
@@ -1232,24 +1356,27 @@ const ManagerDashboardPage: React.FC = () => {
                         <CardTitle>
                           {selectedTargetTitle} 공유 순위 Top {rankingLimit}
                         </CardTitle>
-                        <CardSubTitle>매니저를 클릭하면 정보 수정과 활동내역을 확인할 수 있습니다.</CardSubTitle>
+                        <CardSubTitle>
+                          매니저를 클릭하면 정보 수정과 활동내역을 확인할 수
+                          있습니다.
+                        </CardSubTitle>
                       </CardHeader>
                       <RankList>
                         {topShareManagers.map((row, index) => (
-                            <ClickableRankingRow
-                              key={row.id}
-                              onClick={() => openEditModal(row)}
-                            >
-                              <RankIndex>{index + 1}</RankIndex>
-                              <RankDetails>
-                                <RankName>{row.name || row.managerId}</RankName>
-                                <RankMeta>
-                                  {row.managerId} · {row.office || "사무소 미정"}
-                                </RankMeta>
-                              </RankDetails>
-                              <RankValue>{row.shareCount}</RankValue>
-                            </ClickableRankingRow>
-                          ))}
+                          <ClickableRankingRow
+                            key={row.id}
+                            onClick={() => openEditModal(row)}
+                          >
+                            <RankIndex>{index + 1}</RankIndex>
+                            <RankDetails>
+                              <RankName>{row.name || row.managerId}</RankName>
+                              <RankMeta>
+                                {row.managerId} · {row.office || "사무소 미정"}
+                              </RankMeta>
+                            </RankDetails>
+                            <RankValue>{row.shareCount}</RankValue>
+                          </ClickableRankingRow>
+                        ))}
                         {topShareManagers.length === 0 && (
                           <RankingRow>
                             <RankIndex>–</RankIndex>
@@ -1296,7 +1423,9 @@ const ManagerDashboardPage: React.FC = () => {
                   <RegionStatsPanel>
                     <RegionStatsCard>
                       <CardHeader>
-                        <CardTitle>{selectedTargetTitle} 통계 (카테고리별)</CardTitle>
+                        <CardTitle>
+                          {selectedTargetTitle} 통계 (카테고리별)
+                        </CardTitle>
                         <CardSubTitle>현재 조회 조건 기준 합산</CardSubTitle>
                       </CardHeader>
                       <RegionStatsTable>
@@ -1328,7 +1457,9 @@ const ManagerDashboardPage: React.FC = () => {
                     </RegionStatsCard>
                     <RegionStatsCard>
                       <CardHeader>
-                        <CardTitle>{selectedTargetTitle} 통계 (제품별)</CardTitle>
+                        <CardTitle>
+                          {selectedTargetTitle} 통계 (제품별)
+                        </CardTitle>
                         <CardSubTitle>현재 조회 조건 기준 합산</CardSubTitle>
                       </CardHeader>
                       <RegionStatsTable>
@@ -1366,10 +1497,12 @@ const ManagerDashboardPage: React.FC = () => {
 
                   <RankingCard>
                     <CardHeader>
-                      <CardTitle>{selectedTargetTitle} 조회 결과 목록</CardTitle>
+                      <CardTitle>
+                        {selectedTargetTitle} 조회 결과 목록
+                      </CardTitle>
                       <CardSubTitle>
-                        조건에 맞는 인원 {filteredManagers.length}명 · {resultPage}/
-                        {resultTotalPages} 페이지
+                        조건에 맞는 인원 {filteredManagers.length}명 ·{" "}
+                        {resultPage}/{resultTotalPages} 페이지
                       </CardSubTitle>
                     </CardHeader>
                     <StatsTable>
@@ -1401,8 +1534,9 @@ const ManagerDashboardPage: React.FC = () => {
                               <td>{manager.office || "-"}</td>
                               <td>
                                 {manager.teamLeaderId
-                                  ? teamLeaderNameRegistry.get(manager.teamLeaderId) ||
-                                    manager.teamLeaderId
+                                  ? teamLeaderNameRegistry.get(
+                                      manager.teamLeaderId,
+                                    ) || manager.teamLeaderId
                                   : "-"}
                               </td>
                               <td>{manager.estimateCount}</td>
@@ -1416,7 +1550,9 @@ const ManagerDashboardPage: React.FC = () => {
                       <PaginationBar>
                         <PaginationButton
                           type="button"
-                          onClick={() => setResultPage((prev) => Math.max(1, prev - 1))}
+                          onClick={() =>
+                            setResultPage((prev) => Math.max(1, prev - 1))
+                          }
                           disabled={resultPage === 1}
                         >
                           이전
@@ -1459,214 +1595,62 @@ const ManagerDashboardPage: React.FC = () => {
             </StatsSection>
           )}
           {editModalOpen && editManager && (
-            <ModalOverlay onClick={closeEditModal}>
-              <ModalContent
-                onSubmit={handleEditModalSave}
-                onClick={(event) => event.stopPropagation()}
-              >
-                <ModalHeader>
-                  <ModalTitle>
-                    {editManager.name} ({editManager.managerId}) 편집
-                  </ModalTitle>
-                  <ModalCloseButton type="button" onClick={closeEditModal}>
-                    ×
-                  </ModalCloseButton>
-                </ModalHeader>
-                <EditorInfo>
-                  <span>직급: {editManager.position || "-"}</span>
-                  <span>사무소: {editManager.office || "-"}</span>
-                  <span>담당 팀장: {editManager.teamLeaderId || "-"}</span>
-                </EditorInfo>
-
-                <ActivityHero>
-                  <ActivityHeroCard>
-                    <ActivityHeroLabel>견적 활동</ActivityHeroLabel>
-                    <ActivityHeroValue>{editManager.estimateCount}</ActivityHeroValue>
-                  </ActivityHeroCard>
-                  <ActivityHeroCard>
-                    <ActivityHeroLabel>공유 활동</ActivityHeroLabel>
-                    <ActivityHeroValue>{editManager.shareCount}</ActivityHeroValue>
-                  </ActivityHeroCard>
-                  <ActivityHeroCard>
-                    <ActivityHeroLabel>전체 활동</ActivityHeroLabel>
-                    <ActivityHeroValue>
-                      {editManager.estimateCount + editManager.shareCount}
-                    </ActivityHeroValue>
-                  </ActivityHeroCard>
-                </ActivityHero>
-
-                <Fields>
-                  <Field>
-                    <FieldLabel>이름</FieldLabel>
-                    <FieldInput
-                      name="name"
-                      value={editForm.name}
-                      onChange={handleEditModalFormChange}
-                    />
-                  </Field>
-                  <Field>
-                    <FieldLabel>비밀번호</FieldLabel>
-                    <FieldInput
-                      name="password"
-                      type="password"
-                      value={editForm.password}
-                      onChange={handleEditModalFormChange}
-                      placeholder="변경할 비밀번호를 입력하세요"
-                    />
-                  </Field>
-                </Fields>
-
-                <Divider />
-
-                <Fields>
-                  <Field>
-                    <FieldLabel>지역</FieldLabel>
-                    <FieldInput
-                      name="region"
-                      value={editForm.region}
-                      onChange={handleEditModalFormChange}
-                      placeholder="지역명을 입력하세요"
-                      list="dashboard-region-options"
-                    />
-                  </Field>
-                  <Field>
-                    <FieldLabel>사무소</FieldLabel>
-                    <FieldInput
-                      name="office"
-                      value={editForm.office}
-                      onChange={handleEditModalFormChange}
-                      placeholder="사무소명을 입력하세요"
-                      list="dashboard-office-options"
-                    />
-                  </Field>
-                  <Field>
-                    <FieldLabel>담당 팀장</FieldLabel>
-                    <FieldInput
-                      name="teamLeaderId"
-                      value={editForm.teamLeaderId}
-                      onChange={handleEditModalFormChange}
-                      placeholder="할당할 팀장 ID를 입력하세요"
-                      list="dashboard-teamleader-options"
-                    />
-                  </Field>
-                </Fields>
-
-                <ButtonRow>
-                  <SaveButton type="submit" disabled={editSaving}>
-                    {editSaving ? "저장 중..." : "변경사항 저장"}
-                  </SaveButton>
-                  {editFeedback && <FeedbackSuccess>{editFeedback}</FeedbackSuccess>}
-                  {editFeedbackError && (
-                    <FeedbackError>{editFeedbackError}</FeedbackError>
-                  )}
-                </ButtonRow>
-
-                <ActivitySection>
-                  <ActivitySectionHeader>
-                    <ActivitySectionTitle>활동내역</ActivitySectionTitle>
-                    <ActivitySectionSubTitle>
-                      카테고리별, 제품별 활동 현황을 함께 확인할 수 있습니다.
-                    </ActivitySectionSubTitle>
-                  </ActivitySectionHeader>
-                  {editActivityLoading && (
-                    <InfoText>활동내역을 불러오는 중입니다...</InfoText>
-                  )}
-                  {editActivityError && <ErrorText>{editActivityError}</ErrorText>}
-                  {!editActivityLoading && !editActivityError && (
-                    <ActivityGrid>
-                      <ActivityCard>
-                        <ActivityCardTitle>카테고리별 활동</ActivityCardTitle>
-                        <ActivityTableWrapper>
-                        <ActivityTable>
-                          <thead>
-                            <tr>
-                              <th>카테고리</th>
-                              <th>견적</th>
-                              <th>공유</th>
-                              <th>합계</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {editCategoryActivity.length === 0 ? (
-                              <tr>
-                                <td colSpan={4}>활동내역이 없습니다.</td>
-                              </tr>
-                            ) : (
-                              editCategoryActivity.slice(0, 8).map((row) => (
-                                <tr key={`edit-category-${row.key}`}>
-                                  <td>{row.label}</td>
-                                  <td>{row.estimateCount}</td>
-                                  <td>{row.shareCount}</td>
-                                  <td>{row.estimateCount + row.shareCount}</td>
-                                </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </ActivityTable>
-                        </ActivityTableWrapper>
-                      </ActivityCard>
-                      <ActivityCard>
-                        <ActivityCardTitle>제품별 활동</ActivityCardTitle>
-                        <ActivityTableWrapper>
-                        <ActivityTable>
-                          <thead>
-                            <tr>
-                              <th>제품</th>
-                              <th>견적</th>
-                              <th>공유</th>
-                              <th>합계</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {editProductActivity.length === 0 ? (
-                              <tr>
-                                <td colSpan={4}>활동내역이 없습니다.</td>
-                              </tr>
-                            ) : (
-                              editProductActivity.slice(0, 8).map((row) => (
-                                <tr key={`edit-product-${row.key}`}>
-                                  <td>
-                                    <ProductName title={row.label || row.key}>
-                                      {row.label || row.key}
-                                    </ProductName>
-                                  </td>
-                                  <td>{row.estimateCount}</td>
-                                  <td>{row.shareCount}</td>
-                                  <td>{row.estimateCount + row.shareCount}</td>
-                                </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </ActivityTable>
-                        </ActivityTableWrapper>
-                      </ActivityCard>
-                    </ActivityGrid>
-                  )}
-                </ActivitySection>
-              </ModalContent>
-            </ModalOverlay>
+            <ManagerEditModal
+              manager={{
+                managerId: editManager.managerId,
+                name: editManager.name,
+                position: editManager.position,
+                office: editManager.office,
+                teamLeaderId: editManager.teamLeaderId,
+                region: editManager.region,
+                estimateCount: editManager.estimateCount,
+                shareCount: editManager.shareCount,
+              }}
+              form={editForm}
+              onFormChange={handleEditModalFormChange}
+              onSubmit={handleEditModalSave}
+              onClose={closeEditModal}
+              saving={editSaving}
+              feedback={editFeedback}
+              feedbackError={editFeedbackError}
+              activityLoading={editActivityLoading}
+              activityError={editActivityError}
+              activityTotals={{
+                estimateCount: editManager?.estimateCount ?? 0,
+                shareCount: editManager?.shareCount ?? 0,
+              }}
+              categoryActivity={editCategoryActivity}
+              productActivity={editProductActivity}
+              regionListId="dashboard-region-options"
+              officeListId="dashboard-office-options"
+              teamLeaderListId="dashboard-teamleader-options"
+              learningTotals={editLearningTotals}
+              learningLoading={editLearningLoading}
+              learningError={editLearningError}
+              learningDetails={editLearningDetails}
+            />
           )}
+          <datalist id="dashboard-region-options">
+            {regionOptions.map((value) => (
+              <option key={`dashboard-region-${value}`} value={value} />
+            ))}
+          </datalist>
+          <datalist id="dashboard-office-options">
+            {officeOptions.map((value) => (
+              <option key={`dashboard-office-${value}`} value={value} />
+            ))}
+          </datalist>
+          <datalist id="dashboard-teamleader-options">
+            {teamLeaderOptions.map((option) => (
+              <option
+                key={`dashboard-teamleader-${option.value}`}
+                value={option.value}
+                label={option.label}
+              />
+            ))}
+          </datalist>
         </>
       )}
-      <datalist id="dashboard-region-options">
-        {regionOptions.map((value) => (
-          <option key={`dashboard-region-${value}`} value={value} />
-        ))}
-      </datalist>
-      <datalist id="dashboard-office-options">
-        {officeOptions.map((value) => (
-          <option key={`dashboard-office-${value}`} value={value} />
-        ))}
-      </datalist>
-      <datalist id="dashboard-teamleader-options">
-        {teamLeaderOptions.map((option) => (
-          <option
-            key={`dashboard-teamleader-${option.value}`}
-            value={option.value}
-            label={option.label}
-          />
-        ))}
-      </datalist>
     </PageWrapper>
   );
 };
@@ -1683,6 +1667,40 @@ const HeaderRow = styled.div`
   display: flex;
   flex-direction: column;
   margin-bottom: 16px;
+`;
+
+const ManagerDateRangeSection = styled.div`
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+`;
+
+const ManagerDateRangeLabel = styled.span`
+  font-size: 13px;
+  font-weight: 600;
+  color: #1f2933;
+`;
+
+const ManagerDateRangeControls = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+`;
+
+const ManagerDateInput = styled.input`
+  border-radius: 10px;
+  border: 1px solid #d9e2ec;
+  padding: 6px 10px;
+  font-size: 13px;
+  background: #fff;
+  color: #1f2933;
+  height: 36px;
+`;
+
+const ManagerDateHint = styled.span`
+  font-size: 12px;
+  color: #64748b;
 `;
 
 const Title = styled.h1`
@@ -1878,8 +1896,8 @@ const FilterIntro = styled.div`
 `;
 
 const FilterControls = styled.div`
-display:flex;
-align-items:center;
+  display: flex;
+  align-items: center;
   gap: 12px;
 `;
 
@@ -1888,9 +1906,9 @@ const FilterField = styled.label`
   flex-direction: column;
   gap: 6px;
 
-	min-width:100px;
-	max-width:250px;
-	width:33.33%;
+  min-width: 100px;
+  max-width: 250px;
+  width: 33.33%;
 `;
 
 const FilterLabel = styled.span`
@@ -1906,7 +1924,7 @@ const FilterSelect = styled.select`
   background: #fff;
   padding: 0 12px;
   font-size: 13px;
-	max-width:250px;
+  max-width: 250px;
   color: #1f2933;
 `;
 
@@ -2064,7 +2082,7 @@ const TeamOfficeRankingGrid = styled.div`
 const PaginationBar = styled.div`
   display: flex;
   align-items: center;
-  justify-content:center;
+  justify-content: center;
   gap: 12px;
   margin-top: 16px;
 

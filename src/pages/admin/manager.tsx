@@ -4,6 +4,8 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import ManagerEditModal from "@/components/ManagerEditModal";
+import OrganizationExplorer from "@/components/OrganizationExplorer";
 import styled from "styled-components";
 import { db } from "@/lib/firebase";
 import {
@@ -17,9 +19,17 @@ import {
   where,
 } from "firebase/firestore";
 import {
+  fetchManagerLearningDetails,
+  LearningActivityRow,
+} from "@/lib/learning";
+import {
   getBoardCategoryFullLabel,
   getSalesIndexedCategoryIds,
 } from "@/config/boardCategories";
+import type {
+  ManagerDashboardRequest,
+  ManagerSummary,
+} from "@/pages/api/manager/dashboard";
 
 type Manager = {
   id: string; // Firestore 문서 ID (== Auth uid)
@@ -37,10 +47,74 @@ type Manager = {
   updatedAt?: any;
 };
 
+type StatRow = {
+  key: string;
+  label: string;
+  estimateCount: number;
+  shareCount: number;
+};
+
+const aggregateStats = (items: any[], keyField: string, labelField: string) => {
+  const map = new Map<string, StatRow>();
+  items.forEach((item) => {
+    const key = String(item[keyField] ?? "unknown");
+    const label = String(item[labelField] ?? key);
+    const estimate = Number(item.estimateCount ?? 0);
+    const share = Number(item.shareCount ?? 0);
+
+    const prev = map.get(key) || {
+      key,
+      label,
+      estimateCount: 0,
+      shareCount: 0,
+    };
+    map.set(key, {
+      key,
+      label,
+      estimateCount: prev.estimateCount + estimate,
+      shareCount: prev.shareCount + share,
+    });
+  });
+  return Array.from(map.values()).sort(
+    (a, b) => b.estimateCount + b.shareCount - (a.estimateCount + a.shareCount),
+  );
+};
+
 const ManagerManagementPage: React.FC = () => {
   const [managers, setManagers] = useState<Manager[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [explorerTargetId, setExplorerTargetId] = useState<string | null>(null);
+  useEffect(() => {
+    if (managers.length === 0) {
+      setExplorerTargetId(null);
+      return;
+    }
+    setExplorerTargetId((prev) =>
+      prev && managers.some((manager) => manager.id === prev)
+        ? prev
+        : managers[0].id,
+    );
+  }, [managers]);
+
+  const explorerManager = useMemo(
+    () => managers.find((manager) => manager.id === explorerTargetId) ?? null,
+    [managers, explorerTargetId],
+  );
+
+  const organizationRequestPayload = useMemo<ManagerDashboardRequest | null>(
+    () => {
+      if (!explorerManager) return null;
+      return {
+        managerUid: explorerManager.id,
+        managerId: explorerManager.managerId,
+        position: explorerManager.position,
+        region: explorerManager.region,
+        office: explorerManager.office,
+      };
+    },
+    [explorerManager],
+  );
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingManager, setEditingManager] = useState<Manager | null>(null);
@@ -85,6 +159,43 @@ const ManagerManagementPage: React.FC = () => {
       shareCount: number;
     }[]
   >([]);
+  const [activityTotals, setActivityTotals] = useState({
+    estimateCount: 0,
+    shareCount: 0,
+    totalActivity: 0,
+  });
+  const [activityError, setActivityError] = useState<string | null>(null);
+  const [learningTotals, setLearningTotals] = useState({
+    views: 0,
+    shares: 0,
+  });
+  const [learningLoading, setLearningLoading] = useState(false);
+  const [learningError, setLearningError] = useState<string | null>(null);
+  const [learningDetails, setLearningDetails] = useState<LearningActivityRow[]>(
+    [],
+  );
+  const [editCategoryActivity, setEditCategoryActivity] = useState<StatRow[]>(
+    [],
+  );
+  const [editProductActivity, setEditProductActivity] = useState<StatRow[]>([]);
+  const [activityDetailsLoading, setActivityDetailsLoading] = useState(false);
+  const [activityDetailsError, setActivityDetailsError] = useState<
+    string | null
+  >(null);
+  const STATS_PAGE_SIZE = 10;
+  const [statsPage, setStatsPage] = useState(1);
+  useEffect(() => {
+    setStatsPage(1);
+  }, [statsRows]);
+
+  const statsPageCount = Math.max(
+    1,
+    Math.ceil(statsRows.length / STATS_PAGE_SIZE),
+  );
+  const statsPageItems = statsRows.slice(
+    (statsPage - 1) * STATS_PAGE_SIZE,
+    statsPage * STATS_PAGE_SIZE,
+  );
 
   useEffect(() => {
     const fetchManagers = async () => {
@@ -162,9 +273,48 @@ const ManagerManagementPage: React.FC = () => {
     setIsModalOpen(true);
   };
 
+  const handleExplorerManagerSelect = (summary: ManagerSummary) => {
+    const target = managers.find((manager) => manager.id === summary.id);
+    if (target) {
+      openEditModal(target);
+    }
+  };
+
   const closeModal = () => {
     if (saving) return;
     setIsModalOpen(false);
+  };
+
+  const fetchActivityTotalsForManager = async (managerUid: string) => {
+    const estimateQuery = query(
+      collection(db, "estimatesCount"),
+      where("managerUid", "==", managerUid),
+    );
+    const estimateSnap = await getDocs(estimateQuery);
+    let estimateCount = 0;
+    estimateSnap.docs.forEach((docSnap) => {
+      const data = docSnap.data() as any;
+      estimateCount += Number(
+        data.managerCount ?? data.totalCount ?? data.count ?? 0,
+      );
+    });
+
+    const shareQuery = query(
+      collection(db, "shareCountByManager"),
+      where("managerUid", "==", managerUid),
+    );
+    const shareSnap = await getDocs(shareQuery);
+    let shareCount = 0;
+    shareSnap.docs.forEach((docSnap) => {
+      const data = docSnap.data() as any;
+      shareCount += Number(data.totalCount ?? data.shareCount ?? 0);
+    });
+
+    return {
+      estimateCount,
+      shareCount,
+      totalActivity: estimateCount + shareCount,
+    };
   };
 
   const handleChange = (
@@ -242,6 +392,143 @@ const ManagerManagementPage: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    let cancelled = false;
+    if (!editingManager) {
+      setActivityTotals({ estimateCount: 0, shareCount: 0, totalActivity: 0 });
+      setActivityError(null);
+      return;
+    }
+
+    const loadActivityStats = async () => {
+      setActivityError(null);
+      try {
+        const activity = await fetchActivityTotalsForManager(editingManager.id);
+        if (cancelled) return;
+        setActivityTotals(activity);
+      } catch (err) {
+        console.error("활동 통계 로딩 오류:", err);
+        if (!cancelled) {
+          setActivityError("활동 통계를 불러오는 중 오류가 발생했습니다.");
+        }
+      }
+    };
+
+    loadActivityStats();
+    return () => {
+      cancelled = true;
+    };
+  }, [editingManager]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!editingManager) {
+      setLearningTotals({ views: 0, shares: 0 });
+      setLearningDetails([]);
+      setLearningError(null);
+      setLearningLoading(false);
+      return;
+    }
+
+    const loadLearningDetails = async () => {
+      setLearningLoading(true);
+      setLearningError(null);
+      try {
+        const { totals, details } = await fetchManagerLearningDetails(
+          editingManager.id,
+        );
+        if (cancelled) return;
+        setLearningTotals(totals);
+        setLearningDetails(details);
+      } catch (err) {
+        console.error("학습 통계 로딩 오류:", err);
+        if (!cancelled) {
+          setLearningError("학습 활동을 불러오는 중 오류가 발생했습니다.");
+          setLearningTotals({ views: 0, shares: 0 });
+          setLearningDetails([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLearningLoading(false);
+        }
+      }
+    };
+
+    loadLearningDetails();
+    return () => {
+      cancelled = true;
+    };
+  }, [editingManager]);
+
+  useEffect(() => {
+    if (!editingManager) {
+      setEditCategoryActivity([]);
+      setEditProductActivity([]);
+      setActivityDetailsError(null);
+      setActivityDetailsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchDetailActivity = async () => {
+      try {
+        setActivityDetailsLoading(true);
+        setActivityDetailsError(null);
+
+        const [categorySnap, productSnap] = await Promise.all([
+          getDocs(
+            query(
+              collection(db, "managerCategoryStats"),
+              where("managerUid", "==", editingManager.id),
+            ),
+          ),
+          getDocs(
+            query(
+              collection(db, "managerProductStats"),
+              where("managerUid", "==", editingManager.id),
+            ),
+          ),
+        ]);
+
+        if (cancelled) return;
+
+        setEditCategoryActivity(
+          aggregateStats(
+            categorySnap.docs.map((docSnap) => docSnap.data()),
+            "type",
+            "type",
+          ),
+        );
+        setEditProductActivity(
+          aggregateStats(
+            productSnap.docs.map((docSnap) => docSnap.data()),
+            "modelCode",
+            "productName",
+          ),
+        );
+      } catch (error) {
+        console.error("매니저 활동내역 조회 오류:", error);
+        if (!cancelled) {
+          setEditCategoryActivity([]);
+          setEditProductActivity([]);
+          setActivityDetailsError(
+            "활동내역을 불러오는 중 오류가 발생했습니다.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setActivityDetailsLoading(false);
+        }
+      }
+    };
+
+    fetchDetailActivity();
+    return () => {
+      cancelled = true;
+    };
+  }, [editingManager]);
+
   const handleToggleActive = async (manager: Manager) => {
     const nextActive = !manager.isActive;
 
@@ -271,7 +558,8 @@ const ManagerManagementPage: React.FC = () => {
 
   const handleImportManagers = async () => {
     if (importing) return;
-    if (!confirm("managerList.json 파일 기준으로 일괄등록을 진행할까요?")) return;
+    if (!confirm("managerList.json 파일 기준으로 일괄등록을 진행할까요?"))
+      return;
 
     try {
       setImporting(true);
@@ -510,7 +798,9 @@ const ManagerManagementPage: React.FC = () => {
   );
   const teamLeaderOptions = useMemo(
     () =>
-      Array.from(new Set(managers.map((m) => m.teamLeaderId).filter(Boolean))).sort(),
+      Array.from(
+        new Set(managers.map((m) => m.teamLeaderId).filter(Boolean)),
+      ).sort(),
     [managers],
   );
 
@@ -542,9 +832,7 @@ const ManagerManagementPage: React.FC = () => {
       <SearchRow>
         <SearchSelect
           value={searchField}
-          onChange={(e) =>
-            setSearchField(e.target.value as typeof searchField)
-          }
+          onChange={(e) => setSearchField(e.target.value as typeof searchField)}
         >
           <option value="name">사용자</option>
           <option value="managerId">업무등록번호</option>
@@ -692,15 +980,53 @@ const ManagerManagementPage: React.FC = () => {
         </PaginationRow>
       )}
 
-      {isModalOpen && (
+      {isModalOpen && editingManager && (
+        <ManagerEditModal
+          manager={{
+            managerId: editingManager.managerId,
+            name: editingManager.name,
+            position: editingManager.position,
+            office: editingManager.office,
+            teamLeaderId: editingManager.teamLeaderId,
+            estimateCount: activityTotals.estimateCount,
+            shareCount: activityTotals.shareCount,
+          }}
+          form={{
+            name: form.name,
+            password: form.password,
+            region: form.region,
+            office: form.office,
+            teamLeaderId: form.teamLeaderId,
+          }}
+          onFormChange={handleChange}
+          onSubmit={handleSubmit}
+          onClose={closeModal}
+          saving={saving}
+          activityLoading={activityDetailsLoading}
+          activityError={activityDetailsError}
+          activityTotals={{
+            estimateCount: activityTotals.estimateCount,
+            shareCount: activityTotals.shareCount,
+          }}
+          categoryActivity={editCategoryActivity}
+          productActivity={editProductActivity}
+          regionListId="regionOptions"
+          officeListId="officeOptions"
+          teamLeaderListId="teamLeaderOptions"
+          learningTotals={learningTotals}
+          learningLoading={learningLoading}
+          learningError={learningError}
+          learningDetails={learningDetails}
+        />
+      )}
+
+      {isModalOpen && !editingManager && (
         <ModalOverlay>
           <ModalContent>
             <ModalHeader>
-              <ModalTitle>
-                {editingManager ? "매니저 계정 수정" : "매니저 계정 생성"}
-              </ModalTitle>
+              <ModalTitle>매니저 계정 생성</ModalTitle>
             </ModalHeader>
-            <form onSubmit={handleSubmit}>
+            <form style={{ overflowY: "auto" }} onSubmit={handleSubmit}>
               <ModalBody>
                 <FieldRow>
                   <Field>
@@ -722,11 +1048,7 @@ const ManagerManagementPage: React.FC = () => {
                       name="password"
                       value={form.password}
                       onChange={handleChange}
-                      placeholder={
-                        editingManager
-                          ? "생년월일 6자리로 수정할 수 있습니다."
-                          : "기본값 123456"
-                      }
+                      placeholder="기본값 123456"
                     />
                   </Field>
                   <Field>
@@ -804,11 +1126,7 @@ const ManagerManagementPage: React.FC = () => {
                   취소
                 </ModalButton>
                 <ModalButtonPrimary type="submit" disabled={saving}>
-                  {saving
-                    ? "저장 중.."
-                    : editingManager
-                      ? "수정 완료"
-                      : "생성"}
+                  {saving ? "저장 중.." : "생성"}
                 </ModalButtonPrimary>
               </ModalFooter>
             </form>
@@ -818,7 +1136,7 @@ const ManagerManagementPage: React.FC = () => {
 
       {statsManager && (
         <ModalOverlay>
-          <ModalContent>
+          <StatsModalContent>
             <ModalHeader>
               <ModalTitle>{statsManager.name} 학습현황</ModalTitle>
             </ModalHeader>
@@ -840,28 +1158,56 @@ const ManagerManagementPage: React.FC = () => {
                     </StatsCard>
                   </StatsSummary>
 
-                  <StatsTable>
-                    <thead>
-                      <tr>
-                        <th>카테고리</th>
-                        <th>게시글</th>
-                        <th>열람</th>
-                        <th>공유</th>
-                        <th>열람여부</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {statsRows.map((row) => (
-                        <tr key={row.postId}>
-                          <td>{getBoardCategoryFullLabel(row.categoryId)}</td>
-                          <td>{row.title}</td>
-                          <td>{row.viewCount}</td>
-                          <td>{row.shareCount}</td>
-                          <td>{row.viewCount > 0 ? "열람" : "미열람"}</td>
+                  <StatsTableContainer>
+                    <StatsTable>
+                      <thead>
+                        <tr>
+                          <th>카테고리</th>
+                          <th>게시글</th>
+                          <th>열람</th>
+                          <th>공유</th>
+                          <th>열람여부</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </StatsTable>
+                      </thead>
+                      <tbody>
+                        {statsPageItems.map((row) => (
+                          <tr key={row.postId}>
+                            <td>{getBoardCategoryFullLabel(row.categoryId)}</td>
+                            <td>{row.title}</td>
+                            <td>{row.viewCount}</td>
+                            <td>{row.shareCount}</td>
+                            <td>{row.viewCount > 0 ? "열람" : "미열람"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </StatsTable>
+                  </StatsTableContainer>
+
+                  <StatsPagination>
+                    <PageButton
+                      type="button"
+                      onClick={() =>
+                        setStatsPage((prev) => Math.max(1, prev - 1))
+                      }
+                      disabled={statsPage === 1}
+                    >
+                      이전
+                    </PageButton>
+                    <span>
+                      {statsPage} / {statsPageCount} 페이지
+                    </span>
+                    <PageButton
+                      type="button"
+                      onClick={() =>
+                        setStatsPage((prev) =>
+                          Math.min(statsPageCount, prev + 1),
+                        )
+                      }
+                      disabled={statsPage === statsPageCount}
+                    >
+                      다음
+                    </PageButton>
+                  </StatsPagination>
                 </>
               )}
             </ModalBody>
@@ -870,9 +1216,41 @@ const ManagerManagementPage: React.FC = () => {
                 닫기
               </ModalButton>
             </ModalFooter>
-          </ModalContent>
+          </StatsModalContent>
         </ModalOverlay>
       )}
+
+      <OrganizationExplorerSection>
+        <OrganizationExplorerHeader>
+          <OrganizationExplorerTitle>조직 조회</OrganizationExplorerTitle>
+          <OrganizationExplorerSelect
+            value={explorerTargetId ?? ""}
+            onChange={(event) =>
+              setExplorerTargetId(event.target.value || null)
+            }
+          >
+            <option value="">매니저 선택</option>
+            {managers.map((manager) => (
+              <option key={manager.id} value={manager.id}>
+                {manager.name || manager.managerId} ({manager.managerId})
+              </option>
+            ))}
+          </OrganizationExplorerSelect>
+        </OrganizationExplorerHeader>
+        {organizationRequestPayload ? (
+          <OrganizationExplorer
+            requestPayload={organizationRequestPayload}
+            baseManagerLabel={explorerManager?.name}
+            onManagerSelect={handleExplorerManagerSelect}
+          />
+        ) : (
+          <InfoText>
+            {managers.length === 0
+              ? "매니저를 먼저 등록한 후 조직 조회를 이용하세요."
+              : "조직 조회를 볼 매니저를 선택하세요."}
+          </InfoText>
+        )}
+      </OrganizationExplorerSection>
     </PageWrapper>
   );
 };
@@ -946,6 +1324,40 @@ const SearchInput = styled.input`
 const SearchHint = styled.span`
   font-size: 12px;
   color: #777;
+`;
+
+const OrganizationExplorerSection = styled.div`
+  margin-top: 32px;
+  padding: 18px;
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+`;
+
+const OrganizationExplorerHeader = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+`;
+
+const OrganizationExplorerTitle = styled.h2`
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+`;
+
+const OrganizationExplorerSelect = styled.select`
+  max-width: 220px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  font-size: 13px;
+  background: #fff;
 `;
 
 const InfoText = styled.div`
@@ -1080,10 +1492,19 @@ const ModalOverlay = styled.div`
 const ModalContent = styled.div`
   width: 100%;
   max-width: 760px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
   background: #fff;
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.16);
+`;
+
+const StatsModalContent = styled(ModalContent)`
+  max-width: 520px;
+  max-height: 80vh;
+  overflow: hidden;
 `;
 
 const ModalHeader = styled.div`
@@ -1098,6 +1519,9 @@ const ModalTitle = styled.h2`
 
 const ModalBody = styled.div`
   padding: 16px 20px 8px;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
 `;
 
 const ModalFooter = styled.div`
@@ -1210,6 +1634,22 @@ const StatsLabel = styled.div`
 const StatsValue = styled.div`
   font-size: 18px;
   font-weight: 700;
+`;
+
+const StatsTableContainer = styled.div`
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid #eee;
+  border-radius: 12px;
+`;
+
+const StatsPagination = styled.div`
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
 `;
 
 const StatsTable = styled.table`

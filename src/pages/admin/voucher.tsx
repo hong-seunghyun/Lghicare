@@ -14,7 +14,7 @@ import {
   deleteDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import promoRulesWithTargetsLatest from "@/data/promo_rules_with_targets_latest.json";
+import promoRulesFinal from "@/data/promo_rules_final.json";
 
 type VoucherRules = {
   version?: number;
@@ -498,43 +498,63 @@ const getThemePromoLabel = (
     }
 
     if (hasNewShape) {
-      const rulesPayload = {
+      const rulesPayload: Record<string, unknown> = {
         version: data.version ?? 1,
         generatedFrom: data.meta?.source_file ?? data.generatedFrom ?? "",
-        basePromoTypeKeywords: data.basePromoTypeKeywords ?? undefined,
         baseDefaultKeyword: "기본",
         baseResubscribeKeyword: "재구독",
         combineKeywords: ["신규결합", "기존결합", "기존결합/신규결합"],
         normalPromoTypeKeyword: "일반(N)",
-        promoNameKeywordMap: data.promoNameKeywordMap ?? undefined,
-        stackingPolicy: data.stackingPolicy ?? undefined,
-        multiProductRule: data.multiProductRule ?? undefined,
-        themePromo: data.themePromo ?? undefined,
         updatedAt: new Date(),
         createdAt: new Date(),
       };
+      if (typeof data.basePromoTypeKeywords !== "undefined") {
+        rulesPayload.basePromoTypeKeywords = data.basePromoTypeKeywords;
+      }
+      if (typeof data.promoNameKeywordMap !== "undefined") {
+        rulesPayload.promoNameKeywordMap = data.promoNameKeywordMap;
+      }
+      if (typeof data.stackingPolicy !== "undefined") {
+        rulesPayload.stackingPolicy = data.stackingPolicy;
+      }
+      if (typeof data.multiProductRule !== "undefined") {
+        rulesPayload.multiProductRule = data.multiProductRule;
+      }
+      if (typeof data.themePromo !== "undefined") {
+        rulesPayload.themePromo = data.themePromo;
+      }
       await setDoc(doc(db, RULES_COLLECTION, RULES_DOC_ID), rulesPayload, {
         merge: true,
       });
     }
 
     if (hasExcelRulesShape) {
-      const rulesPayload = {
+      const rulesPayload: Record<string, unknown> = {
         version: data.version ?? 1,
         generatedFrom: data.generatedFrom ?? "",
-        basePromoTypeKeywords: data.basePromoTypeKeywords ?? undefined,
         baseDefaultKeyword: data.baseDefaultKeyword ?? "기본",
         baseResubscribeKeyword: data.baseResubscribeKeyword ?? "재구독",
         combineKeywords:
           data.combineKeywords ?? ["신규결합", "기존결합", "기존결합/신규결합"],
         normalPromoTypeKeyword: data.normalPromoTypeKeyword ?? "일반(N)",
-        promoNameKeywordMap: data.promoNameKeywordMap ?? undefined,
-        stackingPolicy: data.stackingPolicy ?? undefined,
-        multiProductRule: data.multiProductRule ?? undefined,
-        themePromo: data.themePromo ?? undefined,
         updatedAt: new Date(),
         createdAt: new Date(),
       };
+      if (typeof data.basePromoTypeKeywords !== "undefined") {
+        rulesPayload.basePromoTypeKeywords = data.basePromoTypeKeywords;
+      }
+      if (typeof data.promoNameKeywordMap !== "undefined") {
+        rulesPayload.promoNameKeywordMap = data.promoNameKeywordMap;
+      }
+      if (typeof data.stackingPolicy !== "undefined") {
+        rulesPayload.stackingPolicy = data.stackingPolicy;
+      }
+      if (typeof data.multiProductRule !== "undefined") {
+        rulesPayload.multiProductRule = data.multiProductRule;
+      }
+      if (typeof data.themePromo !== "undefined") {
+        rulesPayload.themePromo = data.themePromo;
+      }
       await setDoc(doc(db, RULES_COLLECTION, RULES_DOC_ID), rulesPayload, {
         merge: true,
       });
@@ -659,10 +679,10 @@ const getThemePromoLabel = (
     }
   };
 
-  const importFromPromoRulesWithTargets = async () => {
+  const importFromPromoRulesFinal = async () => {
     try {
       setImporting(true);
-      const success = await importJsonData(promoRulesWithTargetsLatest);
+      const success = await importJsonData(promoRulesFinal);
       if (!success) {
         alert("JSON 형식이 올바르지 않습니다.");
         return;
@@ -706,7 +726,7 @@ const getThemePromoLabel = (
       <Section>
         <SectionTitle>JSON 가져오기</SectionTitle>
         <SectionHelp>
-          기존 voucherMaster.json 또는 promo_rules_with_targets_latest.json을 선택하거나 버튼을 눌러 규칙 + 모델을 파이어베이스에 저장합니다.
+          기존 voucherMaster.json 또는 promo_rules_final.json을 선택하거나 버튼을 눌러 규칙 + 모델을 파이어베이스에 저장합니다.
         </SectionHelp>
         <ImportRow>
           <input
@@ -719,10 +739,10 @@ const getThemePromoLabel = (
             disabled={importing}
           />
           <SecondaryButton
-            onClick={importFromPromoRulesWithTargets}
+            onClick={importFromPromoRulesFinal}
             disabled={importing}
           >
-            promo_rules_with_targets_latest.json 불러오기
+            promo_rules_final.json 불러오기
           </SecondaryButton>
         </ImportRow>
       </Section>

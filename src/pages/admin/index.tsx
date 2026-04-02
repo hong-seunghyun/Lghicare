@@ -9,6 +9,27 @@ import React, {
   useCallback,
 } from "react";
 import styled, { keyframes, css } from "styled-components";
+import { db } from "@/lib/firebase";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where,
+} from "firebase/firestore";
+import type {
+  ManagerDashboardRequest,
+  ManagerSummary,
+} from "@/pages/api/manager/dashboard";
+import ManagerEditModal from "@/components/ManagerEditModal";
+import OrganizationExplorer from "@/components/OrganizationExplorer";
+import {
+  fetchManagerLearningDetails,
+  LearningActivityRow,
+} from "@/lib/learning";
 
 type BarDatum = {
   label: string;
@@ -37,6 +58,99 @@ type DashboardResponse = {
   }>;
 };
 
+type StatRow = {
+  key: string;
+  label: string;
+  estimateCount: number;
+  shareCount: number;
+};
+
+type TopManagerItem = {
+  id: string;
+  branch: string;
+  name: string;
+  estimateCount: number;
+  shareCount: number;
+};
+
+type ActivitySummaryManager = {
+  id: string;
+  name: string;
+  branch: string;
+  estimateCount: number;
+};
+
+type ActivitySummaryBranch = {
+  name: string;
+  estimateCount: number;
+};
+
+type ActivitySummaryType = {
+  name: string;
+  count: number;
+};
+
+type ShareSummary = {
+  today: number;
+  range: number;
+};
+
+type ActivitySummary = {
+  totalEstimates: number;
+  topManagers: ActivitySummaryManager[];
+  topBranches: ActivitySummaryBranch[];
+  typeCounts: ActivitySummaryType[];
+  dailyCounts: Array<{ date: string; count: number }>;
+  rangeStart: string;
+  rangeEnd: string;
+  shareSummary: ShareSummary;
+  todayEstimates: number;
+};
+
+const toIsoDateInput = (date: Date) => date.toISOString().slice(0, 10);
+
+const offsetIsoDate = (input: string, offset: number) => {
+  const parsed = new Date(input);
+  if (Number.isNaN(parsed.getTime())) {
+    return "";
+  }
+  parsed.setDate(parsed.getDate() + offset);
+  parsed.setHours(0, 0, 0, 0);
+  return toIsoDateInput(parsed);
+};
+
+const formatRangeLabel = (start: string, end: string) => {
+  if (!start && !end) return "조회 기간 미지정";
+  if (start === end) return start;
+  return `${start} ~ ${end}`;
+};
+
+const aggregateStats = (items: any[], keyField: string, labelField: string) => {
+  const map = new Map<string, StatRow>();
+  items.forEach((item) => {
+    const key = String(item[keyField] ?? "unknown");
+    const label = String(item[labelField] ?? key);
+    const estimate = Number(item.estimateCount ?? 0);
+    const share = Number(item.shareCount ?? 0);
+
+    const prev = map.get(key) || {
+      key,
+      label,
+      estimateCount: 0,
+      shareCount: 0,
+    };
+    map.set(key, {
+      key,
+      label,
+      estimateCount: prev.estimateCount + estimate,
+      shareCount: prev.shareCount + share,
+    });
+  });
+  return Array.from(map.values()).sort(
+    (a, b) => b.estimateCount + b.shareCount - (a.estimateCount + a.shareCount),
+  );
+};
+
 export default function AdminDashboardPage() {
   // =========================
   // 1) 더미 데이터
@@ -44,38 +158,7 @@ export default function AdminDashboardPage() {
   const [topStats, setTopStats] = useState({
     totalProducts: 0,
     managers: 0,
-    todaySearch: 0,
-    yesterdaySearch: 0,
-    totalSearch: 0,
   });
-
-  const [visitStats, setVisitStats] = useState({
-    pc: 0,
-    mobile: 0,
-  });
-  const [currentMonthRange, setCurrentMonthRange] = useState<{
-    startDate: string;
-    endDate: string;
-  } | null>(null);
-  const counts = useMemo(
-    () => ({
-      todayOrders: 27,
-      totalOrders: 12543,
-      todayInquiries: 125,
-      totalInquiries: 255321,
-    }),
-    [],
-  );
-
-  const latestSearches = useMemo(
-    () => [
-      { keyword: "WD722WE", count: 1225 },
-      { keyword: "WD520WC", count: 785 },
-      { keyword: "J2850B8142", count: 429 },
-    ],
-    [],
-  );
-
   const [bestOrders, setBestOrders] = useState<
     Array<{ name: string; count: number }>
   >([]);
@@ -87,13 +170,243 @@ export default function AdminDashboardPage() {
   const [topBranches, setTopBranches] = useState<
     Array<{ region: string; name: string; count: number }>
   >([]);
-  const [topManagers, setTopManagers] = useState<
-    Array<{ branch: string; name: string; count: number }>
+  const [topManagers, setTopManagers] = useState<TopManagerItem[]>([]);
+  const topManagersDisplay = useMemo(
+    () => topManagers.slice(0, 10),
+    [topManagers],
+  );
+  const today = useMemo(() => new Date(), []);
+  const initialStart = useMemo(() => {
+    const start = new Date(today);
+    start.setMonth(start.getMonth() - 1);
+    start.setHours(0, 0, 0, 0);
+    return start;
+  }, [today]);
+  const [rangeStart, setRangeStart] = useState(toIsoDateInput(initialStart));
+  const [rangeEnd, setRangeEnd] = useState(toIsoDateInput(today));
+  const [activitySummary, setActivitySummary] =
+    useState<ActivitySummary | null>(null);
+  const [activitySummaryLoading, setActivitySummaryLoading] = useState(true);
+  const [activitySummaryError, setActivitySummaryError] = useState<
+    string | null
+  >(null);
+  const [officeOptions, setOfficeOptions] = useState<string[]>([]);
+  const [explorerMode, setExplorerMode] = useState<"all" | "office">("all");
+  const [explorerOffice, setExplorerOffice] = useState("");
+  const [explorerRequestPayload, setExplorerRequestPayload] =
+    useState<ManagerDashboardRequest | null>(null);
+  const [explorerScopeLabel, setExplorerScopeLabel] = useState<string>("전체");
+  const [explorerInfoLoading, setExplorerInfoLoading] = useState(false);
+  const [explorerInfoError, setExplorerInfoError] = useState<string | null>(
+    null,
+  );
+  const [orgRangeStart, setOrgRangeStart] = useState(rangeStart);
+  const [orgRangeEnd, setOrgRangeEnd] = useState(rangeEnd);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editManager, setEditManager] = useState<ManagerSummary | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    password: "",
+    region: "",
+    office: "",
+    teamLeaderId: "",
+  });
+  const [editSaving, setEditSaving] = useState(false);
+  const [editFeedback, setEditFeedback] = useState<string | null>(null);
+  const [editFeedbackError, setEditFeedbackError] = useState<string | null>(
+    null,
+  );
+  const [editActivityLoading, setEditActivityLoading] = useState(false);
+  const [editActivityError, setEditActivityError] = useState<string | null>(
+    null,
+  );
+  const [editCategoryActivity, setEditCategoryActivity] = useState<StatRow[]>(
+    [],
+  );
+  const [editProductActivity, setEditProductActivity] = useState<StatRow[]>([]);
+  const [editLearningTotals, setEditLearningTotals] = useState({
+    views: 0,
+    shares: 0,
+  });
+  const [editLearningLoading, setEditLearningLoading] = useState(false);
+  const [editLearningError, setEditLearningError] = useState<string | null>(
+    null,
+  );
+  const [editLearningDetails, setEditLearningDetails] = useState<
+    LearningActivityRow[]
   >([]);
+  const [managerDetailsLoading, setManagerDetailsLoading] = useState(false);
+  const [managerDetailsError, setManagerDetailsError] = useState<string | null>(
+    null,
+  );
   const [barData, setBarData] = useState<BarDatum[]>([]);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchSummary = async () => {
+      setActivitySummaryLoading(true);
+      setActivitySummaryError(null);
+      setActivitySummary(null);
+      try {
+        const fallbackStart = toIsoDateInput(initialStart);
+        const fallbackEnd = toIsoDateInput(today);
+        const startParam = rangeStart || fallbackStart;
+        const endParam = rangeEnd || fallbackEnd;
+        const response = await fetch(
+          `/api/admin/activity-summary?start=${encodeURIComponent(
+            startParam,
+          )}&end=${encodeURIComponent(endParam)}`,
+        );
+        if (!response.ok) {
+          throw new Error("activity summary load failed");
+        }
+        const data = (await response.json()) as ActivitySummary;
+        if (cancelled) return;
+        setActivitySummary(data);
+        setBestOrders(
+          data.typeCounts.slice(0, 5).map((row) => ({
+            name: row.name,
+            count: row.count,
+          })),
+        );
+        setTopManagers(
+          data.topManagers.map((manager) => ({
+            id: manager.id,
+            branch: manager.branch || "지점",
+            name: manager.name,
+            estimateCount: manager.estimateCount,
+            shareCount: 0,
+          })),
+        );
+        setTopBranches(
+          data.topBranches.slice(0, 10).map((branch) => ({
+            region: "지점",
+            name: branch.name,
+            count: branch.estimateCount,
+          })),
+        );
+      } catch (error) {
+        console.error("activity summary load error:", error);
+        if (cancelled) return;
+        setActivitySummaryError(
+          "활동 데이터를 불러오는 중 오류가 발생했습니다.",
+        );
+      } finally {
+        if (!cancelled) {
+          setActivitySummaryLoading(false);
+        }
+      }
+    };
+
+    fetchSummary();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [rangeStart, rangeEnd, initialStart, today]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchOffices = async () => {
+      try {
+        const snap = await getDocs(
+          query(collection(db, "users"), where("role", "==", "manager")),
+        );
+        if (cancelled) return;
+        const offices = Array.from(
+          new Set(
+            snap.docs
+              .map((docSnap) => {
+                const data = docSnap.data() as any;
+                return String(data.office ?? data.branch ?? "").trim();
+              })
+              .filter((office) => office),
+          ),
+        ).sort();
+        setOfficeOptions(offices);
+      } catch (error) {
+        console.error("사무소 옵션 로딩 오류:", error);
+      }
+    };
+    fetchOffices();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    setExplorerInfoError(null);
+    setExplorerInfoLoading(true);
+    setExplorerRequestPayload(null);
+
+    const fallbackStart = toIsoDateInput(initialStart);
+    const fallbackEnd = toIsoDateInput(today);
+    const startParam = orgRangeStart || fallbackStart;
+    const endParam = orgRangeEnd || fallbackEnd;
+    const basePayload: ManagerDashboardRequest = {
+      managerUid: "admin-global",
+      managerId: "admin-global",
+      position: "지역담당",
+      startDate: startParam,
+      endDate: endParam,
+    };
+
+    if (explorerMode === "office") {
+      if (!officeOptions.length) {
+        setExplorerInfoError("사무소 목록을 불러오는 중입니다.");
+        setExplorerInfoLoading(false);
+        return;
+      }
+      if (!explorerOffice) {
+        setExplorerInfoError("조회할 사무소를 선택해 주세요.");
+        setExplorerInfoLoading(false);
+        return;
+      }
+      setExplorerScopeLabel(explorerOffice);
+      setExplorerRequestPayload({
+        ...basePayload,
+        office: explorerOffice,
+        position: "사무소장",
+      });
+      setExplorerInfoLoading(false);
+      return;
+    }
+
+    setExplorerScopeLabel("전체");
+    setExplorerRequestPayload(basePayload);
+    setExplorerInfoLoading(false);
+  }, [
+    explorerMode,
+    explorerOffice,
+    officeOptions,
+    orgRangeStart,
+    orgRangeEnd,
+    initialStart,
+    today,
+  ]);
+
+  useEffect(() => {
+    if (officeOptions.length === 0) {
+      setExplorerOffice("");
+      return;
+    }
+    if (!officeOptions.includes(explorerOffice)) {
+      setExplorerOffice(officeOptions[0]);
+    }
+  }, [officeOptions, explorerOffice]);
+
+  useEffect(() => {
+    if (officeOptions.length === 0) {
+      setExplorerOffice("");
+      return;
+    }
+    if (!officeOptions.includes(explorerOffice)) {
+      setExplorerOffice(officeOptions[0]);
+    }
+  }, [officeOptions, explorerOffice]);
   useEffect(() => {
     let cancelled = false;
 
@@ -122,39 +435,13 @@ export default function AdminDashboardPage() {
           .filter((row) => row.estimate > 0 || row.share > 0)
           .slice(0, 10);
 
-        const mappedBestOrders = mappedBars
-          .map((row) => ({ name: row.label, count: row.estimate }))
-          .filter((row) => row.count > 0)
-          .slice(0, 5);
-
         const mappedBestInquiries = mappedBars
           .map((row) => ({ name: row.label, count: row.share }))
           .filter((row) => row.count > 0)
           .slice(0, 5);
 
-        const branches = Array.isArray(data.topBranches)
-          ? data.topBranches
-          : [];
-        const mappedBranches = branches.map((row) => ({
-          region: "지점",
-          name: String(row.name ?? "unknown"),
-          count: Number(row.estimateCount ?? 0) + Number(row.shareCount ?? 0),
-        }));
-
-        const managers = Array.isArray(data.topManagers)
-          ? data.topManagers
-          : [];
-        const mappedManagers = managers.map((row) => ({
-          branch: String(row.branchName ?? "unknown"),
-          name: String(row.name ?? "unknown"),
-          count: Number(row.estimateCount ?? 0) + Number(row.shareCount ?? 0),
-        }));
-
         setBarData(mappedBars);
-        setBestOrders(mappedBestOrders);
         setBestInquiries(mappedBestInquiries);
-        setTopBranches(mappedBranches);
-        setTopManagers(mappedManagers);
       } catch (err) {
         console.error("Admin dashboard analytics error:", err);
         if (!cancelled) {
@@ -172,10 +459,303 @@ export default function AdminDashboardPage() {
     };
   }, []);
 
-  const monthRangeLabel = useMemo(() => {
-    if (!currentMonthRange) return "";
-    return `${currentMonthRange.startDate} ~ ${currentMonthRange.endDate}`;
-  }, [currentMonthRange]);
+  const handleEditModalFormChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const { name, value } = event.target;
+    setEditForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const openManagerEditModal = async (manager: TopManagerItem) => {
+    setManagerDetailsError(null);
+    setManagerDetailsLoading(true);
+    try {
+      if (!manager.id) {
+        throw new Error("매니저 ID가 없습니다.");
+      }
+      const userSnap = await getDoc(doc(db, "users", manager.id));
+      if (!userSnap.exists()) {
+        throw new Error("매니저 정보를 찾을 수 없습니다.");
+      }
+      const data = userSnap.data() as any;
+      const summary: ManagerSummary = {
+        id: manager.id,
+        managerId: String(data.managerId ?? ""),
+        name: String(data.name ?? manager.name ?? ""),
+        position: String(data.position ?? ""),
+        office: String(data.office ?? data.branch ?? ""),
+        region: String(data.region ?? ""),
+        teamLeaderId: String(data.teamLeaderId ?? ""),
+        estimateCount: manager.estimateCount,
+        shareCount: manager.shareCount,
+      };
+      setEditManager(summary);
+      setEditForm({
+        name: summary.name,
+        password: "",
+        region: summary.region,
+        office: summary.office,
+        teamLeaderId: summary.teamLeaderId,
+      });
+      setEditFeedback(null);
+      setEditFeedbackError(null);
+      setEditModalOpen(true);
+    } catch (error) {
+      console.error("매니저 상세 정보 로딩 오류:", error);
+      setManagerDetailsError("매니저 정보를 불러오는 중 오류가 발생했습니다.");
+    } finally {
+      setManagerDetailsLoading(false);
+    }
+  };
+
+  const handleExplorerManagerSelect = (manager: ManagerSummary) => {
+    openManagerEditModal({
+      id: manager.id,
+      branch:
+        manager.office ||
+        manager.region ||
+        manager.teamLeaderId ||
+        "사무소 미정",
+      name: manager.name,
+      estimateCount: manager.estimateCount,
+      shareCount: manager.shareCount,
+    });
+  };
+
+  const handleRangeStartInputChange = (value: string) => {
+    if (!value) return;
+    if (rangeEnd && new Date(value) > new Date(rangeEnd)) {
+      setRangeEnd(value);
+    }
+    setRangeStart(value);
+  };
+
+  const handleRangeEndInputChange = (value: string) => {
+    if (!value) return;
+    if (rangeStart && new Date(value) < new Date(rangeStart)) {
+      setRangeStart(value);
+    }
+    setRangeEnd(value);
+  };
+
+  const handleOrgRangeStartChange = (value: string) => {
+    if (!value) return;
+    if (orgRangeEnd && new Date(value) > new Date(orgRangeEnd)) {
+      setOrgRangeEnd(value);
+    }
+    setOrgRangeStart(value);
+  };
+
+  const handleOrgRangeEndChange = (value: string) => {
+    if (!value) return;
+    if (orgRangeStart && new Date(value) < new Date(orgRangeStart)) {
+      setOrgRangeStart(value);
+    }
+    setOrgRangeEnd(value);
+  };
+
+  const todayCount = activitySummary?.todayEstimates ?? 0;
+  const shareSummary = activitySummary?.shareSummary;
+  const shareTodayCount = shareSummary?.today ?? 0;
+  const shareRangeCount = shareSummary?.range ?? 0;
+  const summaryRangeLabel = formatRangeLabel(rangeStart, rangeEnd);
+  const orgRangeLabel = formatRangeLabel(orgRangeStart, orgRangeEnd);
+
+  const closeEditModal = () => {
+    if (editSaving) return;
+    setEditModalOpen(false);
+    setEditManager(null);
+    setEditFeedback(null);
+    setEditFeedbackError(null);
+  };
+
+  useEffect(() => {
+    if (!editManager) {
+      setEditCategoryActivity([]);
+      setEditProductActivity([]);
+      setEditActivityError(null);
+      setEditActivityLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchEditActivity = async () => {
+      try {
+        setEditActivityLoading(true);
+        setEditActivityError(null);
+
+        const [categorySnap, productSnap] = await Promise.all([
+          getDocs(
+            query(
+              collection(db, "managerCategoryStats"),
+              where("managerUid", "==", editManager.id),
+            ),
+          ),
+          getDocs(
+            query(
+              collection(db, "managerProductStats"),
+              where("managerUid", "==", editManager.id),
+            ),
+          ),
+        ]);
+
+        if (cancelled) return;
+
+        setEditCategoryActivity(
+          aggregateStats(
+            categorySnap.docs.map((docSnap) => docSnap.data()),
+            "type",
+            "type",
+          ),
+        );
+        setEditProductActivity(
+          aggregateStats(
+            productSnap.docs.map((docSnap) => docSnap.data()),
+            "modelCode",
+            "productName",
+          ),
+        );
+      } catch (error) {
+        console.error("매니저 활동내역 조회 오류:", error);
+        if (!cancelled) {
+          setEditCategoryActivity([]);
+          setEditProductActivity([]);
+          setEditActivityError("활동내역을 불러오는 중 오류가 발생했습니다.");
+        }
+      } finally {
+        if (!cancelled) {
+          setEditActivityLoading(false);
+        }
+      }
+    };
+
+    fetchEditActivity();
+    return () => {
+      cancelled = true;
+    };
+  }, [editManager]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!editManager) {
+      setEditLearningTotals({ views: 0, shares: 0 });
+      setEditLearningDetails([]);
+      setEditLearningError(null);
+      setEditLearningLoading(false);
+      return;
+    }
+
+    const fetchLearningDetails = async () => {
+      setEditLearningLoading(true);
+      setEditLearningError(null);
+      try {
+        const { totals, details } = await fetchManagerLearningDetails(
+          editManager.id,
+        );
+        if (cancelled) return;
+        setEditLearningTotals(totals);
+        setEditLearningDetails(details);
+      } catch (error) {
+        console.error("학습 통계 로딩 오류:", error);
+        if (!cancelled) {
+          setEditLearningError("학습 활동을 불러오는 중 오류가 발생했습니다.");
+          setEditLearningTotals({ views: 0, shares: 0 });
+          setEditLearningDetails([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setEditLearningLoading(false);
+        }
+      }
+    };
+
+    fetchLearningDetails();
+    return () => {
+      cancelled = true;
+    };
+  }, [editManager]);
+
+  const handleEditModalSave = async (
+    event: React.FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault();
+    if (!editManager) return;
+
+    const trimmedName = editForm.name.trim();
+    if (!trimmedName) {
+      setEditFeedbackError("이름을 입력해 주세요.");
+      return;
+    }
+
+    const updates: Partial<ManagerSummary> & { password?: string } = {};
+    if (trimmedName !== editManager.name) {
+      updates.name = trimmedName;
+    }
+    if (editForm.password.trim()) {
+      updates.password = editForm.password.trim();
+    }
+    if (editForm.region.trim() !== editManager.region) {
+      updates.region = editForm.region.trim();
+    }
+    if (editForm.office.trim() !== editManager.office) {
+      updates.office = editForm.office.trim();
+    }
+    if (editForm.teamLeaderId.trim() !== editManager.teamLeaderId) {
+      updates.teamLeaderId = editForm.teamLeaderId.trim();
+    }
+
+    if (Object.keys(updates).length === 0) {
+      setEditFeedback("변경된 내용이 없습니다.");
+      return;
+    }
+
+    setEditSaving(true);
+    setEditFeedback(null);
+    setEditFeedbackError(null);
+
+    try {
+      await updateDoc(doc(db, "users", editManager.id), {
+        ...("password" in updates ? { password: updates.password } : {}),
+        ...(updates.region !== undefined ? { region: updates.region } : {}),
+        ...(updates.office !== undefined ? { office: updates.office } : {}),
+        ...(updates.teamLeaderId !== undefined
+          ? { teamLeaderId: updates.teamLeaderId }
+          : {}),
+        ...(updates.name !== undefined ? { name: updates.name } : {}),
+        updatedAt: serverTimestamp(),
+      });
+
+      const summaryUpdates: Partial<ManagerSummary> = {};
+      if (updates.name !== undefined) summaryUpdates.name = updates.name;
+      if (updates.region !== undefined) summaryUpdates.region = updates.region;
+      if (updates.office !== undefined) summaryUpdates.office = updates.office;
+      if (updates.teamLeaderId !== undefined) {
+        summaryUpdates.teamLeaderId = updates.teamLeaderId;
+      }
+
+      setEditManager((prev) => (prev ? { ...prev, ...summaryUpdates } : prev));
+
+      setTopManagers((prev) =>
+        prev.map((item) =>
+          item.id === editManager.id
+            ? { ...item, name: summaryUpdates.name ?? item.name }
+            : item,
+        ),
+      );
+      setEditForm((prev) => ({ ...prev, password: "" }));
+      setEditFeedback("저장되었습니다.");
+    } catch (error) {
+      console.error("매니저 저장 오류:", error);
+      setEditFeedbackError("저장 중 오류가 발생했습니다.");
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   // =========================
   useEffect(() => {
     let cancelled = false;
@@ -192,23 +772,7 @@ export default function AdminDashboardPage() {
         setTopStats({
           totalProducts: Number(data?.topStats?.totalProducts ?? 0),
           managers: Number(data?.topStats?.managers ?? 0),
-          todaySearch: Number(data?.topStats?.todaySearch ?? 0),
-          yesterdaySearch: Number(data?.topStats?.yesterdaySearch ?? 0),
-          totalSearch: Number(data?.topStats?.totalSearch ?? 0),
         });
-
-        setVisitStats({
-          pc: Number(data?.visitStats?.pc ?? 0),
-          mobile: Number(data?.visitStats?.mobile ?? 0),
-        });
-        setCurrentMonthRange(
-          data?.currentMonthRange
-            ? {
-                startDate: String(data.currentMonthRange.startDate ?? ""),
-                endDate: String(data.currentMonthRange.endDate ?? ""),
-              }
-            : null,
-        );
       } catch (err) {
         console.error("Admin overview error:", err);
       }
@@ -340,74 +904,38 @@ export default function AdminDashboardPage() {
               <HeroStatUnit>명</HeroStatUnit>
             </HeroFlex>
           </HeroStatCard>
-
-          <HeroMiniPanel>
-            <HeroMiniLine>
-              <span>오늘 접속자 수</span>
-              <b>{formatNumber(topStats.todaySearch)}명</b>
-            </HeroMiniLine>
-            <HeroMiniLine>
-              <span>어제 접속자 수</span>
-              <b>{formatNumber(topStats.yesterdaySearch)}명</b>
-            </HeroMiniLine>
-            <HeroMiniLine>
-              <span>지난달 접속자 수</span>
-              <b>{formatNumber(topStats.totalSearch)}명</b>
-            </HeroMiniLine>
-          </HeroMiniPanel>
         </HeroRow>
       </TopHero>
 
       <Content>
-        <Grid2>
-          <Card>
-            <CardHeader>
-              <CardTitle>접속 현황 상세</CardTitle>
-              <CardRight>
-                {monthRangeLabel ? `날짜기준 ${monthRangeLabel}` : "날짜기준 -"}
-              </CardRight>
-            </CardHeader>
-
-            <Split2>
-              <MiniKpi>
-                <MiniKpiLabel>PC</MiniKpiLabel>
-                <HeroFlex>
-                  <MiniKpiValue>{formatNumber(visitStats.pc)}</MiniKpiValue>
-                  <MiniKpiUnit>명</MiniKpiUnit>
-                </HeroFlex>
-              </MiniKpi>
-
-              <MiniKpi>
-                <MiniKpiLabel>MOBILE</MiniKpiLabel>
-                <HeroFlex>
-                  <MiniKpiValue>{formatNumber(visitStats.mobile)}</MiniKpiValue>
-                  <MiniKpiUnit>명</MiniKpiUnit>
-                </HeroFlex>
-              </MiniKpi>
-            </Split2>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>지난달 접속 상세 페이지</CardTitle>
-              <CardRight>
-                {monthRangeLabel ? `날짜기준 ${monthRangeLabel}` : "날짜기준 -"}
-              </CardRight>
-            </CardHeader>
-
-            <Table>
-              <TBody>
-                {latestSearches.map((r) => (
-                  <tr key={r.keyword}>
-                    <td>{r.keyword}</td>
-                    <td>{formatNumber(r.count)}회</td>
-                  </tr>
-                ))}
-              </TBody>
-            </Table>
-          </Card>
-        </Grid2>
-
+        <DateRangeSection>
+          <DateRangeLabel>조회 기간</DateRangeLabel>
+          <DateRangeControls>
+            <DateInput
+              type="date"
+              value={rangeStart}
+              onChange={(event) =>
+                handleRangeStartInputChange(event.target.value)
+              }
+            />
+            <span>~</span>
+            <DateInput
+              type="date"
+              value={rangeEnd}
+              onChange={(event) =>
+                handleRangeEndInputChange(event.target.value)
+              }
+            />
+          </DateRangeControls>
+          <DateRangeHint>
+            {activitySummaryLoading
+              ? "범위 데이터를 불러오는 중입니다..."
+              : `현재 조회 기준: ${summaryRangeLabel}`}
+          </DateRangeHint>
+          {activitySummaryError && (
+            <ErrorText>{activitySummaryError}</ErrorText>
+          )}
+        </DateRangeSection>
         <CardHeader>
           <CardTitle>견적내기 / 공유하기</CardTitle>
         </CardHeader>
@@ -418,22 +946,26 @@ export default function AdminDashboardPage() {
               <SmallKpiLabel>오늘 견적 수</SmallKpiLabel>
               <HeroFlex>
                 <SmallKpiValue>
-                  {formatNumber(counts.todayOrders)}
+                  {activitySummaryLoading ? "..." : formatNumber(todayCount)}
                 </SmallKpiValue>
                 <SmallKpiUnit>건</SmallKpiUnit>
               </HeroFlex>
+              <SmallKpiMeta>견적 수는 실시간 집계 기준입니다.</SmallKpiMeta>
             </SmallKpi>
           </SmallCard>
 
           <SmallCard>
             <SmallKpi>
-              <SmallKpiLabel>총 견적 수</SmallKpiLabel>
+              <SmallKpiLabel>기간 내 견적 수</SmallKpiLabel>
               <HeroFlex>
                 <SmallKpiValue>
-                  {formatNumber(counts.totalOrders)}
+                  {activitySummaryLoading
+                    ? "..."
+                    : formatNumber(activitySummary?.totalEstimates ?? 0)}
                 </SmallKpiValue>
                 <SmallKpiUnit>건</SmallKpiUnit>
               </HeroFlex>
+              <SmallKpiMeta>{`기간: ${summaryRangeLabel}`}</SmallKpiMeta>
             </SmallKpi>
           </SmallCard>
 
@@ -442,22 +974,24 @@ export default function AdminDashboardPage() {
               <SmallKpiLabel>오늘 공유 수</SmallKpiLabel>
               <HeroFlex>
                 <SmallKpiValue>
-                  {formatNumber(counts.todayInquiries)}
+                  {activitySummaryLoading ? "..." : formatNumber(shareTodayCount)}
                 </SmallKpiValue>
                 <SmallKpiUnit>건</SmallKpiUnit>
               </HeroFlex>
+              <SmallKpiMeta>공유 수는 Firebase shareCount 기준입니다.</SmallKpiMeta>
             </SmallKpi>
           </SmallCard>
 
           <SmallCard>
             <SmallKpi>
-              <SmallKpiLabel>총 공유 수</SmallKpiLabel>
+              <SmallKpiLabel>기간 내 공유 수</SmallKpiLabel>
               <HeroFlex>
                 <SmallKpiValue>
-                  {formatNumber(counts.totalInquiries)}
+                  {activitySummaryLoading ? "..." : formatNumber(shareRangeCount)}
                 </SmallKpiValue>
                 <SmallKpiUnit>건</SmallKpiUnit>
               </HeroFlex>
+              <SmallKpiMeta>{`기간: ${summaryRangeLabel}`}</SmallKpiMeta>
             </SmallKpi>
           </SmallCard>
         </Grid4>
@@ -467,7 +1001,9 @@ export default function AdminDashboardPage() {
             <CardHeader>
               <CardTitle>견적내기 BEST 5 상품</CardTitle>
               <CardRight>
-                {monthRangeLabel ? `날짜기준 ${monthRangeLabel}` : "날짜기준 -"}
+                {activitySummaryLoading
+                  ? "집계 기준 로딩 중..."
+                  : `집계 기준: ${summaryRangeLabel}`}
               </CardRight>
             </CardHeader>
 
@@ -487,7 +1023,9 @@ export default function AdminDashboardPage() {
             <CardHeader>
               <CardTitle>공유하기 BEST 5 상품</CardTitle>
               <CardRight>
-                {monthRangeLabel ? `날짜기준 ${monthRangeLabel}` : "날짜기준 -"}
+                {activitySummaryLoading
+                  ? "집계 기준 로딩 중..."
+                  : `집계 기준: ${summaryRangeLabel}`}
               </CardRight>
             </CardHeader>
 
@@ -503,6 +1041,33 @@ export default function AdminDashboardPage() {
             </Table>
           </Card>
         </Grid2>
+        {editModalOpen && editManager && (
+          <ManagerEditModal
+            manager={editManager}
+            form={editForm}
+            onFormChange={handleEditModalFormChange}
+            onSubmit={handleEditModalSave}
+            onClose={closeEditModal}
+            saving={editSaving}
+            feedback={editFeedback}
+            feedbackError={editFeedbackError}
+            activityLoading={editActivityLoading}
+            activityError={editActivityError}
+            activityTotals={{
+              estimateCount: editManager.estimateCount,
+              shareCount: editManager.shareCount,
+            }}
+            categoryActivity={editCategoryActivity}
+            productActivity={editProductActivity}
+            learningTotals={editLearningTotals}
+            learningLoading={editLearningLoading}
+            learningError={editLearningError}
+            learningDetails={editLearningDetails}
+            regionListId="dashboard-region-options"
+            officeListId="dashboard-office-options"
+            teamLeaderListId="dashboard-teamleader-options"
+          />
+        )}
 
         <Card>
           <CardHeader>
@@ -658,7 +1223,9 @@ export default function AdminDashboardPage() {
             <CardHeader>
               <CardTitle>지난 달 상위 지점 TOP 10</CardTitle>
               <CardRight>
-                {monthRangeLabel ? `집계기준 ${monthRangeLabel}` : "집계기준 -"}
+                {activitySummaryLoading
+                  ? "집계 기준 로딩 중..."
+                  : `집계 기준: ${summaryRangeLabel}`}
               </CardRight>
             </CardHeader>
 
@@ -683,27 +1250,119 @@ export default function AdminDashboardPage() {
             <CardHeader>
               <CardTitle>지난 달 상위 매니저 TOP 10</CardTitle>
               <CardRight>
-                {monthRangeLabel ? `집계기준 ${monthRangeLabel}` : "집계기준 -"}
+                {activitySummaryLoading
+                  ? "집계 기준 로딩 중..."
+                  : `집계 기준: ${summaryRangeLabel}`}
               </CardRight>
             </CardHeader>
 
+            {managerDetailsLoading && (
+              <InfoText>매니저 정보를 불러오는 중입니다...</InfoText>
+            )}
+            {managerDetailsError && (
+              <ErrorText>{managerDetailsError}</ErrorText>
+            )}
+
             <Table>
               <TBody>
-                {topManagers.map((r, idx) => (
-                  <tr key={`${r.branch}-${r.name}-${idx}`}>
+                {topManagersDisplay.map((r, idx) => (
+                  <ClickableRow
+                    key={`${r.branch}-${r.name}-${idx}`}
+                    role="button"
+                    onClick={() => openManagerEditModal(r)}
+                  >
                     <td>
                       <Top10Left>
                         <span>{r.branch}</span>
                         <b>{r.name}</b>
                       </Top10Left>
                     </td>
-                    <td>{formatNumber(r.count)}건</td>
-                  </tr>
+                    <td>{formatNumber(r.estimateCount + r.shareCount)}건</td>
+                  </ClickableRow>
                 ))}
               </TBody>
             </Table>
           </Card>
         </Grid2>
+        <ExplorerPanel>
+          <ExplorerPanelHeader>
+            <ExplorerPanelTitle>조직 조회</ExplorerPanelTitle>
+            <ExplorerPanelControls>
+              <ExplorerPanelField>
+                <ExplorerPanelLabel htmlFor="explorer-mode">
+                  조회 범위
+                </ExplorerPanelLabel>
+                <ExplorerPanelSelect
+                  id="explorer-mode"
+                  value={explorerMode}
+                  onChange={(event) =>
+                    setExplorerMode(event.target.value as "all" | "office")
+                  }
+                >
+                  <option value="all">전체</option>
+                  <option value="office">사무소</option>
+                </ExplorerPanelSelect>
+              </ExplorerPanelField>
+              {explorerMode === "office" && (
+                <ExplorerPanelField>
+                  <ExplorerPanelLabel htmlFor="explorer-office">
+                    사무소
+                  </ExplorerPanelLabel>
+                  <ExplorerPanelSelect
+                    id="explorer-office"
+                    value={explorerOffice}
+                    onChange={(event) => setExplorerOffice(event.target.value)}
+                  >
+                    {officeOptions.length === 0 ? (
+                      <option value="">등록된 사무소가 없습니다</option>
+                    ) : (
+                      officeOptions.map((office) => (
+                        <option key={office} value={office}>
+                          {office}
+                        </option>
+                      ))
+                    )}
+                  </ExplorerPanelSelect>
+                </ExplorerPanelField>
+              )}
+            </ExplorerPanelControls>
+          </ExplorerPanelHeader>
+          {explorerInfoError && <ErrorText>{explorerInfoError}</ErrorText>}
+          <ExplorerDateSection>
+            <ExplorerDateControls>
+              <ExplorerDateInput
+                type="date"
+                value={orgRangeStart}
+                onChange={(event) =>
+                  handleOrgRangeStartChange(event.target.value)
+                }
+              />
+              <span>~</span>
+              <ExplorerDateInput
+                type="date"
+                value={orgRangeEnd}
+                onChange={(event) =>
+                  handleOrgRangeEndChange(event.target.value)
+                }
+              />
+            </ExplorerDateControls>
+            <ExplorerDateHint>{`조회 기준: ${orgRangeLabel}`}</ExplorerDateHint>
+          </ExplorerDateSection>
+          {explorerRequestPayload ? (
+            <OrganizationExplorer
+              requestPayload={explorerRequestPayload}
+              onManagerSelect={handleExplorerManagerSelect}
+              baseManagerLabel={explorerScopeLabel}
+              title="조직 조회"
+            />
+          ) : (
+            <InfoText>
+              {explorerInfoLoading
+                ? "조직 조건을 정리하는 중입니다..."
+                : "조회 조건을 선택하면 조직 정보를 확인할 수 있습니다."}
+            </InfoText>
+          )}
+        </ExplorerPanel>
       </Content>
     </Page>
   );
@@ -786,29 +1445,6 @@ const HeroFlex = styled.div`
   margin-bottom: 10px;
 `;
 
-const HeroMiniPanel = styled.div`
-  display: grid;
-  gap: 10px;
-  width: 100%;
-`;
-
-const HeroMiniLine = styled.div`
-  border-radius: 12px;
-  height: 55px;
-  background: rgba(255, 255, 255, 0.15);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 16px;
-  padding: 0 25px;
-  color: #fff;
-
-  b {
-    font-size: 22px;
-    font-weight: 900;
-  }
-`;
-
 const Content = styled.div`
   padding: 0px 35px 40px;
 `;
@@ -853,6 +1489,41 @@ const CardHeader = styled.div`
   margin-top: 75px;
 `;
 
+const DateRangeSection = styled.div`
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 40px 0px 20px;
+`;
+
+const DateRangeLabel = styled.div`
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2933;
+`;
+
+const DateRangeControls = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const DateInput = styled.input`
+  border-radius: 10px;
+  border: 1px solid #d9e2ec;
+  padding: 6px 10px;
+  font-size: 13px;
+  background: #fff;
+  color: #1f2933;
+  height: 36px;
+`;
+
+const DateRangeHint = styled.div`
+  font-size: 12px;
+  color: #6b7280;
+`;
+
 const CardTitle = styled.div`
   font-size: 22px;
   font-weight: 500;
@@ -875,37 +1546,16 @@ const Split2 = styled.div`
   }
 `;
 
-const MiniKpi = styled.div`
-  border: 1px solid #ddd;
-  border-radius: 10px;
-  padding: 18px;
-  display: grid;
-  grid-template-rows: auto auto;
-  gap: 6px;
-`;
-
-const MiniKpiLabel = styled.div`
-  font-size: 22px;
-  color: #000;
-  font-weight: 400;
-`;
-
-const MiniKpiValue = styled.div`
-  font-size: 60px;
-  font-weight: bold;
-  color: #000;
-  line-height: 1.05;
-`;
-
-const MiniKpiUnit = styled.div`
-  font-size: 22px;
-  font-weight: bold;
-`;
-
 const SmallKpi = styled.div`
   border: 1px solid #ddd;
   border-radius: 10px;
   padding: 18px;
+`;
+
+const SmallKpiMeta = styled.span`
+  font-size: 11px;
+  color: #9aa5b1;
+  margin-top: 6px;
 `;
 
 const SmallKpiLabel = styled.div`
@@ -1329,4 +1979,327 @@ const Tag = styled.span`
   font-weight: 900;
   color: #151922;
   flex: 0 0 auto;
+`;
+
+const ExplorerPanel = styled.div`
+  margin-top: 55px;
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid #e3e8ef;
+  padding: 24px;
+`;
+
+const ExplorerPanelHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+`;
+
+const ExplorerPanelTitle = styled.h3`
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+`;
+
+const ExplorerPanelControls = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+`;
+
+const ExplorerPanelLabel = styled.label`
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+`;
+
+const ExplorerPanelSelect = styled.select`
+  min-width: 220px;
+  border-radius: 10px;
+  border: 1px solid #d9e2ec;
+  height: 40px;
+  padding: 0 12px;
+  font-size: 13px;
+  background: #fff;
+  color: #1f2933;
+`;
+
+const ExplorerPanelField = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+`;
+
+const ExplorerDateSection = styled.div`
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e3e8ef;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+`;
+
+const ExplorerDateLabel = styled.span`
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+`;
+
+const ExplorerDateControls = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const ExplorerDateInput = styled.input`
+  border-radius: 10px;
+  border: 1px solid #d9e2ec;
+  padding: 6px 10px;
+  font-size: 13px;
+  background: #fff;
+  color: #1f2933;
+  height: 34px;
+`;
+
+const ExplorerDateHint = styled.span`
+  font-size: 12px;
+  color: #6b7280;
+`;
+
+const InfoText = styled.div`
+  font-size: 14px;
+  color: #555;
+  padding: 12px 0;
+`;
+
+const ErrorText = styled.div`
+  font-size: 14px;
+  color: #e74c3c;
+  padding: 12px 0;
+`;
+
+const ClickableRow = styled.tr`
+  cursor: pointer;
+
+  &:hover {
+    background: #f5f5f5;
+  }
+`;
+
+const ModalOverlay = styled.div`
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+`;
+
+const ModalContent = styled.form`
+  width: min(520px, 100%);
+  max-height: 80vh;
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+  overflow-y: auto;
+`;
+
+const ModalHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+`;
+
+const ModalTitle = styled.div`
+  font-size: 18px;
+  font-weight: 600;
+`;
+
+const ModalCloseButton = styled.button`
+  background: transparent;
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+`;
+
+const EditorInfo = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 13px;
+  color: #555;
+`;
+
+const ActivityHero = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+`;
+
+const ActivityHeroCard = styled.div`
+  border-radius: 14px;
+  padding: 14px;
+  background: linear-gradient(135deg, #f8fbff 0%, #eef4ff 100%);
+  border: 1px solid #d9e7ff;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+`;
+
+const ActivityHeroLabel = styled.span`
+  font-size: 12px;
+  color: #52606d;
+`;
+
+const ActivityHeroValue = styled.strong`
+  font-size: 24px;
+  color: #1f2933;
+`;
+
+const Fields = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+`;
+
+const Field = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+`;
+
+const FieldLabel = styled.label`
+  font-size: 12px;
+  color: #555;
+`;
+
+const FieldInput = styled.input`
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #dcdcdc;
+  font-size: 14px;
+`;
+
+const Divider = styled.div`
+  height: 1px;
+  background: #f0f0f0;
+  margin: 6px 0 10px;
+`;
+
+const ButtonRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+`;
+
+const SaveButton = styled.button`
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: none;
+  background: #111;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+
+  &:disabled {
+    background: #999;
+    cursor: default;
+  }
+`;
+
+const FeedbackSuccess = styled.div`
+  font-size: 13px;
+  color: #0b9150;
+`;
+
+const FeedbackError = styled.div`
+  font-size: 13px;
+  color: #e74c3c;
+`;
+
+const ActivitySection = styled.div`
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+`;
+
+const ActivitySectionHeader = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+`;
+
+const ActivitySectionTitle = styled.h3`
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2933;
+`;
+
+const ActivitySectionSubTitle = styled.p`
+  font-size: 12px;
+  color: #7b8794;
+`;
+
+const ActivityGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+`;
+
+const ActivityCard = styled.div`
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  padding: 14px;
+`;
+
+const ActivityCardTitle = styled.h4`
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #1f2933;
+`;
+
+const ActivityTableWrapper = styled.div`
+  max-height: 228px;
+  overflow-y: auto;
+  border-radius: 10px;
+`;
+
+const ActivityTable = styled.table`
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+
+  th,
+  td {
+    padding: 8px 6px;
+    border-bottom: 1px solid #e5e7eb;
+    text-align: left;
+  }
+
+  th {
+    color: #52606d;
+    font-weight: 700;
+    background: transparent;
+  }
+`;
+
+const ProductName = styled.span`
+  display: inline-block;
+  max-width: 160px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 `;

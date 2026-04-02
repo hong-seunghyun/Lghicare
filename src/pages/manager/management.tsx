@@ -13,6 +13,11 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
+import ManagerEditModal, { StatRow } from "@/components/ManagerEditModal";
+import {
+  fetchManagerLearningDetails,
+  LearningActivityRow,
+} from "@/lib/learning";
 
 interface ManagerSession {
   id: string;
@@ -42,6 +47,32 @@ type ManagerRecord = {
   teamLeaderId: string;
   password?: string;
   isActive: boolean;
+};
+
+const aggregateStats = (items: any[], keyField: string, labelField: string) => {
+  const map = new Map<string, StatRow>();
+  items.forEach((item) => {
+    const key = String(item[keyField] ?? "unknown");
+    const label = String(item[labelField] ?? key);
+    const estimate = Number(item.estimateCount ?? 0);
+    const share = Number(item.shareCount ?? 0);
+
+    const prev = map.get(key) || {
+      key,
+      label,
+      estimateCount: 0,
+      shareCount: 0,
+    };
+    map.set(key, {
+      key,
+      label,
+      estimateCount: prev.estimateCount + estimate,
+      shareCount: prev.shareCount + share,
+    });
+  });
+  return Array.from(map.values()).sort(
+    (a, b) => b.estimateCount + b.shareCount - (a.estimateCount + a.shareCount),
+  );
 };
 
 const getTier = (position?: string): Tier => {
@@ -77,7 +108,7 @@ const tierLabelMap: Record<Tier, string> = {
   regionLeader: "리더사무소장",
   officeHead: "사무소장",
   teamLeader: "팀장",
-  member: "매니저",
+  member: "팀원",
 };
 
 const ManagerManagementPage: React.FC = () => {
@@ -101,6 +132,29 @@ const ManagerManagementPage: React.FC = () => {
   const [modalSaving, setModalSaving] = useState(false);
   const [modalFeedback, setModalFeedback] = useState<string | null>(null);
   const [modalFeedbackError, setModalFeedbackError] = useState<string | null>(null);
+  const [modalCategoryActivity, setModalCategoryActivity] =
+    useState<StatRow[]>([]);
+  const [modalProductActivity, setModalProductActivity] =
+    useState<StatRow[]>([]);
+  const [modalActivityTotals, setModalActivityTotals] = useState({
+    estimateCount: 0,
+    shareCount: 0,
+  });
+  const [modalActivityLoading, setModalActivityLoading] = useState(false);
+  const [modalActivityError, setModalActivityError] = useState<string | null>(
+    null,
+  );
+  const [modalLearningTotals, setModalLearningTotals] = useState({
+    views: 0,
+    shares: 0,
+  });
+  const [modalLearningLoading, setModalLearningLoading] = useState(false);
+  const [modalLearningError, setModalLearningError] = useState<string | null>(
+    null,
+  );
+  const [modalLearningDetails, setModalLearningDetails] = useState<
+    LearningActivityRow[]
+  >([]);
   const PAGE_SIZE = 10;
   const [pageByTier, setPageByTier] = useState<Record<Tier, number>>({
     areaAdmin: 1,
@@ -164,37 +218,39 @@ const ManagerManagementPage: React.FC = () => {
               };
             })
             .filter(
-              (item) => item.id !== session.id && getAreaFromRegion(item.region) === area,
+              (item) =>
+                item.id !== session.id &&
+                getAreaFromRegion(item.region) === area,
             );
         } else {
           let managerQuery;
           if (tier === "regionLeader") {
-          if (!session.region) {
-            throw new Error("지역 정보가 없어 매니저를 불러올 수 없습니다.");
-          }
-          managerQuery = query(
-            collection(db, "users"),
-            where("role", "==", "manager"),
-            where("region", "==", session.region),
-          );
+            if (!session.region) {
+              throw new Error("지역 정보가 없어 매니저를 불러올 수 없습니다.");
+            }
+            managerQuery = query(
+              collection(db, "users"),
+              where("role", "==", "manager"),
+              where("region", "==", session.region),
+            );
           } else if (tier === "officeHead") {
-          if (!session.office) {
-            throw new Error("사무소 정보가 없어 매니저를 불러올 수 없습니다.");
-          }
-          managerQuery = query(
-            collection(db, "users"),
-            where("role", "==", "manager"),
-            where("office", "==", session.office),
-          );
+            if (!session.office) {
+              throw new Error("사무소 정보가 없어 매니저를 불러올 수 없습니다.");
+            }
+            managerQuery = query(
+              collection(db, "users"),
+              where("role", "==", "manager"),
+              where("office", "==", session.office),
+            );
           } else {
-          if (!session.managerId) {
-            throw new Error("팀장 아이디가 없어 매니저을 불러올 수 없습니다.");
-          }
-          managerQuery = query(
-            collection(db, "users"),
-            where("role", "==", "manager"),
-            where("teamLeaderId", "==", session.managerId),
-          );
+            if (!session.managerId) {
+              throw new Error("팀장 아이디가 없어 매니저를 불러올 수 없습니다.");
+            }
+            managerQuery = query(
+              collection(db, "users"),
+              where("role", "==", "manager"),
+              where("teamLeaderId", "==", session.managerId),
+            );
           }
 
           const snap = await getDocs(managerQuery);
@@ -375,6 +431,110 @@ const ManagerManagementPage: React.FC = () => {
     setModalManager(null);
   };
 
+  useEffect(() => {
+    if (!modalManager) {
+      setModalCategoryActivity([]);
+      setModalProductActivity([]);
+      setModalActivityTotals({ estimateCount: 0, shareCount: 0 });
+      setModalActivityError(null);
+      setModalActivityLoading(false);
+      setModalLearningTotals({ views: 0, shares: 0 });
+      setModalLearningError(null);
+      setModalLearningLoading(false);
+      setModalLearningDetails([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchModalActivity = async () => {
+      try {
+        setModalActivityLoading(true);
+        setModalLearningLoading(true);
+        setModalActivityError(null);
+        setModalLearningError(null);
+
+        const [categorySnap, productSnap] = await Promise.all([
+          getDocs(
+            query(
+              collection(db, "managerCategoryStats"),
+              where("managerUid", "==", modalManager.id),
+            ),
+          ),
+          getDocs(
+            query(
+              collection(db, "managerProductStats"),
+              where("managerUid", "==", modalManager.id),
+            ),
+          ),
+        ]);
+
+        if (cancelled) return;
+
+        const categories = aggregateStats(
+          categorySnap.docs.map((docSnap) => docSnap.data()),
+          "type",
+          "type",
+        );
+        const products = aggregateStats(
+          productSnap.docs.map((docSnap) => docSnap.data()),
+          "modelCode",
+          "productName",
+        );
+
+        const estimateTotal = categories.reduce(
+          (sum, row) => sum + row.estimateCount,
+          0,
+        );
+        const shareTotal = categories.reduce(
+          (sum, row) => sum + row.shareCount,
+          0,
+        );
+
+        setModalCategoryActivity(categories);
+        setModalProductActivity(products);
+        setModalActivityTotals({
+          estimateCount: estimateTotal,
+          shareCount: shareTotal,
+        });
+
+        try {
+          const { totals, details } = await fetchManagerLearningDetails(
+            modalManager.id,
+          );
+
+          if (cancelled) return;
+
+          setModalLearningDetails(details);
+          setModalLearningTotals(totals);
+        } catch (learningError) {
+          console.error("학습현황 조회 오류:", learningError);
+          if (!cancelled) {
+            setModalLearningError("학습 활동을 불러오는 중 오류가 발생했습니다.");
+            setModalLearningTotals({ views: 0, shares: 0 });
+            setModalLearningDetails([]);
+          }
+        }
+      } catch (error) {
+        console.error("매니저 활동내역 조회 오류:", error);
+        if (!cancelled) {
+          setModalActivityError("활동내역을 불러오는 중 오류가 발생했습니다.");
+          setModalLearningError("학습 활동을 불러오는 중 오류가 발생했습니다.");
+        }
+      } finally {
+        if (!cancelled) {
+          setModalActivityLoading(false);
+          setModalLearningLoading(false);
+        }
+      }
+    };
+
+    fetchModalActivity();
+    return () => {
+      cancelled = true;
+    };
+  }, [modalManager]);
+
   const handleModalFormChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
     setModalForm((prev) => ({
@@ -550,9 +710,8 @@ const ManagerManagementPage: React.FC = () => {
       <Heading>
         <PageTitle>매니저 관리</PageTitle>
         <PageSubtitle>
-          본 페이지에서는 지역행정, 지역담당, CSA, 리더 사무소장, 사무소장,
-          팀장님께서 담당 범위 내 매니저의 이름·비밀번호·소속을 변경하실 수
-          있습니다.
+          본 페이지에서는 리더 사무소장, 사무소장, 팀장님께서 담당 범위 내 매니저의
+          이름·비밀번호·소속을 변경하실 수 있습니다.
         </PageSubtitle>
       </Heading>
 
@@ -576,7 +735,7 @@ const ManagerManagementPage: React.FC = () => {
           {tier === "areaAdmin" && (
             <>
               {renderSection(
-                "리더 사무소장",
+                "리더사무소장",
                 "담당 지역에 속한 권역 리더를 관리합니다.",
                 regionLeaderManagers,
                 "regionLeader",
@@ -594,7 +753,7 @@ const ManagerManagementPage: React.FC = () => {
                 "teamLeader",
               )}
               {renderSection(
-                "매니저",
+                "팀원",
                 "담당 지역 전체의 일반 매니저를 관리합니다.",
                 teamMemberManagers,
                 "member",
@@ -619,14 +778,14 @@ const ManagerManagementPage: React.FC = () => {
           )}
           {(tier === "regionLeader" || tier === "officeHead") &&
             renderSection(
-              "매니저",
-              "팀장의 매니저(일반 매니저)을 확인하고 소속을 조정합니다.",
+              "팀원",
+              "팀장의 팀원(일반 매니저)을 확인하고 소속을 조정합니다.",
               teamMemberManagers,
               "member",
             )}
           {tier === "teamLeader" &&
             renderSection(
-              "매니저",
+              "팀원",
               "현재 팀에 속한 매니저만 표시됩니다.",
               teamMemberManagers,
               "member",
@@ -635,92 +794,28 @@ const ManagerManagementPage: React.FC = () => {
       )}
 
       {modalOpen && modalManager && (
-        <ModalOverlay onClick={closeModal}>
-          <ModalContent
-            onSubmit={handleModalSave}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <ModalHeader>
-              <ModalTitle>
-                {modalManager.name} ({modalManager.managerId}) 편집
-              </ModalTitle>
-              <ModalCloseButton type="button" onClick={closeModal}>
-                ×
-              </ModalCloseButton>
-            </ModalHeader>
-            <EditorInfo>
-              <span>직급: {modalManager.position || "-"}</span>
-              <span>사무소: {modalManager.office || "-"}</span>
-              <span>담당 팀장: {modalManager.teamLeaderId || "-"}</span>
-            </EditorInfo>
-
-            <Fields>
-              <Field>
-                <FieldLabel>이름</FieldLabel>
-                <FieldInput
-                  name="name"
-                  value={modalForm.name}
-                  onChange={handleModalFormChange}
-                />
-              </Field>
-              <Field>
-                <FieldLabel>비밀번호</FieldLabel>
-                <FieldInput
-                  name="password"
-                  type="password"
-                  value={modalForm.password}
-                  onChange={handleModalFormChange}
-                  placeholder="변경할 비밀번호를 입력하세요"
-                />
-              </Field>
-            </Fields>
-
-            <Divider />
-
-            <Fields>
-              <Field>
-                <FieldLabel>지역</FieldLabel>
-                <FieldInput
-                  name="region"
-                  value={modalForm.region}
-                  onChange={handleModalFormChange}
-                  placeholder="지역명을 입력하세요"
-                  list="manager-management-region-options"
-                />
-              </Field>
-              <Field>
-                <FieldLabel>사무소</FieldLabel>
-                <FieldInput
-                  name="office"
-                  value={modalForm.office}
-                  onChange={handleModalFormChange}
-                  placeholder="사무소명을 입력하세요"
-                  list="manager-management-office-options"
-                />
-              </Field>
-              <Field>
-                <FieldLabel>담당 팀장</FieldLabel>
-                <FieldInput
-                  name="teamLeaderId"
-                  value={modalForm.teamLeaderId}
-                  onChange={handleModalFormChange}
-                  placeholder="할당할 팀장 ID를 입력하세요"
-                  list="manager-management-teamleader-options"
-                />
-              </Field>
-            </Fields>
-
-            <ButtonRow>
-              <SaveButton type="submit" disabled={modalSaving}>
-                {modalSaving ? "저장 중..." : "변경사항 저장"}
-              </SaveButton>
-              {modalFeedback && <FeedbackSuccess>{modalFeedback}</FeedbackSuccess>}
-              {modalFeedbackError && (
-                <FeedbackError>{modalFeedbackError}</FeedbackError>
-              )}
-            </ButtonRow>
-          </ModalContent>
-        </ModalOverlay>
+        <ManagerEditModal
+          manager={modalManager}
+          form={modalForm}
+          onFormChange={handleModalFormChange}
+          onSubmit={handleModalSave}
+          onClose={closeModal}
+          saving={modalSaving}
+          feedback={modalFeedback}
+          feedbackError={modalFeedbackError}
+          activityLoading={modalActivityLoading}
+          activityError={modalActivityError}
+          activityTotals={modalActivityTotals}
+          categoryActivity={modalCategoryActivity}
+          productActivity={modalProductActivity}
+          regionListId="manager-management-region-options"
+          officeListId="manager-management-office-options"
+          teamLeaderListId="manager-management-teamleader-options"
+          learningTotals={modalLearningTotals}
+          learningLoading={modalLearningLoading}
+          learningError={modalLearningError}
+          learningDetails={modalLearningDetails}
+        />
       )}
 
       <datalist id="manager-management-region-options">
@@ -1036,4 +1131,12 @@ const FeedbackSuccess = styled.div`
 const FeedbackError = styled.div`
   font-size: 13px;
   color: #e74c3c;
+`;
+
+const ProductName = styled.span`
+  display: inline-block;
+  max-width: 160px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 `;

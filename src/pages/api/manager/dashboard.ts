@@ -6,6 +6,8 @@ import {
   getDocs,
   query,
   where,
+  Timestamp,
+  type QueryConstraint,
   type QueryDocumentSnapshot,
   type DocumentData,
 } from "firebase/firestore";
@@ -16,6 +18,8 @@ export type ManagerDashboardRequest = {
   position: string;
   region?: string;
   office?: string;
+  startDate?: string;
+  endDate?: string;
 };
 
 export type ManagerDashboardScope =
@@ -97,38 +101,45 @@ const getScopeQuery = (
   return baseQuery;
 };
 
-const fetchManagerTotals = async () => {
-  const estimatesSnap = await getDocs(collection(db, "estimatesCount"));
-  const sharesSnap = await getDocs(collection(db, "shareCountByManager"));
+const fetchEstimateTotals = async (
+  start?: Timestamp,
+  end?: Timestamp,
+) => {
+  const constraints: QueryConstraint[] = [];
+  if (start) constraints.push(where("createdAt", ">=", start));
+  if (end) constraints.push(where("createdAt", "<", end));
+  const estimatesQuery = constraints.length
+    ? query(collection(db, "estimates"), ...constraints)
+    : query(collection(db, "estimates"));
 
-  const totals = new Map<
-    string,
-    { estimate: number; share: number }
-  >();
+  const snap = await getDocs(estimatesQuery);
+  const totals = new Map<string, number>();
+  snap.docs.forEach((docSnap) => {
+    const data = docSnap.data() as any;
+    const uid: string =
+      String(data.managerUid ?? "") ||
+      String(data.managerId ?? "") ||
+      docSnap.id;
+    totals.set(uid, (totals.get(uid) ?? 0) + 1);
+  });
+  return totals;
+};
 
-  const processDoc = (
-    docSnap: QueryDocumentSnapshot<DocumentData>,
-    field: "estimate" | "share",
-    countField: "managerCount" | "totalCount" | "shareCount",
-  ) => {
+const fetchShareTotals = async () => {
+  const snap = await getDocs(collection(db, "shareCountByManager"));
+  const totals = new Map<string, number>();
+  snap.docs.forEach((docSnap) => {
     if (!docSnap.id.startsWith("manager_")) return;
     const data = docSnap.data() as any;
-    const uid: string = data.managerUid || docSnap.id.split("_")[1] || "unknown";
-    const count = Number(data[countField] ?? 0);
-    const prev = totals.get(uid) || { estimate: 0, share: 0 };
-    totals.set(uid, {
-      ...prev,
-      [field]: prev[field] + count,
-    });
-  };
-
-  estimatesSnap.docs.forEach((docSnap) =>
-    processDoc(docSnap, "estimate", "managerCount"),
-  );
-  sharesSnap.docs.forEach((docSnap) =>
-    processDoc(docSnap, "share", "totalCount"),
-  );
-
+    const uid: string =
+      String(data.managerUid ?? "") ||
+      docSnap.id.split("_")[1] ||
+      "unknown";
+    totals.set(
+      uid,
+      (totals.get(uid) ?? 0) + Number(data.totalCount ?? data.shareCount ?? 0),
+    );
+  });
   return totals;
 };
 
@@ -143,6 +154,22 @@ export default async function handler(
   const body = req.body as ManagerDashboardRequest;
   if (!body.managerUid || !body.position) {
     return res.status(400).json({ message: "Missing required fields" });
+  }
+
+  const parseTimestamp = (value?: string) => {
+    if (!value) return null;
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return Timestamp.fromDate(parsed);
+  };
+
+  const startTimestamp = parseTimestamp(body.startDate);
+  let endTimestamp = parseTimestamp(body.endDate);
+  if (endTimestamp) {
+    const endDate = endTimestamp.toDate();
+    endDate.setDate(endDate.getDate() + 1);
+    endDate.setHours(0, 0, 0, 0);
+    endTimestamp = Timestamp.fromDate(endDate);
   }
 
   try {
@@ -174,14 +201,20 @@ export default async function handler(
       return getAreaFromRegion(manager.region) === scopedArea;
     });
 
-    const totalMap = await fetchManagerTotals();
+    const estimateMap = await fetchEstimateTotals(
+      startTimestamp ?? undefined,
+      endTimestamp ?? undefined,
+    );
+    const shareMap = await fetchShareTotals();
 
     const enriched = filteredManagers.map((manager) => {
-      const totals = totalMap.get(manager.id) ?? { estimate: 0, share: 0 };
+      const estimateCount = estimateMap.get(manager.id) ?? 0;
+      const shareCount = shareMap.get(manager.id) ?? 0;
+
       return {
         ...manager,
-        estimateCount: totals.estimate,
-        shareCount: totals.share,
+        estimateCount,
+        shareCount,
       };
     });
 
