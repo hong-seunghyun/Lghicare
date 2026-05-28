@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 
 import Loading from "@/components/loading/Loading";
-import { colorMap } from "@/constants/colorMap";
+import { getProductColorChipColors } from "@/constants/colorMap";
 import CompareModal from "@/components/Modal/CompareModal";
 
 type Variant = {
@@ -263,12 +263,7 @@ export default function Products() {
                   const code = (variant["모델코드"] || "").trim();
                   const colorName = variant["제품색상"] || code;
 
-                  const colors = colorName
-                    .split(/[/|]/)
-                    .map((c) => c.replace(/\s+/g, ""))
-                    .map((c) =>
-                      c.includes("무드업") ? "rainbow" : colorMap[c] || "#fff",
-                    );
+                  const colors = getProductColorChipColors(colorName);
 
                   return (
                     <OptionButton
@@ -788,10 +783,14 @@ const ColorChipBox = styled.div<{ colors: string[] }>`
         ? `
         background: linear-gradient(to bottom, ${colors[0]} 50%, ${colors[1]} 50%);
       `
-        : `background: linear-gradient(
-          to right,
-          red, orange, yellow, green, blue, indigo, violet
-        );`}
+        : `background: conic-gradient(${colors
+          .map((color, index) => {
+            const start = (index / colors.length) * 100;
+            const end = ((index + 1) / colors.length) * 100;
+            return `${color} ${start}% ${end}%`;
+          })
+          .join(", ")});
+        `}
 
   &:hover::after {
     content: attr(data-colorname);

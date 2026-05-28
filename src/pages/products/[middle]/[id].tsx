@@ -1,6 +1,6 @@
 ﻿/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useRouter } from "next/router";
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styled from "styled-components";
 import Link from "next/link";
 import Image from "next/image";
@@ -17,7 +17,7 @@ import type { GetServerSidePropsContext } from "next";
 import Loading from "@/components/loading/Loading";
 import ToolTip from "@/components/ToolTip/ToolTip";
 import AutoHeightIframe from "@/components/Iframe/AutoHeightIframe";
-import { colorMap } from "@/constants/colorMap";
+import { getProductColorChipColors } from "@/constants/colorMap";
 
 import disclaimerData from "@/disclaimer/disclaimer.json";
 
@@ -165,7 +165,7 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
     const baseUrl = `${protocol}://${host}`;
 
     const res = await fetch(
-      `${baseUrl}/api/products?middle=${middle}&id=${id}`
+      `${baseUrl}/api/products?middle=${middle}&id=${id}`,
     );
 
     let productName = id || "";
@@ -229,6 +229,7 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
   const [serviceCycle, setServiceCycle] = useState("");
   const [promoType, setPromoType] = useState("");
   const [promoName, setPromoName] = useState("");
+  const [promoCategory, setPromoCategory] = useState("");
 
   const [prepay, setPrepay] = useState("");
   const [prepayAmount, setPrepayAmount] = useState("");
@@ -240,25 +241,145 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
 
   const allContracts = Array.from(new Set(options.map((o) => o["계약기간"])));
   const allServiceTypes = Array.from(
-    new Set(options.map((o) => o["서비스유형"]))
+    new Set(options.map((o) => o["서비스유형"])),
   );
   const allCycles = Array.from(new Set(options.map((o) => o["서비스주기/월"])));
-  const allPromoTypes = Array.from(
-    new Set(options.map((o) => o["프로모션유형"]?.trim()).filter(Boolean))
-  );
-  const allPromoNames = Array.from(
-    new Set(options.map((o) => o["프로모션명"]).filter(Boolean))
+  
+  const normalizeValue = (value?: string) => (value ?? "").toString().trim();
+
+  const filteredByCycle = options.filter((o) => {
+    if (
+      contract &&
+      normalizeValue(o["계약기간"]) !== normalizeValue(contract)
+    ) {
+      return false;
+    }
+    if (
+      serviceType &&
+      normalizeValue(o["서비스유형"]) !== normalizeValue(serviceType)
+    ) {
+      return false;
+    }
+    if (
+      serviceCycle &&
+      normalizeValue(o["서비스주기/월"]) !== normalizeValue(serviceCycle)
+    ) {
+      return false;
+    }
+    return true;
+  });
+
+  const promoCategoryList = Array.from(
+    new Set(
+      filteredByCycle
+        .map((o) => normalizeValue(o["프로모션 대분류"]))
+        .filter(Boolean),
+    ),
   );
 
-  const [disclaimerText, setDisclaimerText] = useState<string | null>(null);
+  const filteredByCategory = promoCategory
+    ? filteredByCycle.filter(
+        (o) =>
+          normalizeValue(o["프로모션 대분류"]) ===
+          normalizeValue(promoCategory),
+      )
+    : [];
+
+  const promoTypeList =
+    promoCategory && filteredByCategory.length > 0
+      ? Array.from(
+          new Set(
+            filteredByCategory
+              .map((o) => normalizeValue(o["프로모션유형"]))
+              .filter(Boolean),
+          ),
+        )
+      : [];
+
+  const promoNameList =
+    promoType && filteredByCategory.length > 0
+      ? Array.from(
+          new Set(
+            filteredByCategory
+              .filter(
+                (o) =>
+                  normalizeValue(o["프로모션유형"]) ===
+                  normalizeValue(promoType),
+              )
+              .map((o) => o["프로모션명"])
+              .filter((v) => !!v),
+          ),
+        )
+      : [];
+
+const [disclaimerText, setDisclaimerText] = useState<string | null>(null);
 
   const [prepayRate, setPrepayRate] = useState(""); // 30 / 50 / ""
   const [prepayAvailableRate, setPrepayAvailableRate] = useState<
     "30" | "30_50" | null
   >(null);
   const [prepayAmountDisplay, setPrepayAmountDisplay] = useState<number | null>(
-    null
+    null,
   );
+
+  const selectPromoCategory = useCallback((value: string) => {
+    setPromoCategory(value);
+    setPromoType("");
+    setPromoName("");
+    setPrepayRate("");
+  }, []);
+
+  useEffect(() => {
+    if (promoCategoryList.length === 0) {
+      if (promoCategory !== "") {
+        selectPromoCategory("");
+      }
+      return;
+    }
+
+    const normalizedCurrent = normalizeValue(promoCategory) || "";
+    const normalizedList = promoCategoryList.map(normalizeValue);
+    const fallback =
+      promoCategoryList.find(
+        (value) => normalizeValue(value).toLowerCase() === "신규",
+      ) ?? promoCategoryList[0];
+
+    if (!normalizedCurrent) {
+      selectPromoCategory(fallback);
+      return;
+    }
+
+    if (!normalizedList.includes(normalizedCurrent)) {
+      selectPromoCategory(fallback);
+    }
+  }, [promoCategoryList, promoCategory, selectPromoCategory]);
+
+  useEffect(() => {
+    if (promoTypeList.length === 0) {
+      if (promoType !== "") {
+        setPromoType("");
+        setPromoName("");
+        setPrepayRate("");
+      }
+      return;
+    }
+
+    const normalizedList = promoTypeList.map(normalizeValue);
+    const normalizedType = normalizeValue(promoType);
+
+    if (!promoType) {
+      setPromoType(promoTypeList[0]);
+      setPromoName("");
+      setPrepayRate("");
+      return;
+    }
+
+    if (!normalizedList.includes(normalizedType)) {
+      setPromoType(promoTypeList[0]);
+      setPromoName("");
+      setPrepayRate("");
+    }
+  }, [promoTypeList, promoType]);
 
   // 🔥 구독교원 상태
   const [teacherPlans, setTeacherPlans] = useState<TeacherPlan[]>([]);
@@ -324,14 +445,14 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
 
     // ① 완전 일치 (정확히 신규결합)
     const exactNewJoin = options.filter(
-      (o) => normalizePromo(o["프로모션유형"]) === "신규결합"
+      (o) => normalizePromo(o["프로모션유형"]) === "신규결합",
     );
 
     // ② 포함형 (복합형)
     const mixedNewJoin = options.filter(
       (o) =>
         normalizePromo(o["프로모션유형"]).includes("신규결합") &&
-        normalizePromo(o["프로모션유형"]) !== "신규결합"
+        normalizePromo(o["프로모션유형"]) !== "신규결합",
     );
 
     // ③ 우선순위 고정
@@ -346,7 +467,7 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
 
     // ④ targetList 내부에서만 최저가 계산
     const cheapest = targetList.reduce((min, cur) =>
-      parsePrice(cur) < parsePrice(min) ? cur : min
+      parsePrice(cur) < parsePrice(min) ? cur : min,
     );
 
     // ⑤ 상태 업데이트
@@ -383,11 +504,16 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
       if (parts[2] && options[+parts[2]])
         setServiceCycle(options[+parts[2]]["서비스주기/월"] || "");
       if (parts[3] && options[+parts[3]])
-        setPromoType(options[+parts[3]]["프로모션유형"]?.trim() || "");
+        selectPromoCategory(
+          options[+parts[3]]["프로모션 대분류"]?.trim() || "",
+        );
       if (parts[4] && options[+parts[4]])
-        setPromoName(options[+parts[4]]["프로모션명"] || "");
-      if (parts[5]) setPrepay(parts[5]);
-      if (parts[6]) setPrepayAmount(parts[6]);
+        setPromoType(options[+parts[4]]["프로모션유형"]?.trim() || "");
+      if (parts[5] && options[+parts[5]])
+        setPromoName(options[+parts[5]]["프로모션명"] || "");
+      if (parts[6]) setPrepay(parts[6]);
+      if (parts[7]) setPrepayAmount(parts[7]);
+      if (parts[8]) setPrepayRate(parts[8]);
     } catch (e) {
       console.error("URL 옵션 파싱 오류:", e);
     }
@@ -419,7 +545,7 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
   const isValidOption = (
     key: string,
     value: string,
-    conditions: Record<string, string>
+    conditions: Record<string, string>,
   ) => {
     if (!value) return false;
 
@@ -455,6 +581,24 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
         })
       : undefined;
 
+  const prepayContractOption = useMemo(() => {
+    const targetContract = normalizeNum(contract);
+    if (targetContract !== "72" || !serviceType || !serviceCycle) {
+      return undefined;
+    }
+
+    const normalizedServiceType = normalizeStr(serviceType);
+    const normalizedServiceCycle = normalizeNum(serviceCycle);
+
+    return options.find((option) => {
+      return (
+        normalizeNum(option["계약기간"]) === "72" &&
+        normalizeStr(option["서비스유형"]) === normalizedServiceType &&
+        normalizeNum(option["서비스주기/월"]) === normalizedServiceCycle
+      );
+    });
+  }, [options, contract, serviceType, serviceCycle]);
+
   useEffect(() => {
     if (!options.length) return;
     const wrong = options.find((o) => o["할인전금액"]?.includes("49,700"));
@@ -483,6 +627,19 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
   // ✅ 기존 usageFee, bestPrice 부분 유지
   const usageFee = current ? getPriceValue(current, !!promoName) : 0;
   const bestPrice = current ? Math.max(usageFee - 13000, 0) : 0;
+  // 선납금 산정 기준: 할인전금액
+  const prepayBaseMonthly = useMemo(() => {
+    const target = current ?? prepayContractOption;
+    if (!target) return 0;
+    const value = getPriceValue(target, false);
+    return value > 0 ? value : 0;
+  }, [current, prepayContractOption]);
+
+  // 선납 반영 월요금 계산 기준: 할인후금액(프로모션 반영 usageFee)
+  const prepayBillingBaseMonthly = useMemo(() => {
+    if (usageFee > 0) return usageFee;
+    return prepayBaseMonthly;
+  }, [usageFee, prepayBaseMonthly]);
 
   const middleValue = options[0]?.["중분류"] ?? "";
   const allModels = Array.from(new Set(options.map((o) => o["모델코드"])));
@@ -509,7 +666,7 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
       const findIndex = (key: string, value: string) => {
         if (!value) return "";
         const idx = options.findIndex(
-          (o) => (o[key] || "").trim() === value.trim()
+          (o) => (o[key] || "").trim() === value.trim(),
         );
         return idx >= 0 ? idx.toString() : "";
       };
@@ -521,13 +678,14 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
       indices[0] = findIndex("계약기간", contract); // parts[0]
       indices[1] = findIndex("서비스유형", serviceType); // parts[1]
       indices[2] = findIndex("서비스주기/월", serviceCycle); // parts[2]
-      indices[3] = findIndex("프로모션유형", promoType); // parts[3]
-      indices[4] = findIndex("프로모션명", promoName); // parts[4]
+      indices[3] = findIndex("프로모션 대분류", promoCategory); // parts[3]
+      indices[4] = findIndex("프로모션유형", promoType); // parts[4]
+      indices[5] = findIndex("프로모션명", promoName); // parts[5]
 
-      // 5~7 : 선입금 / 선입금액 / 선납율
-      indices[5] = prepay || ""; // parts[5]
-      indices[6] = prepayAmount || ""; // parts[6]
-      indices[7] = prepayRate || ""; // parts[7]
+      // 6~8 : 선입금 / 선입금액 / 선납율
+      indices[6] = prepay || ""; // parts[6]
+      indices[7] = prepayAmount || ""; // parts[7]
+      indices[8] = prepayRate || ""; // parts[8]
 
       // 빈 값도 포함해서 그대로 join (자리 유지)
       const optParam = indices.join("-");
@@ -618,8 +776,8 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
           (typeof middle === "string"
             ? middle
             : Array.isArray(middle)
-            ? middle[0]
-            : undefined) ||
+              ? middle[0]
+              : undefined) ||
           "unknown";
 
         const analyticsTasks: Promise<unknown>[] = [];
@@ -661,8 +819,8 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
               lastSharedUrl: shareUrl,
               updatedAt: now,
             },
-            { merge: true }
-          )
+            { merge: true },
+          ),
         );
 
         if (managerMeta) {
@@ -683,8 +841,8 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
                 lastSharedUrl: shareUrl,
                 updatedAt: now,
               },
-              { merge: true }
-            )
+              { merge: true },
+            ),
           );
 
           analyticsTasks.push(
@@ -716,13 +874,16 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
                   lastSharedUrl: shareUrl,
                   updatedAt: now,
                 },
-                { merge: true }
-              )
+                { merge: true },
+              ),
             );
 
             analyticsTasks.push(
               setDoc(
-                doc(shareBranchCountCol, `branch_${branch}_type_${estimateType}`),
+                doc(
+                  shareBranchCountCol,
+                  `branch_${branch}_type_${estimateType}`,
+                ),
                 {
                   type: estimateType,
                   branch,
@@ -737,7 +898,11 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
           const modelCode =
             (current?.["모델코드"] as string | undefined) ||
             (options[0]?.["모델코드"] as string | undefined) ||
-            (typeof id === "string" ? id : Array.isArray(id) ? id[0] : "unknown") ||
+            (typeof id === "string"
+              ? id
+              : Array.isArray(id)
+                ? id[0]
+                : "unknown") ||
             "unknown";
           const productName =
             (current?.["상품명"] as string | undefined) ||
@@ -769,7 +934,10 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
 
           analyticsTasks.push(
             setDoc(
-              doc(managerProductStatsCol, `manager_${uid}_product_${modelCode}`),
+              doc(
+                managerProductStatsCol,
+                `manager_${uid}_product_${modelCode}`,
+              ),
               {
                 type: estimateType,
                 modelCode,
@@ -828,7 +996,7 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
       const setIfValid = (
         idxStr: string,
         key: string,
-        setter: (v: string) => void
+        setter: (v: string) => void,
       ) => {
         const idx = parseInt(idxStr, 10);
         if (!isNaN(idx) && idx >= 0 && options[idx]) {
@@ -839,11 +1007,13 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
       if (parts[0]) setIfValid(parts[0], "계약기간", setContract);
       if (parts[1]) setIfValid(parts[1], "서비스유형", setServiceType);
       if (parts[2]) setIfValid(parts[2], "서비스주기/월", setServiceCycle);
-      if (parts[3]) setIfValid(parts[3], "프로모션유형", setPromoType);
-      if (parts[4]) setIfValid(parts[4], "프로모션명", setPromoName);
-      if (parts[5]) setPrepay(parts[5]);
-      if (parts[6]) setPrepayAmount(parts[6]);
-      if (parts[7]) setPrepayRate(parts[7]);
+      if (parts[3])
+        setIfValid(parts[3], "프로모션 대분류", selectPromoCategory);
+      if (parts[4]) setIfValid(parts[4], "프로모션유형", setPromoType);
+      if (parts[5]) setIfValid(parts[5], "프로모션명", setPromoName);
+      if (parts[6]) setPrepay(parts[6]);
+      if (parts[7]) setPrepayAmount(parts[7]);
+      if (parts[8]) setPrepayRate(parts[8]);
     } catch (e) {
       console.error("URL 옵션 파싱 오류:", e);
     }
@@ -898,14 +1068,14 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
     }
 
     const rate = Number(prepayRate); // 30 or 50
-    const monthly = usageFee; // 현재 구독료
-    const total = monthly * 72; // 총요금
+    const baseMonthly = prepayBaseMonthly || usageFee;
+    const total = baseMonthly * 72;
 
     const rawPrepay = total * (rate / 100);
     const truncatedPrepay = floorTo10(rawPrepay);
 
     setPrepayAmountDisplay(truncatedPrepay);
-  }, [prepayRate, current, usageFee]);
+  }, [prepayRate, current, usageFee, prepayBaseMonthly]);
 
   // 🔥 구독교원 Firestore에서 불러오기
   useEffect(() => {
@@ -1026,20 +1196,22 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
     setTeacherSelections(nextSelections);
   }, [teacherPlans, router.query.teacher]);
 
-  // 🔥 usageFee & bestPrice에 선납 할인 적용 (13.5%)
+  // 🔥 usageFee & bestPrice에 선납 수수료 반영 (선납금 × 1.135)
   const finalUsageFee = (() => {
     if (!current) return 0;
 
     // 6년 & 선납 선택된 경우
-    if (normalizeNum(contract) === "72" && prepayRate) {
-      const total = usageFee * 72;
-      const rate = Number(prepayRate) / 100; // 0.3 or 0.5
+    if (
+      normalizeNum(contract) === "72" &&
+      prepayRate &&
+      prepayAmountDisplay &&
+      prepayBillingBaseMonthly
+    ) {
+      const baseMonthly = prepayBillingBaseMonthly;
+      const total = baseMonthly * 72;
+      const prepayWithFee = prepayAmountDisplay * 1.135; // 실제 표시 선납금 + 수수료
 
-      const rawPrepay = total * rate;
-      const truncatedPrepay = floorTo10(rawPrepay); // 실제 선납금과 동일하게 절사
-      const discount = truncatedPrepay * 0.135; // 선납 할인
-
-      const newMonthlyRaw = (total - truncatedPrepay - discount) / 72;
+      const newMonthlyRaw = (total - prepayWithFee) / 72;
       const newMonthly = floorTo10(newMonthlyRaw);
 
       return newMonthly;
@@ -1052,7 +1224,7 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
   const handleTeacherSeatsChange = (
     planId: string,
     maxSeats: number,
-    nextSeats: number
+    nextSeats: number,
   ) => {
     if (nextSeats < 0 || nextSeats > maxSeats) return;
 
@@ -1062,7 +1234,7 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
       // 현재 전체 구좌 수
       let totalSeats = 0;
       teacherPlans.forEach((p) => {
-        const cnt = p.id === planId ? currentSeats : prev[p.id] ?? 0;
+        const cnt = p.id === planId ? currentSeats : (prev[p.id] ?? 0);
         totalSeats += cnt;
       });
 
@@ -1132,7 +1304,7 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
 
     // 제휴카드 선택이 없을 경우: 이용요금 - 13,000
     if (!selectedCard) {
-      const bp = finalUsageFee > 13000 ? finalUsageFee - 13000 : finalUsageFee;
+      const bp = finalUsageFee > 13000 ? finalUsageFee - 0 : finalUsageFee;
       return Math.max(bp, 0);
     }
 
@@ -1144,7 +1316,7 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
   // 2단계: 구독교원까지 반영된 "최종 최대혜택가"
   const finalBestPriceWithTeacher = Math.max(
     baseBestPrice - teacherTotalDiscount,
-    0
+    0,
   );
 
   if (loading) return <Loading />;
@@ -1313,7 +1485,7 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
                     ? id[0]
                     : (id as string) || "";
                   const currentModel = options.find(
-                    (o) => (o["모델코드"] || "").trim() === idValue.trim()
+                    (o) => (o["모델코드"] || "").trim() === idValue.trim(),
                   );
                   if (!currentModel) return null;
 
@@ -1345,8 +1517,8 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
                   // ✅ 중복 제거 (API 응답에도 혹시 중복이 있을 수 있으니)
                   groupModels = Array.from(
                     new Map(
-                      groupModels.map((m) => [(m["모델코드"] || "").trim(), m])
-                    ).values()
+                      groupModels.map((m) => [(m["모델코드"] || "").trim(), m]),
+                    ).values(),
                   );
 
                   // ✅ 버튼 렌더링
@@ -1356,12 +1528,7 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
                     const code = (item["모델코드"] || "").trim();
                     const colorName = item["제품색상"] || code;
 
-                    const colors = colorName
-                      .split(/[/|]/)
-                      .map((c: string) => c.replace(/\s+/g, ""))
-                      .map((c: string) =>
-                        c.includes("무드업") ? "rainbow" : colorMap[c] || "#ccc"
-                      );
+                    const colors = getProductColorChipColors(colorName);
 
                     return (
                       <OptionButton
@@ -1380,8 +1547,8 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
                           e.preventDefault();
                           router.replace(
                             `/products/${encodeURIComponent(
-                              middleValue
-                            )}/${encodeURIComponent(code)}`
+                              middleValue,
+                            )}/${encodeURIComponent(code)}`,
                           );
                         }}
                       >
@@ -1588,33 +1755,71 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
                 ))}
               </ButtonGroup>
             </Section>
+            {/* 프로모션 대분류 */}
+            <Section>
+              <Label>프로모션 대분류</Label>
+              {promoCategoryList.length > 0 ? (
+                <ButtonGroup>
+                  {promoCategoryList.map((value) => (
+                    <OptionButton
+                      key={value}
+                      style={{ width: "calc(50% - 4px)" }}
+                      selected={promoCategory === value}
+                      disabled={
+                        !isValidOption("프로모션 대분류", value, {
+                          계약기간: contract,
+                          서비스유형: serviceType,
+                          "서비스주기/월": serviceCycle,
+                        })
+                      }
+                      onClick={() => {
+                        if (!serviceCycle) return;
+                        selectPromoCategory(value);
+                      }}
+                    >
+                      {value}
+                    </OptionButton>
+                  ))}
+                </ButtonGroup>
+              ) : (
+                <InfoText>
+                  계약/서비스유형/방문주기를 먼저 선택하면 대분류가 나타납니다.
+                </InfoText>
+              )}
+            </Section>
+
             {/* 프로모션 */}
             <Section>
               <Label>프로모션유형</Label>
-              <ButtonGroup>
-                {allPromoTypes.map((v) => (
-                  <OptionButton
-                    style={{ width: "calc(50% - 4px)" }}
-                    key={v}
-                    selected={promoType === v}
-                    disabled={
-                      !isValidOption("프로모션유형", v, {
-                        계약기간: contract,
-                        서비스유형: serviceType,
-                        "서비스주기/월": serviceCycle,
-                      })
-                    }
-                    onClick={() => {
-                      if (!serviceCycle) return;
-                      setPromoType(v);
-                      setPromoName("");
-                      setPrepayRate("");
-                    }}
-                  >
-                    {v}
-                  </OptionButton>
-                ))}
-              </ButtonGroup>
+              {promoTypeList.length > 0 ? (
+                <ButtonGroup>
+                  {promoTypeList.map((value) => (
+                    <OptionButton
+                      style={{ width: "calc(50% - 4px)" }}
+                      key={value}
+                      selected={promoType === value}
+                      disabled={
+                        !isValidOption("프로모션유형", value, {
+                          계약기간: contract,
+                          서비스유형: serviceType,
+                          "서비스주기/월": serviceCycle,
+                          "프로모션 대분류": promoCategory,
+                        })
+                      }
+                      onClick={() => {
+                        if (!serviceCycle || !promoCategory) return;
+                        setPromoType(value);
+                        setPromoName("");
+                        setPrepayRate("");
+                      }}
+                    >
+                      {value}
+                    </OptionButton>
+                  ))}
+                </ButtonGroup>
+              ) : (
+                <InfoText>먼저 프로모션 대분류를 선택해주세요.</InfoText>
+              )}
             </Section>
 
             {/* 프로모션명 */}
@@ -1627,22 +1832,8 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
                   disabled={!promoType}
                   placeholder="선택 안 함"
                   options={[
-                    { value: "", label: "선택 안 함" }, // 🔥 추가됨
-
-                    ...Array.from(
-                      new Set(
-                        options
-                          .filter(
-                            (o) =>
-                              o["계약기간"] === contract &&
-                              o["서비스유형"] === serviceType &&
-                              o["서비스주기/월"] === serviceCycle &&
-                              (o["프로모션유형"]?.trim() || "") === promoType
-                          )
-                          .map((o) => o["프로모션명"])
-                          .filter((v): v is string => !!v)
-                      )
-                    ).map((v) => ({
+                    { value: "", label: "선택 안 함" },
+                    ...promoNameList.map((v) => ({
                       value: v,
                       label: v,
                     })),
@@ -1769,7 +1960,7 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
                                 handleTeacherSeatsChange(
                                   plan.id,
                                   plan.maxSeats,
-                                  seats - 1
+                                  seats - 1,
                                 )
                               }
                               disabled={seats <= 0}
@@ -1807,7 +1998,7 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
                                 handleTeacherSeatsChange(
                                   plan.id,
                                   plan.maxSeats,
-                                  seats + 1
+                                  seats + 1,
                                 )
                               }
                               disabled={seats >= plan.maxSeats}
@@ -2149,6 +2340,7 @@ const PriceSale = styled.h2`
     font-size: 18px;
   }
 `;
+
 const ButtonGroup = styled.div`
   display: flex;
   flex-wrap: wrap;
@@ -2287,13 +2479,17 @@ const ColorChipBox = styled.div<{ colors: string[] }>`
     colors.length === 1
       ? `background: ${colors[0]};`
       : colors.length === 2
-      ? `
+        ? `
         background: linear-gradient(to bottom, ${colors[0]} 50%, ${colors[1]} 50%);
       `
-      : `background: linear-gradient(
-          to right,
-          red, orange, yellow, green, blue, indigo, violet
-        );`}
+        : `background: conic-gradient(${colors
+            .map((color, index) => {
+              const start = (index / colors.length) * 100;
+              const end = ((index + 1) / colors.length) * 100;
+              return `${color} ${start}% ${end}%`;
+            })
+            .join(", ")});
+        `}
 
   &:hover::after {
     content: attr(data-colorname);
@@ -2339,7 +2535,9 @@ const CustomSelectButton = styled.button`
   line-height: 1.5;
   color: #222;
 
-  transition: border-color 0.15s ease, box-shadow 0.15s ease,
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
     background-color 0.15s ease;
 
   span {

@@ -72,6 +72,8 @@ export interface SelectedProduct {
   voucherTotal?: number;
   voucherDetails?: Array<{ type: string; amount: number; reason: string }>;
   voucherMultiProductCount?: number;
+  voucherMultiProductCountOnly?: boolean;
+  voucherMultiProductNote?: string;
 }
 
 interface Props {
@@ -97,6 +99,42 @@ function normalizePrepayMonthlyDiscount(raw: unknown): number {
   return truncated >= 1000 ? truncated : 0; // 1000원 미만 0 처리
 }
 
+const normalizeText = (value: unknown) => String(value ?? "").trim();
+
+const getProductCategory = (product: SelectedProduct) => {
+  const anyProduct = product as any;
+  const variant = product.selectedVariant as any | undefined;
+
+  return (
+    normalizeText(anyProduct.중분류) ||
+    normalizeText(anyProduct.category) ||
+    normalizeText(anyProduct.categoryName) ||
+    normalizeText(anyProduct.type) ||
+    normalizeText(variant?.중분류) ||
+    normalizeText(variant?.category) ||
+    normalizeText(variant?.categoryName) ||
+    normalizeText(variant?.type) ||
+    "unknown"
+  );
+};
+
+const getModelName = (product: SelectedProduct) => {
+  const anyProduct = product as any;
+  const variant = product.selectedVariant as any | undefined;
+
+  return (
+    normalizeText(anyProduct.모델명) ||
+    normalizeText(anyProduct.modelName) ||
+    normalizeText(anyProduct.모델코드) ||
+    normalizeText(anyProduct.modelCode) ||
+    normalizeText(variant?.모델명) ||
+    normalizeText(variant?.modelName) ||
+    normalizeText(variant?.모델코드) ||
+    normalizeText(variant?.modelCode) ||
+    "unknown"
+  );
+};
+
 function getSaveDiscounts(p: SelectedProduct) {
   const v = p.selectedVariant as any | undefined;
 
@@ -121,7 +159,7 @@ function getSaveDiscounts(p: SelectedProduct) {
 
   // 카드/교원/선결제 할인 선택이 없으면 기본 카드 13,000 적용
   const hasAny = card > 0 || teacher > 0 || prepay > 0;
-  const cardEffective = hasAny ? card : 13000;
+  const cardEffective = hasAny ? card : 0;
 
   return {
     cardDiscount: cardEffective,
@@ -150,6 +188,11 @@ function calcBaseMonthly(p: SelectedProduct): number {
 }
 
 function calcFinalMonthlyForSave(p: SelectedProduct): number {
+  const savedFinal = (p as any).finalPrice;
+  if (savedFinal !== undefined && savedFinal !== null && savedFinal !== "") {
+    return Math.max(parseMoney(savedFinal), 0);
+  }
+
   const base = calcBaseMonthly(p);
   if (!base) return 0;
 
@@ -166,6 +209,62 @@ function getVoucherTotal(p: SelectedProduct): number {
   return n > 0 ? n : 0;
 }
 
+function getVoucherSummaryDetails(
+  products: SelectedProduct[],
+  multiProductVoucher: {
+    details: Array<{ type: string; amount: number; reason: string }>;
+  },
+) {
+  const totals: Record<string, number> = {};
+
+  products.forEach((product) => {
+    const details = Array.isArray(product.voucherDetails)
+      ? product.voucherDetails
+      : [];
+    details.forEach((detail) => {
+      const type = detail?.type?.trim() || "기타 상품권";
+      const amount = parseMoney(detail?.amount);
+      if (amount <= 0) return;
+      totals[type] = (totals[type] || 0) + amount;
+    });
+  });
+
+  const multiDetails = Array.isArray(multiProductVoucher?.details)
+    ? multiProductVoucher.details
+    : [];
+  multiDetails.forEach((detail) => {
+    const type = detail?.type?.trim() || "다품목 상품권";
+    const amount = parseMoney(detail?.amount);
+    if (amount <= 0) return;
+    totals[type] = (totals[type] || 0) + amount;
+  });
+
+  return Object.entries(totals).map(([type, amount]) => ({
+    type,
+    amount,
+  }));
+}
+
+function getProductMultiProductReward(
+  product: SelectedProduct,
+  multiProductVoucher: {
+    perUnitReward: number;
+  },
+) {
+  const perUnitReward = multiProductVoucher?.perUnitReward ?? 0;
+  const count = Number(product.voucherMultiProductCount ?? 0);
+  const eligible = !product.voucherMultiProductCountOnly;
+  if (perUnitReward <= 0 || count <= 0 || !eligible) {
+    return { amount: 0, perUnitReward, count, eligible };
+  }
+  return {
+    amount: perUnitReward * count,
+    perUnitReward,
+    count,
+    eligible,
+  };
+}
+
 export default function EstimateModal({
   products,
   onReset,
@@ -177,7 +276,16 @@ export default function EstimateModal({
   const [multiProductVoucher, setMultiProductVoucher] = useState<{
     total: number;
     details: Array<{ type: string; amount: number; reason: string }>;
-  }>({ total: 0, details: [] });
+    perUnitReward: number;
+    totalUnits: number;
+    eligibleUnits: number;
+  }>({
+    total: 0,
+    details: [],
+    perUnitReward: 0,
+    totalUnits: 0,
+    eligibleUnits: 0,
+  });
   const router = useRouter();
 
   useEffect(() => {
@@ -196,6 +304,8 @@ export default function EstimateModal({
           products: productList.map((p) => ({
             modelCode: p.모델코드,
             multiProductCount: p.voucherMultiProductCount ?? 0,
+            multiProductCountOnly: p.voucherMultiProductCountOnly ?? false,
+            multiProductNote: p.voucherMultiProductNote,
           })),
         });
         if (!cancelled) {
@@ -204,7 +314,13 @@ export default function EstimateModal({
       } catch (err) {
         console.error("다품목 상품권 계산 오류:", err);
         if (!cancelled) {
-          setMultiProductVoucher({ total: 0, details: [] });
+          setMultiProductVoucher({
+            total: 0,
+            details: [],
+            perUnitReward: 0,
+            totalUnits: 0,
+            eligibleUnits: 0,
+          });
         }
       }
     })();
@@ -226,6 +342,10 @@ export default function EstimateModal({
   );
   const totalVoucherWithMultiProduct =
     totalVoucher + (multiProductVoucher?.total ?? 0);
+  const voucherSummary = getVoucherSummaryDetails(
+    productList,
+    multiProductVoucher,
+  );
 
   const totalFinalPrice = productList.reduce(
     (sum, p) => sum + calcFinalMonthlyForSave(p),
@@ -263,10 +383,17 @@ export default function EstimateModal({
         const base = calcBaseMonthly(p);
         const discounts = getSaveDiscounts(p);
         const final = calcFinalMonthlyForSave(p);
+        const category = getProductCategory(p);
+        const modelName = getModelName(p);
 
         return cleanData({
           모델코드: p.모델코드,
           상품명: p.상품명,
+          category,
+          categoryName: category,
+          productName: p.상품명,
+          modelName,
+          quantity: 1,
           thumbnailUrl: p.thumbnailUrl || "",
           baseMonthly: base,
           finalPrice: final,
@@ -287,6 +414,10 @@ export default function EstimateModal({
           voucherTotal: getVoucherTotal(p),
           voucherDetails: (p as any).voucherDetails ?? [],
           voucherMultiProductCount: (p as any).voucherMultiProductCount ?? 0,
+          voucherMultiProductCountOnly:
+            (p as any).voucherMultiProductCountOnly ?? false,
+          voucherMultiProductNote:
+            (p as any).voucherMultiProductNote ?? undefined,
         });
       });
 
@@ -297,6 +428,29 @@ export default function EstimateModal({
 
       const estimateTypes = Array.from(new Set(typeList));
       const primaryEstimateType = estimateTypes[0] || "unknown";
+      const selectedProductCount = productList.length;
+      const productSelectionType =
+        selectedProductCount >= 2 ? "multi" : "single";
+      const estimateProductList = productList.map((p) => {
+        const category = getProductCategory(p);
+        const modelName = getModelName(p);
+        return cleanData({
+          category,
+          categoryName: category,
+          productName: p.상품명,
+          modelName,
+          modelCode: p.모델코드,
+          quantity: 1,
+        });
+      });
+      const selectedAffiliateCardNames = Array.from(
+        new Set(
+          productList
+            .map((p) => normalizeText((p as any).selectedCardName))
+            .filter(Boolean),
+        ),
+      );
+      const affiliateCardUsed = selectedAffiliateCardNames.length > 0;
 
       const { getAuth } = await import("firebase/auth");
       const auth = getAuth();
@@ -338,16 +492,35 @@ export default function EstimateModal({
       );
       const safeTotalDiscount = Math.max(safeTotalBase - safeTotalFinal, 0);
 
+      const multiProductExceptionUnits = Math.max(
+        (multiProductVoucher?.totalUnits ?? 0) -
+          (multiProductVoucher?.eligibleUnits ?? 0),
+        0,
+      );
+
       const payload: any = {
         products: safeProducts,
+        estimateProducts: estimateProductList,
+        selectedProductCount,
+        productSelectionType,
+        isMultiProductEstimate: productSelectionType === "multi",
+        affiliateCardUsed,
+        selectedAffiliateCardName: selectedAffiliateCardNames[0] ?? "",
+        selectedAffiliateCardNames,
         totalBasePrice: safeTotalBase,
         totalFinalPrice: safeTotalFinal,
         totalDiscount: safeTotalDiscount,
         estimateTypes,
         primaryEstimateType,
         createdAt: new Date(),
+        estimateCreatedAt: new Date(),
         totalVoucher: totalVoucherWithMultiProduct,
         multiProductVoucherTotal: multiProductVoucher?.total ?? 0,
+        multiProductVoucherPerUnitReward:
+          multiProductVoucher?.perUnitReward ?? 0,
+        multiProductTotalUnits: multiProductVoucher?.totalUnits ?? 0,
+        multiProductEligibleUnits: multiProductVoucher?.eligibleUnits ?? 0,
+        multiProductExceptionUnits,
         multiProductVoucherDetails: multiProductVoucher?.details ?? [],
       };
 
@@ -511,9 +684,9 @@ export default function EstimateModal({
             <Title>상품 견적 비교하기</Title>
           </HeaderTop>
           <Desc>
-            기존 가전 구독/케어십 고객이 다른 상품군을 추가 구독하거나 2개 이상의
-            상품군을 동시에 구독할 때 결합할인 혜택을 드립니다. (최대 5% 할인,
-            상품별 상이)
+            기존 가전 구독/케어십 고객이 다른 상품군을 추가 구독하거나 2개
+            이상의 상품군을 동시에 구독할 때 결합할인 혜택을 드립니다. (최대 5%
+            할인, 상품별 상이)
           </Desc>
         </Header>
 
@@ -524,7 +697,15 @@ export default function EstimateModal({
                 const base = calcBaseMonthly(p);
                 const final = calcFinalMonthlyForSave(p);
 
-                console.log(p);
+                const multiProductReward = getProductMultiProductReward(
+                  p,
+                  multiProductVoucher,
+                );
+                const multiProductNote =
+                  p.voucherMultiProductNote ||
+                  (p.voucherMultiProductCountOnly
+                    ? "대수만 인정, 상품권 미적용"
+                    : undefined);
                 return (
                   <ProductItem key={p.모델코드}>
                     <ImageWrap>
@@ -557,15 +738,36 @@ export default function EstimateModal({
                               (p as any).voucherDetails.length > 0 && (
                                 <VoucherDetail>
                                   {(p as any).voucherDetails
-                                    .filter((d: any) => parseMoney(d?.amount) > 0)
+                                    .filter(
+                                      (d: any) => parseMoney(d?.amount) > 0,
+                                    )
                                     .map((d: any, idx: number) => (
                                       <p key={`${p.모델코드}-voucher-${idx}`}>
                                         - {d.type}:{" "}
-                                        {parseMoney(d.amount).toLocaleString()}원
+                                        {parseMoney(d.amount).toLocaleString()}
+                                        원
                                       </p>
                                     ))}
                                 </VoucherDetail>
                               )}
+                          </>
+                        )}
+                        {(multiProductReward.amount > 0 ||
+                          multiProductNote) && (
+                          <>
+                            {multiProductReward.amount > 0 && (
+                              <VoucherLine>
+                                다품목 상품권{" "}
+                                <b>
+                                  {multiProductReward.amount.toLocaleString()}원
+                                </b>
+                              </VoucherLine>
+                            )}
+                            {multiProductNote && (
+                              <MultiProductNote>
+                                {multiProductNote}
+                              </MultiProductNote>
+                            )}
                           </>
                         )}
                       </ProductBenefit>
@@ -598,23 +800,17 @@ export default function EstimateModal({
                 <p>{totalFinalPrice.toLocaleString()}원</p>
               </TotalSale>
 
-              {(
+              {
                 <VoucherTotalBox>
                   <span>총 지급 상품권</span>
                   <b>{totalVoucherWithMultiProduct.toLocaleString()}원</b>
                 </VoucherTotalBox>
-              )}
-              {multiProductVoucher?.total > 0 && (
-                <VoucherLine>
-                  다품목 상품권{" "}
-                  <b>{multiProductVoucher.total.toLocaleString()}</b>원
-                </VoucherLine>
-              )}
-              {multiProductVoucher?.details?.length > 0 && (
+              }
+              {voucherSummary.length > 0 && (
                 <VoucherDetail>
-                  {multiProductVoucher.details.map((d, idx) => (
-                    <p key={`multi-voucher-${idx}`}>
-                      - {d.type}: {parseMoney(d.amount).toLocaleString()}원
+                  {voucherSummary.map((item) => (
+                    <p key={`summary-voucher-${item.type}`}>
+                      - {item.type}: {item.amount.toLocaleString()}원
                     </p>
                   ))}
                 </VoucherDetail>
@@ -870,6 +1066,8 @@ const SaleWrap = styled.div`
   border-top: 1px solid #ccc;
   margin-top: 5px;
   padding-top: 5px;
+  overflow-y: auto;
+  padding-bottom: 10px;
 `;
 
 const CardsSale = styled.div`
@@ -964,9 +1162,8 @@ const VoucherDetail = styled.div`
   }
 `;
 
-
-
-
-
-
-
+const MultiProductNote = styled.div`
+  margin-top: 4px;
+  font-size: 12px;
+  color: #777;
+`;

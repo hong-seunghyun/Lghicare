@@ -17,6 +17,7 @@ import {
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
   SALES_HUB_ID,
+  getBoardCounterId,
   getBoardCategoryById,
   getBoardCategoryChildren,
   getBoardCategoryFullLabel,
@@ -56,6 +57,7 @@ const AdminBoardEditPage: React.FC = () => {
   const [categoryId, setCategoryId] = useState<string>("");
   const [productId, setProductId] = useState<string>("");
   const [subCategoryId, setSubCategoryId] = useState<string>("");
+  const [originalCategoryId, setOriginalCategoryId] = useState<string>("");
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
   const [publishedDate, setPublishedDate] = useState("");
@@ -92,6 +94,7 @@ const AdminBoardEditPage: React.FC = () => {
 
         const data = snap.data() as any;
         const initialCategory = data.categoryId || routeCategoryId || "";
+        setOriginalCategoryId(initialCategory);
         setCategoryId(initialCategory);
         if (isSalesHubCategory(initialCategory)) {
           const resolvedProductId =
@@ -263,16 +266,19 @@ const AdminBoardEditPage: React.FC = () => {
         }))
         .filter((link) => link.label || link.url);
 
-      let nextSalesIndex = salesIndex;
-      if (isSalesIndexedCategory(categoryId) && !nextSalesIndex) {
+      let nextSalesIndex = isSalesIndexedCategory(categoryId) ? salesIndex : null;
+      if (
+        isSalesIndexedCategory(categoryId) &&
+        (!nextSalesIndex || categoryId !== originalCategoryId)
+      ) {
         await runTransaction(db, async (tx) => {
-          const counterRef = doc(db, "boardCounters", "salesHub");
+          const counterRef = doc(db, "boardCounters", getBoardCounterId(categoryId));
           const counterSnap = await tx.get(counterRef);
           const current = counterSnap.exists()
             ? (counterSnap.data() as any).current ?? 0
             : 0;
           const next = Number(current) + 1;
-          tx.set(counterRef, { current: next }, { merge: true });
+          tx.set(counterRef, { categoryId, current: next }, { merge: true });
           nextSalesIndex = next;
         });
       }
@@ -742,4 +748,3 @@ const PrimaryButton = styled.button`
     cursor: default;
   }
 `;
-/* eslint-disable @typescript-eslint/no-explicit-any */

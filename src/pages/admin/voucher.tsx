@@ -69,6 +69,8 @@ type VoucherModel = {
     | { name?: string; amount?: number; startDate?: string; endDate?: string }
     | Array<{ name?: string; amount?: number; startDate?: string; endDate?: string }>;
   multiProductCount?: number;
+  multiProductNote?: string;
+  multiProductExcludeVoucher?: boolean;
   excludeWhenPromoTypeIsNormalN?: boolean;
 };
 
@@ -125,22 +127,32 @@ const normalizeThemePromo = (input: any): Record<string, number> | any => {
       .filter((item) => item.amount > 0);
   }
 
-  if (!Array.isArray(input)) {
-    const hasDateFields =
-      Object.prototype.hasOwnProperty.call(input, "startDate") ||
-      Object.prototype.hasOwnProperty.call(input, "endDate");
-    const hasAmountField = Object.prototype.hasOwnProperty.call(input, "amount");
-    if (hasDateFields || hasAmountField) {
-      const amount = safeNumber(input?.amount);
-      return amount > 0
-        ? {
-            name: (input?.name || "테마판촉").toString(),
-            amount,
-            startDate: input?.startDate,
-            endDate: input?.endDate,
-          }
-        : {};
-    }
+  if (Array.isArray(input?.events)) {
+    const events = input.events
+      .map((item: any) => ({
+        name: (item?.name || "테마판촉").toString(),
+        amount: safeNumber(item?.amount),
+        startDate: item?.startDate,
+        endDate: item?.endDate,
+      }))
+      .filter((item: any) => item.amount > 0);
+    return { events };
+  }
+
+  const hasDateFields =
+    Object.prototype.hasOwnProperty.call(input, "startDate") ||
+    Object.prototype.hasOwnProperty.call(input, "endDate");
+  const hasAmountField = Object.prototype.hasOwnProperty.call(input, "amount");
+  if (hasDateFields || hasAmountField) {
+    const amount = safeNumber(input?.amount);
+    return amount > 0
+      ? {
+          name: (input?.name || "테마판촉").toString(),
+          amount,
+          startDate: input?.startDate,
+          endDate: input?.endDate,
+        }
+      : {};
   }
   return normalizeNumberMap(input);
 };
@@ -237,6 +249,13 @@ export default function VoucherAdminPage() {
           promo: normalizeNumberMap(data?.promo),
           themePromo: normalizeThemePromo(data?.themePromo),
           multiProductCount: safeNumber(data?.multiProductCount),
+          multiProductNote:
+            typeof data?.multiProductNote === "string"
+              ? data.multiProductNote
+              : undefined,
+          multiProductExcludeVoucher: Boolean(
+            data?.multiProductExcludeVoucher,
+          ),
           excludeWhenPromoTypeIsNormalN:
             data?.excludeWhenPromoTypeIsNormalN ?? false,
         };
@@ -303,6 +322,8 @@ const getThemePromoLabel = (
       promo: {},
       themePromo: {},
       multiProductCount: 0,
+      multiProductNote: "",
+      multiProductExcludeVoucher: false,
       excludeWhenPromoTypeIsNormalN: false,
     });
     setServiceCycleText("{}");
@@ -384,8 +405,13 @@ const getThemePromoLabel = (
         return;
       }
 
-      const payload = {
+      const multiProductNote =
+        editing.multiProductNote && editing.multiProductNote.trim()
+          ? editing.multiProductNote.trim()
+          : "";
+      const payload: VoucherModel = {
         modelCode,
+        id: modelCode,
         base: {
           default: safeNumber(editing.base.default),
           combine_new_existing: safeNumber(
@@ -400,12 +426,19 @@ const getThemePromoLabel = (
         promo: normalizeNumberMap(promoParsed),
         themePromo: normalizeThemePromo(themePromoParsed),
         multiProductCount: safeNumber(editing.multiProductCount),
+        multiProductExcludeVoucher: editing.multiProductExcludeVoucher ?? false,
         excludeWhenPromoTypeIsNormalN:
           editing.excludeWhenPromoTypeIsNormalN ?? false,
+      };
+      if (multiProductNote) {
+        payload.multiProductNote = multiProductNote;
+      }
+      const dbPayload = {
+        ...payload,
         updatedAt: new Date(),
         createdAt: new Date(),
       };
-      await setDoc(doc(db, MODELS_COLLECTION, modelCode), payload, {
+      await setDoc(doc(db, MODELS_COLLECTION, modelCode), dbPayload, {
         merge: true,
       });
 
@@ -468,97 +501,102 @@ const getThemePromoLabel = (
     }
   };
 
-  const importJsonData = async (data: any) => {
-    const hasLegacyShape = data?.rules && data?.models;
-    const hasNewShape = data?.products;
-    const hasExcelRulesShape =
-      data?.models &&
-      !data?.rules &&
-      !data?.products &&
-      (data?.promoNameKeywordMap ||
-        data?.baseDefaultKeyword ||
-        data?.baseResubscribeKeyword);
+    const importJsonData = async (data: any) => {
+      const hasLegacyShape = data?.rules && data?.models;
+      const hasNewShape = data?.products;
+      const hasExcelRulesShape =
+        data?.models &&
+        !data?.rules &&
+        !data?.products &&
+        (data?.promoNameKeywordMap ||
+          data?.baseDefaultKeyword ||
+          data?.baseResubscribeKeyword);
 
-    if (!hasLegacyShape && !hasNewShape && !hasExcelRulesShape) {
-      return false;
-    }
+      if (!hasLegacyShape && !hasNewShape && !hasExcelRulesShape) {
+        return false;
+      }
 
-    if (hasLegacyShape) {
-      await setDoc(
-        doc(db, RULES_COLLECTION, RULES_DOC_ID),
-        {
+      const rulesDocRef = doc(db, RULES_COLLECTION, RULES_DOC_ID);
+      await deleteDoc(rulesDocRef);
+      const now = new Date();
+      let rulesPayload: Record<string, unknown> = {};
+      let hasRulesPayload = false;
+
+      const mergeRulesPayload = (payload: Record<string, unknown>) => {
+        rulesPayload = { ...rulesPayload, ...payload };
+        hasRulesPayload = true;
+      };
+
+      if (hasLegacyShape) {
+        mergeRulesPayload({
           ...data.rules,
           version: data.version ?? 1,
           generatedFrom: data.generatedFrom ?? "",
-          updatedAt: new Date(),
-          createdAt: new Date(),
-        },
-        { merge: true },
-      );
-    }
+        });
+      }
 
-    if (hasNewShape) {
-      const rulesPayload: Record<string, unknown> = {
-        version: data.version ?? 1,
-        generatedFrom: data.meta?.source_file ?? data.generatedFrom ?? "",
-        baseDefaultKeyword: "기본",
-        baseResubscribeKeyword: "재구독",
-        combineKeywords: ["신규결합", "기존결합", "기존결합/신규결합"],
-        normalPromoTypeKeyword: "일반(N)",
-        updatedAt: new Date(),
-        createdAt: new Date(),
-      };
-      if (typeof data.basePromoTypeKeywords !== "undefined") {
-        rulesPayload.basePromoTypeKeywords = data.basePromoTypeKeywords;
+      if (hasNewShape) {
+        const payload: Record<string, unknown> = {
+          version: data.version ?? 1,
+          generatedFrom: data.meta?.source_file ?? data.generatedFrom ?? "",
+          baseDefaultKeyword: "기본",
+          baseResubscribeKeyword: "재구독",
+          combineKeywords: ["신규결합", "기존결합", "기존결합/신규결합"],
+          normalPromoTypeKeyword: "일반(N)",
+        };
+        if (typeof data.basePromoTypeKeywords !== "undefined") {
+          payload.basePromoTypeKeywords = data.basePromoTypeKeywords;
+        }
+        if (typeof data.promoNameKeywordMap !== "undefined") {
+          payload.promoNameKeywordMap = data.promoNameKeywordMap;
+        }
+        if (typeof data.stackingPolicy !== "undefined") {
+          payload.stackingPolicy = data.stackingPolicy;
+        }
+        if (typeof data.multiProductRule !== "undefined") {
+          payload.multiProductRule = data.multiProductRule;
+        }
+        if (typeof data.themePromo !== "undefined") {
+          payload.themePromo = data.themePromo;
+        }
+        mergeRulesPayload(payload);
       }
-      if (typeof data.promoNameKeywordMap !== "undefined") {
-        rulesPayload.promoNameKeywordMap = data.promoNameKeywordMap;
-      }
-      if (typeof data.stackingPolicy !== "undefined") {
-        rulesPayload.stackingPolicy = data.stackingPolicy;
-      }
-      if (typeof data.multiProductRule !== "undefined") {
-        rulesPayload.multiProductRule = data.multiProductRule;
-      }
-      if (typeof data.themePromo !== "undefined") {
-        rulesPayload.themePromo = data.themePromo;
-      }
-      await setDoc(doc(db, RULES_COLLECTION, RULES_DOC_ID), rulesPayload, {
-        merge: true,
-      });
-    }
 
-    if (hasExcelRulesShape) {
-      const rulesPayload: Record<string, unknown> = {
-        version: data.version ?? 1,
-        generatedFrom: data.generatedFrom ?? "",
-        baseDefaultKeyword: data.baseDefaultKeyword ?? "기본",
-        baseResubscribeKeyword: data.baseResubscribeKeyword ?? "재구독",
-        combineKeywords:
-          data.combineKeywords ?? ["신규결합", "기존결합", "기존결합/신규결합"],
-        normalPromoTypeKeyword: data.normalPromoTypeKeyword ?? "일반(N)",
-        updatedAt: new Date(),
-        createdAt: new Date(),
-      };
-      if (typeof data.basePromoTypeKeywords !== "undefined") {
-        rulesPayload.basePromoTypeKeywords = data.basePromoTypeKeywords;
+      if (hasExcelRulesShape) {
+        const payload: Record<string, unknown> = {
+          version: data.version ?? 1,
+          generatedFrom: data.generatedFrom ?? "",
+          baseDefaultKeyword: data.baseDefaultKeyword ?? "기본",
+          baseResubscribeKeyword: data.baseResubscribeKeyword ?? "재구독",
+          combineKeywords:
+            data.combineKeywords ?? ["신규결합", "기존결합", "기존결합/신규결합"],
+          normalPromoTypeKeyword: data.normalPromoTypeKeyword ?? "일반(N)",
+        };
+        if (typeof data.basePromoTypeKeywords !== "undefined") {
+          payload.basePromoTypeKeywords = data.basePromoTypeKeywords;
+        }
+        if (typeof data.promoNameKeywordMap !== "undefined") {
+          payload.promoNameKeywordMap = data.promoNameKeywordMap;
+        }
+        if (typeof data.stackingPolicy !== "undefined") {
+          payload.stackingPolicy = data.stackingPolicy;
+        }
+        if (typeof data.multiProductRule !== "undefined") {
+          payload.multiProductRule = data.multiProductRule;
+        }
+        if (typeof data.themePromo !== "undefined") {
+          payload.themePromo = data.themePromo;
+        }
+        mergeRulesPayload(payload);
       }
-      if (typeof data.promoNameKeywordMap !== "undefined") {
-        rulesPayload.promoNameKeywordMap = data.promoNameKeywordMap;
+
+      if (hasRulesPayload) {
+        await setDoc(rulesDocRef, {
+          ...rulesPayload,
+          updatedAt: now,
+          createdAt: now,
+        });
       }
-      if (typeof data.stackingPolicy !== "undefined") {
-        rulesPayload.stackingPolicy = data.stackingPolicy;
-      }
-      if (typeof data.multiProductRule !== "undefined") {
-        rulesPayload.multiProductRule = data.multiProductRule;
-      }
-      if (typeof data.themePromo !== "undefined") {
-        rulesPayload.themePromo = data.themePromo;
-      }
-      await setDoc(doc(db, RULES_COLLECTION, RULES_DOC_ID), rulesPayload, {
-        merge: true,
-      });
-    }
 
     const baseDefaultKeyword =
       data.baseDefaultKeyword ||
@@ -628,26 +666,37 @@ const getThemePromoLabel = (
         if (basePriority) {
           basePayload.priority = basePriority;
         }
-        batch.set(
-          doc(db, MODELS_COLLECTION, modelCode),
-          {
-            modelCode,
-            base: {
-              ...basePayload,
-            },
-            serviceCycle: normalizeNumberMap(value?.serviceCycle),
-            promo: normalizePromoMap(value?.promo),
-            themePromo: normalizeThemePromo(value?.themePromo),
-            multiProductCount: safeNumber(
-              value?.multiProductCount ?? value?.multiProduct?.recognizedUnits,
-            ),
-            excludeWhenPromoTypeIsNormalN:
-              value?.excludeWhenPromoTypeIsNormalN ?? false,
-            updatedAt: new Date(),
-            createdAt: new Date(),
+        const multiProductNote =
+          typeof value?.multiProduct?.note === "string"
+            ? value.multiProduct.note.trim()
+            : "";
+        const modelPayload: Record<string, unknown> = {
+          modelCode,
+          base: {
+            ...basePayload,
           },
-          { merge: true },
-        );
+          serviceCycle: normalizeNumberMap(value?.serviceCycle),
+          promo: normalizePromoMap(value?.promo),
+          themePromo: normalizeThemePromo(value?.themePromo),
+          multiProductCount: safeNumber(
+            value?.multiProductCount ?? value?.multiProduct?.recognizedUnits,
+          ),
+          multiProductExcludeVoucher:
+            Boolean(value?.multiProduct?.excludeVoucher) ||
+            Boolean(value?.multiProduct?.countOnly) ||
+            Boolean(
+              typeof value?.multiProduct?.note === "string" &&
+                value.multiProduct.note.includes("상품권 미적용"),
+            ),
+          excludeWhenPromoTypeIsNormalN:
+            value?.excludeWhenPromoTypeIsNormalN ?? false,
+          updatedAt: new Date(),
+          createdAt: new Date(),
+        };
+          if (multiProductNote) {
+            modelPayload.multiProductNote = multiProductNote;
+          }
+          batch.set(doc(db, MODELS_COLLECTION, modelCode), modelPayload);
       });
       await batch.commit();
     }
@@ -901,6 +950,38 @@ const getThemePromoLabel = (
                       ? {
                           ...prev,
                           multiProductCount: Number(e.target.value),
+                        }
+                      : prev,
+                  )
+                }
+              />
+
+              <label>다품목 상품권 예외</label>
+              <input
+                type="checkbox"
+                checked={!!editing.multiProductExcludeVoucher}
+                onChange={(e) =>
+                  setEditing((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          multiProductExcludeVoucher: e.target.checked,
+                        }
+                      : prev,
+                  )
+                }
+              />
+
+              <label>다품목 예외 메모</label>
+              <input
+                type="text"
+                value={editing.multiProductNote ?? ""}
+                onChange={(e) =>
+                  setEditing((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          multiProductNote: e.target.value,
                         }
                       : prev,
                   )

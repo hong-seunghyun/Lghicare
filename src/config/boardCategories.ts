@@ -2,6 +2,7 @@ import { categories } from "@/constants/categories";
 
 export const SALES_HUB_ID = "sales-hub";
 export const SALES_TALK_BOARD_ID = "sales-talk-board";
+export const STANDARD_ESTIMATE_CATEGORY_PREFIX = "standard-multi-item-estimate";
 
 export type BoardCategory = {
   id: string;
@@ -57,9 +58,22 @@ const buildSalesHubContentCategories = (
       parentId: product.id,
       salesIndexed: true,
     },
+    {
+      id: `${STANDARD_ESTIMATE_CATEGORY_PREFIX}-${product.label}`,
+      label: "표준견적서",
+      parentId: product.id,
+      salesIndexed: true,
+    },
   ]);
 
-const salesHubProducts = buildSalesHubProductCategories();
+const salesHubCommonCategory: BoardCategory = {
+  id: `${SALES_HUB_ID}-common`,
+  label: "공통",
+  parentId: SALES_HUB_ID,
+};
+
+const salesHubProductCategories = buildSalesHubProductCategories();
+const salesHubProducts = [salesHubCommonCategory, ...salesHubProductCategories];
 const salesHubContentCategories = buildSalesHubContentCategories(salesHubProducts);
 
 export const boardCategories: BoardCategory[] = [
@@ -92,6 +106,12 @@ export const getBoardLeafCategories = () => {
 
 export const isSalesIndexedCategory = (id?: string | null) =>
   Boolean(getBoardCategoryById(id)?.salesIndexed);
+
+export const isStandardEstimateCategory = (id?: string | null) =>
+  Boolean(id && id.startsWith(`${STANDARD_ESTIMATE_CATEGORY_PREFIX}-`));
+
+export const getBoardCounterId = (categoryId: string) =>
+  `salesHub_${encodeURIComponent(categoryId)}`;
 
 export const getBoardCategoryLabel = (id?: string | null) =>
   getBoardCategoryById(id)?.label || "-";
@@ -141,6 +161,22 @@ export const getSalesHubNavigationItems = () => {
   const salesHub = getBoardCategoryById(SALES_HUB_ID);
   if (!salesHub) return [];
   return [{ label: salesHub.label, path: getBoardCategoryPath(salesHub.id) }];
+};
+
+export const getStandardEstimateDefaultCategory = () =>
+  boardCategories.find((category) => isStandardEstimateCategory(category.id)) ||
+  null;
+
+export const getAdminStandardEstimateNavigationItem = () => {
+  const category = getStandardEstimateDefaultCategory();
+  if (!category) return null;
+  return { label: "표준견적서", path: getBoardCategoryPath(category.id) };
+};
+
+export const getManagerStandardEstimateNavigationItem = () => {
+  const category = getStandardEstimateDefaultCategory();
+  if (!category) return null;
+  return { label: "표준견적서", path: `/manager/boards/${category.id}` };
 };
 
 export const getAdminBoardNavigationItems = () => {

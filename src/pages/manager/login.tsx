@@ -54,20 +54,26 @@ const ManagerLoginPage: React.FC = () => {
         const data = snap.exists() ? (snap.data() as any) : null;
         const role = data?.role as string | undefined;
 
-        if (role === "manager") {
+        if (role === "manager" || role === "admin") {
           setCurrentUser(fbUser);
 
           // 기존 managerSession 유지 (users 문서 기준으로 구성)
           if (typeof window !== "undefined") {
+            const isAdmin = role === "admin";
             const session = {
               id: fbUser.uid,
-              managerId: data?.managerId ?? "",
-              name: data?.name ?? "",
-              branch: data?.branch ?? "",
-              region: data?.region ?? "",
-              office: data?.office ?? data?.branch ?? "",
-              position: data?.position ?? "",
-              teamLeaderId: data?.teamLeaderId ?? "",
+              managerId: isAdmin ? "admin" : data?.managerId ?? "",
+              name:
+                data?.name ??
+                fbUser.displayName ??
+                fbUser.email ??
+                (isAdmin ? "관리자" : ""),
+              branch: isAdmin ? "관리자" : data?.branch ?? "",
+              region: isAdmin ? "" : data?.region ?? "",
+              office: isAdmin ? "관리자" : data?.office ?? data?.branch ?? "",
+              position: isAdmin ? "관리자" : data?.position ?? "",
+              teamLeaderId: isAdmin ? "" : data?.teamLeaderId ?? "",
+              role,
             };
             localStorage.setItem("managerSession", JSON.stringify(session));
           }
@@ -103,11 +109,50 @@ const ManagerLoginPage: React.FC = () => {
     try {
       const trimmedId = managerId.trim();
 
+      if (trimmedId.includes("@")) {
+        const cred = await signInWithEmailAndPassword(auth, trimmedId, password);
+        const fbUser = cred.user;
+        const userRef = doc(db, "users", fbUser.uid);
+        const userSnap = await getDoc(userRef);
+        const userData = userSnap.exists() ? (userSnap.data() as any) : null;
+
+        if (!userData || userData.role !== "admin") {
+          await signOut(auth);
+          setError("관리자 권한이 없는 계정입니다.");
+          setLoading(false);
+          return;
+        }
+
+        if (typeof window !== "undefined") {
+          const session = {
+            id: fbUser.uid,
+            managerId: "admin",
+            name:
+              userData.name ??
+              fbUser.displayName ??
+              fbUser.email ??
+              "관리자",
+            branch: "관리자",
+            region: "",
+            office: "관리자",
+            position: "관리자",
+            teamLeaderId: "",
+            role: "admin",
+          };
+          localStorage.setItem("managerSession", JSON.stringify(session));
+        }
+
+        router.replace("/manager");
+        return;
+      }
+
+      const normalizedManagerId = trimmedId.toUpperCase();
+
       // 1) managerId로 users 컬렉션에서 매니저 계정 찾기
       const q = query(
         collection(db, "users"),
         where("role", "==", "manager"),
-        where("managerId", "==", trimmedId),
+        where("managerId", "==", normalizedManagerId),
         limit(1),
       );
 
@@ -138,7 +183,7 @@ const ManagerLoginPage: React.FC = () => {
       }
 
       // 4) 규칙에 따라 Auth용 이메일/비밀번호 구성
-      const authEmail = `${trimmedId}${MANAGER_AUTH_EMAIL_SUFFIX}`;
+      const authEmail = `${normalizedManagerId}${MANAGER_AUTH_EMAIL_SUFFIX}`;
       const commonPassword = MANAGER_AUTH_COMMON_PASSWORD;
 
       // 5) Firebase Auth로 로그인 (공통 비밀번호 사용)
@@ -175,7 +220,7 @@ const ManagerLoginPage: React.FC = () => {
       if (typeof window !== "undefined") {
         const session = {
           id: fbUser.uid,
-          managerId: latestUserData.managerId ?? trimmedId,
+          managerId: latestUserData.managerId ?? normalizedManagerId,
           name: latestUserData.name ?? "",
           branch: latestUserData.branch ?? "",
           region: latestUserData.region ?? "",
@@ -231,11 +276,11 @@ const ManagerLoginPage: React.FC = () => {
         </Title>
         <form onSubmit={handleSubmit}>
           <Field>
-            <Label>업무등록번호</Label>
+            <Label>업무등록번호 또는 관리자 이메일</Label>
             <Input
               value={managerId}
-              onChange={(e) => setManagerId(e.target.value.toUpperCase())}
-              placeholder="예: H01064"
+              onChange={(e) => setManagerId(e.target.value)}
+              placeholder="예: H01064 또는 admin@example.com"
             />
           </Field>
           <Field>

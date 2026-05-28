@@ -12,10 +12,14 @@ import {
   collection,
   doc,
   getDoc,
+  getDocs,
+  orderBy,
+  query,
   Timestamp,
   setDoc,
   increment,
   serverTimestamp,
+  where,
 } from "firebase/firestore";
 import {
   getBoardCategoryFullLabel,
@@ -75,6 +79,7 @@ const ManagerBoardDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [displayIndex, setDisplayIndex] = useState<number | null>(null);
   const viewLoggedRef = useRef<Set<string>>(new Set());
 
   const managerLeafCategories = useMemo(
@@ -95,6 +100,8 @@ const ManagerBoardDetailPage: React.FC = () => {
   const currentCategoryId = post?.categoryId || categoryId;
   const isRestrictedSalesHub = isRestrictedSalesHubCategory(currentCategoryId);
   const shareEnabled = isSalesCategory && !isRestrictedSalesHub;
+  const saveEnabled =
+    Boolean(post) && !isRestrictedSalesHub && (post?.attachments.length ?? 0) > 0;
 
   useEffect(() => {
     if (!router.isReady || !postId) return;
@@ -114,6 +121,26 @@ const ManagerBoardDetailPage: React.FC = () => {
         }
 
         const data = snap.data() as any;
+        const postCategoryId = data.categoryId ?? categoryId;
+
+        try {
+          const sameCategoryQuery = query(
+            collection(db, "boardPosts"),
+            where("categoryId", "==", postCategoryId),
+            orderBy("createdAt", "desc"),
+          );
+          const sameCategorySnap = await getDocs(sameCategoryQuery);
+          const descIndex = sameCategorySnap.docs.findIndex(
+            (docSnap) => docSnap.id === snap.id,
+          );
+          setDisplayIndex(
+            descIndex >= 0 ? sameCategorySnap.docs.length - descIndex : null,
+          );
+        } catch (indexErr) {
+          console.warn("게시글 카테고리 번호 계산 오류:", indexErr);
+          setDisplayIndex(data.salesIndex ?? null);
+        }
+
         setPost({
           id: snap.id,
           title: data.title ?? "(제목 없음)",
@@ -125,7 +152,7 @@ const ManagerBoardDetailPage: React.FC = () => {
           links: data.links ?? [],
           thumbnailUrl: data.thumbnailUrl,
           salesIndex: data.salesIndex ?? null,
-          categoryId: data.categoryId ?? categoryId,
+          categoryId: postCategoryId,
         });
       } catch (err: any) {
         console.error("게시글 상세 오류:", err);
@@ -181,7 +208,7 @@ const ManagerBoardDetailPage: React.FC = () => {
     };
 
     logView();
-  }, [postId, categoryId, isSalesCategory]);
+  }, [postId, categoryId, isSalesCategory, post?.categoryId]);
 
   const handleBack = () => {
     router.push(`/manager/boards/${categoryId}`);
@@ -310,6 +337,28 @@ const ManagerBoardDetailPage: React.FC = () => {
     }
   };
 
+  const handleSaveAttachment = () => {
+    if (!post || !saveEnabled) {
+      alert("저장할 첨부 파일이 없습니다.");
+      return;
+    }
+
+    const file = post.attachments.find(isPdfAttachment) || post.attachments[0];
+    if (!file?.url) {
+      alert("저장할 첨부 파일이 없습니다.");
+      return;
+    }
+
+    const anchor = document.createElement("a");
+    anchor.href = file.url;
+    anchor.download = file.name || "attachment";
+    anchor.target = "_blank";
+    anchor.rel = "noopener noreferrer";
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+  };
+
   const formatDate = (publishedDate?: string, createdAt?: Timestamp | null) => {
     if (publishedDate && publishedDate.trim() !== "") {
       return publishedDate;
@@ -345,6 +394,11 @@ const ManagerBoardDetailPage: React.FC = () => {
               {sharing ? "공유 중..." : "공유하기"}
             </PrimaryButton>
           )}
+          {saveEnabled && (
+            <Button type="button" onClick={handleSaveAttachment}>
+              저장
+            </Button>
+          )}
         </RightActions>
       </HeaderRow>
 
@@ -366,6 +420,12 @@ const ManagerBoardDetailPage: React.FC = () => {
               <MetaLabel>게시일</MetaLabel>
               <MetaValue>{formatDate(post.publishedDate, post.createdAt)}</MetaValue>
             </MetaItem>
+            {displayIndex || post.salesIndex ? (
+              <MetaItem>
+                <MetaLabel>번호</MetaLabel>
+                <MetaValue>#{displayIndex ?? post.salesIndex}</MetaValue>
+              </MetaItem>
+            ) : null}
           </MetaGrid>
 
           <TitleRow>{post.title}</TitleRow>
@@ -399,7 +459,12 @@ const ManagerBoardDetailPage: React.FC = () => {
                     {isRestrictedSalesHub ? (
                       <FileName>{file.name}</FileName>
                     ) : (
-                      <FileLink href={file.url} target="_blank" rel="noreferrer">
+                      <FileLink
+                        href={file.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        download={file.name}
+                      >
                         {file.name}
                       </FileLink>
                     )}

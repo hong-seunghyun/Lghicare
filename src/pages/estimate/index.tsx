@@ -73,6 +73,12 @@ export interface SelectedProduct {
   // 👉 선납 정보
   prepayRate?: string; // "30" | "50" | ""
   prepayAmount?: number; // 선납금액
+
+  voucherTotal?: number;
+  voucherDetails?: Array<{ type: string; amount: number; reason: string }>;
+  voucherMultiProductCount?: number;
+  voucherMultiProductCountOnly?: boolean;
+  voucherMultiProductNote?: string;
 }
 
 interface Product {

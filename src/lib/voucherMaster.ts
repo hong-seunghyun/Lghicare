@@ -53,6 +53,8 @@ export type VoucherModel = {
     | { name?: string; amount?: number; startDate?: string; endDate?: string }
     | Array<{ name?: string; amount?: number; startDate?: string; endDate?: string }>;
   multiProductCount?: number;
+  multiProductNote?: string;
+  multiProductExcludeVoucher?: boolean;
   excludeWhenPromoTypeIsNormalN?: boolean;
 };
 

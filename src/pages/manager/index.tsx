@@ -6,6 +6,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
 import ManagerEditModal from "@/components/ManagerEditModal";
+import PopupDisplay from "@/components/Popups/PopupDisplay";
 import { useRouter } from "next/router";
 import { db } from "@/lib/firebase";
 import { SALES_HUB_ID } from "@/config/boardCategories";
@@ -41,6 +42,7 @@ interface ManagerSession {
   office: string;
   position: string;
   teamLeaderId: string;
+  role?: "manager" | "admin" | string;
 }
 
 type ManagementTier =
@@ -117,6 +119,13 @@ const getDashboardScopeFromPosition = (
     return "team";
   }
   return "self";
+};
+
+const getDashboardScopeFromSession = (
+  session: ManagerSession,
+): ManagerDashboardScope => {
+  if (session.role === "admin") return "national";
+  return getDashboardScopeFromPosition(session.position);
 };
 
 const getManagementTier = (position?: string): ManagementTier => {
@@ -214,6 +223,7 @@ const ManagerDashboardPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const summaryRangeLabel = formatRangeLabel(rangeStart, rangeEnd);
+  const isAdminSession = session?.role === "admin";
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -232,9 +242,10 @@ const ManagerDashboardPage: React.FC = () => {
   }, [router]);
 
   const dashboardScope = useMemo<ManagerDashboardScope | null>(() => {
-    if (!session?.position) return null;
-    return getDashboardScopeFromPosition(session.position);
-  }, [session?.position]);
+    if (!session) return null;
+    if (session.role !== "admin" && !session.position) return null;
+    return getDashboardScopeFromSession(session);
+  }, [session]);
 
   const aggregateStats = (
     items: any[],
@@ -288,14 +299,20 @@ const ManagerDashboardPage: React.FC = () => {
           limit(5),
         );
 
-        const categoryQuery = query(
-          collection(db, "managerCategoryStats"),
-          where("managerUid", "==", session.id),
-        );
-        const productQuery = query(
-          collection(db, "managerProductStats"),
-          where("managerUid", "==", session.id),
-        );
+        const categoryQuery =
+          session.role === "admin"
+            ? collection(db, "managerCategoryStats")
+            : query(
+                collection(db, "managerCategoryStats"),
+                where("managerUid", "==", session.id),
+              );
+        const productQuery =
+          session.role === "admin"
+            ? collection(db, "managerProductStats")
+            : query(
+                collection(db, "managerProductStats"),
+                where("managerUid", "==", session.id),
+              );
 
         const [noticesSnap, categorySnap, productSnap, salesHubSnap] =
           await Promise.all([
@@ -369,6 +386,7 @@ const ManagerDashboardPage: React.FC = () => {
             managerUid: session.id,
             managerId: session.managerId,
             position: session.position,
+            role: session.role,
             region: session.region,
             office: session.office,
             startDate: rangeStart,
@@ -464,6 +482,7 @@ const ManagerDashboardPage: React.FC = () => {
 
   const scopeDescription = useMemo(() => {
     if (!session || !dashboardScope) return "";
+    if (session.role === "admin") return "전국 단위 조회";
     if (dashboardScope === "national") return "전국 단위 조회";
     if (dashboardScope === "area") {
       return `${getAreaFromRegion(session.region) || session.region} 지역 단위 조회`;
@@ -964,17 +983,21 @@ const ManagerDashboardPage: React.FC = () => {
       return;
     }
 
-    const actorTier = getManagementTier(session.position);
+    const actorTier =
+      session.role === "admin" ? "areaAdmin" : getManagementTier(session.position);
     const targetTier = getManagementTier(editManager.position);
     const allowRegionEdit =
+      session.role === "admin" ||
       (actorTier === "areaAdmin" && targetTier !== "areaAdmin") ||
       (actorTier === "regionLeader" && targetTier !== "regionLeader");
     const allowOfficeEdit =
+      session.role === "admin" ||
       (actorTier === "areaAdmin" && targetTier !== "areaAdmin") ||
       ((actorTier === "regionLeader" || actorTier === "officeHead") &&
         targetTier !== "regionLeader");
     const allowTeamLeaderEdit =
-      actorTier !== "teamLeader" && targetTier === "member";
+      session.role === "admin" ||
+      (actorTier !== "teamLeader" && targetTier === "member");
 
     const updates: Partial<ManagerSummary> & { password?: string } = {};
     if (trimmedName !== editManager.name) updates.name = trimmedName;
@@ -1073,6 +1096,7 @@ const ManagerDashboardPage: React.FC = () => {
 
   return (
     <PageWrapper>
+      <PopupDisplay location="manager_dashboard" />
       <HeaderRow>
         <Title>대시보드</Title>
         {session && (
@@ -1161,7 +1185,11 @@ const ManagerDashboardPage: React.FC = () => {
             <StatsPairGrid>
               <Card>
                 <CardHeader>
-                  <CardTitle>내 활동 통계 (카테고리별)</CardTitle>
+                  <CardTitle>
+                    {isAdminSession
+                      ? "전체 활동 통계 (카테고리별)"
+                      : "내 활동 통계 (카테고리별)"}
+                  </CardTitle>
                   <CardSubTitle>견적/공유 합산 상위</CardSubTitle>
                   <SliderControls>
                     <SliderButton
@@ -1204,7 +1232,11 @@ const ManagerDashboardPage: React.FC = () => {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>내 활동 통계 (제품별)</CardTitle>
+                  <CardTitle>
+                    {isAdminSession
+                      ? "전체 활동 통계 (제품별)"
+                      : "내 활동 통계 (제품별)"}
+                  </CardTitle>
                   <CardSubTitle>견적/공유 합산 상위</CardSubTitle>
                   <SliderControls>
                     <SliderButton

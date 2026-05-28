@@ -3,7 +3,7 @@
 
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ManagerEditModal from "@/components/ManagerEditModal";
 import OrganizationExplorer from "@/components/OrganizationExplorer";
 import styled from "styled-components";
@@ -80,6 +80,106 @@ const aggregateStats = (items: any[], keyField: string, labelField: string) => {
   );
 };
 
+type ManagerImportAction =
+  | { type: "create"; rows: Record<string, unknown>[] }
+  | { type: "delete"; managerIds: string[] };
+
+const MANAGER_ID_FIELDS = ["managerId", "manager_id", "id", "업무등록번호"];
+const normalizeKey = (key: string) => key.normalize("NFKC");
+
+function extractStringField(
+  record: Record<string, unknown> | null,
+  keys: string[],
+): string {
+  if (!record) return "";
+  const targetSet = new Set(keys.map((key) => normalizeKey(key)));
+  for (const rawKey of Object.keys(record)) {
+    const normalizedKey = normalizeKey(rawKey);
+    if (!targetSet.has(normalizedKey)) continue;
+    const value = record[rawKey];
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed) return trimmed;
+      continue;
+    }
+    if (typeof value === "number") {
+      return String(value);
+    }
+  }
+  return "";
+}
+
+const extractImportRows = (value: unknown): Record<string, unknown>[] => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value as Record<string, unknown>[];
+  if (typeof value !== "object") return [];
+  const record = value as Record<string, any>;
+  if (Array.isArray(record.rows)) {
+    return record.rows as Record<string, unknown>[];
+  }
+  if (Array.isArray(record.data)) {
+    return record.data as Record<string, unknown>[];
+  }
+  if (record.sheets && typeof record.sheets === "object") {
+    const sheetKeys = Object.keys(record.sheets);
+    const firstKey = sheetKeys[0];
+    if (firstKey && Array.isArray(record.sheets[firstKey])) {
+      return record.sheets[firstKey] as Record<string, unknown>[];
+    }
+  }
+  return [];
+};
+
+const toManagerIdString = (value: unknown): string => {
+  if (value == null) return "";
+  if (typeof value === "string") {
+    return value.trim().toUpperCase();
+  }
+  if (typeof value === "number") {
+    return String(value).trim().toUpperCase();
+  }
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const candidate = extractStringField(record, MANAGER_ID_FIELDS);
+    if (candidate) {
+      return candidate.trim().normalize("NFKC").toUpperCase();
+    }
+  }
+  return "";
+};
+
+const resolveDeleteManagerIds = (value: unknown): string[] => {
+  const ids = new Set<string>();
+  if (!value) return [];
+  const addId = (entry: unknown) => {
+    const normalized = toManagerIdString(entry);
+    if (normalized) {
+      ids.add(normalized);
+    }
+  };
+  const record = typeof value === "object" && value !== null ? (value as Record<string, unknown>) : null;
+  if (record) {
+    if (Array.isArray(record.managerIds)) {
+      record.managerIds.forEach(addId);
+    }
+    if (Array.isArray(record.deleteList)) {
+      record.deleteList.forEach(addId);
+    }
+  }
+  extractImportRows(value).forEach(addId);
+  return Array.from(ids);
+};
+
+const readJsonFromFile = async (file: File) => {
+  const text = await file.text();
+  if (!text.trim()) return null;
+  try {
+    return JSON.parse(text);
+  } catch (err: any) {
+    throw new Error(`${file.name} 파싱 실패: ${err?.message || "올바른 JSON이 아닙니다."}`);
+  }
+};
+
 const ManagerManagementPage: React.FC = () => {
   const [managers, setManagers] = useState<Manager[]>([]);
   const [loading, setLoading] = useState(true);
@@ -143,6 +243,46 @@ const ManagerManagementPage: React.FC = () => {
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 30;
 
+  const createFileInputRef = useRef<HTMLInputElement | null>(null);
+  const deleteFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const reloadManagers = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const q = query(
+        collection(db, "users"),
+        where("role", "==", "manager"),
+        orderBy("createdAt", "desc"),
+      );
+      const snap = await getDocs(q);
+      const list: Manager[] = snap.docs.map((d) => {
+        const data = d.data() as any;
+        return {
+          id: d.id,
+          managerId: data.managerId ?? "",
+          email: data.email ?? "",
+          password: data.password ?? "",
+          name: data.name ?? "",
+          position: data.position ?? "",
+          region: data.region ?? "",
+          office: data.office ?? data.branch ?? "",
+          teamLeaderId: data.teamLeaderId ?? "",
+          memo: data.memo ?? "",
+          isActive: data.isActive ?? true,
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt,
+        };
+      });
+      setManagers(list);
+    } catch (err: any) {
+      console.error("매니저 목록 불러오기 오류:", err);
+      setError("매니저 목록을 불러오는 중 오류가 발생했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const [statsManager, setStatsManager] = useState<Manager | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState<string | null>(null);
@@ -198,48 +338,8 @@ const ManagerManagementPage: React.FC = () => {
   );
 
   useEffect(() => {
-    const fetchManagers = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const q = query(
-          collection(db, "users"),
-          where("role", "==", "manager"),
-          orderBy("createdAt", "desc"),
-        );
-
-        const snap = await getDocs(q);
-        const list: Manager[] = snap.docs.map((d) => {
-          const data = d.data() as any;
-          return {
-            id: d.id,
-            managerId: data.managerId ?? "",
-            email: data.email ?? "",
-            password: data.password ?? "",
-            name: data.name ?? "",
-            position: data.position ?? "",
-            region: data.region ?? "",
-            office: data.office ?? data.branch ?? "",
-            teamLeaderId: data.teamLeaderId ?? "",
-            memo: data.memo ?? "",
-            isActive: data.isActive ?? true,
-            createdAt: data.createdAt,
-            updatedAt: data.updatedAt,
-          };
-        });
-
-        setManagers(list);
-      } catch (err: any) {
-        console.error("매니저 목록 불러오기 오류:", err);
-        setError("매니저 목록을 불러오는 중 오류가 발생했습니다.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchManagers();
-  }, []);
+    reloadManagers();
+  }, [reloadManagers]);
 
   const openCreateModal = () => {
     setEditingManager(null);
@@ -556,60 +656,97 @@ const ManagerManagementPage: React.FC = () => {
     }
   };
 
-  const handleImportManagers = async () => {
+  const handleImportManagers = () => {
     if (importing) return;
-    if (!confirm("managerList.json 파일 기준으로 일괄등록을 진행할까요?"))
-      return;
+    createFileInputRef.current?.click();
+  };
 
+  const importManagerActions = async (actions: ManagerImportAction[]) => {
+    if (!actions.length) return;
+    setImporting(true);
     try {
-      setImporting(true);
       const response = await fetch("/api/admin/managers/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ defaultPassword: DEFAULT_MANAGER_PASSWORD }),
+        body: JSON.stringify({
+          defaultPassword: DEFAULT_MANAGER_PASSWORD,
+          actions,
+        }),
       });
-
       const result = await response.json();
       if (!response.ok) {
         throw new Error(result?.error || "import failed");
       }
-
       alert(
-        `일괄등록 완료\n신규: ${result.created}\n업데이트: ${result.updated}\n스킵: ${result.skipped}\n오류: ${result.errors}`,
+        `처리 완료\n신규: ${result.created ?? 0}\n업데이트: ${
+          result.updated ?? 0
+        }\n삭제: ${result.deleted ?? 0}\n스킵: ${result.skipped ?? 0}\n오류: ${
+          result.errors ?? 0
+        }`,
       );
-
-      setLoading(true);
-      const q = query(
-        collection(db, "users"),
-        where("role", "==", "manager"),
-        orderBy("createdAt", "desc"),
-      );
-      const snap = await getDocs(q);
-      const list: Manager[] = snap.docs.map((d) => {
-        const data = d.data() as any;
-        return {
-          id: d.id,
-          managerId: data.managerId ?? "",
-          email: data.email ?? "",
-          password: data.password ?? "",
-          name: data.name ?? "",
-          position: data.position ?? "",
-          region: data.region ?? "",
-          office: data.office ?? data.branch ?? "",
-          teamLeaderId: data.teamLeaderId ?? "",
-          memo: data.memo ?? "",
-          isActive: data.isActive ?? true,
-          createdAt: data.createdAt,
-          updatedAt: data.updatedAt,
-        };
-      });
-      setManagers(list);
+      await reloadManagers();
     } catch (err: any) {
-      console.error("일괄등록 오류:", err);
-      alert("일괄등록 중 오류가 발생했습니다.");
+      console.error("매니저 일괄 처리 오류:", err);
+      alert(err?.message || "매니저 일괄 처리 중 오류가 발생했습니다.");
     } finally {
       setImporting(false);
-      setLoading(false);
+    }
+  };
+
+  const handleCreateFilesChange = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const files = event.target.files;
+    if (!files?.length || importing) {
+      event.target.value = "";
+      return;
+    }
+    try {
+      const rows: Record<string, unknown>[] = [];
+      for (const file of Array.from(files)) {
+        const parsed = await readJsonFromFile(file);
+        if (!parsed) continue;
+        rows.push(...extractImportRows(parsed));
+      }
+      if (!rows.length) {
+        alert("업로드할 매니저 데이터가 없습니다.");
+        return;
+      }
+      await importManagerActions([{ type: "create", rows }]);
+    } catch (err: any) {
+      console.error("매니저 업로드 오류:", err);
+      alert(err?.message || "매니저 파일을 처리하는 중 오류가 발생했습니다.");
+    } finally {
+      event.target.value = "";
+    }
+  };
+
+  const handleDeleteFilesChange = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const files = event.target.files;
+    if (!files?.length || importing) {
+      event.target.value = "";
+      return;
+    }
+    try {
+      const ids: string[] = [];
+      for (const file of Array.from(files)) {
+        const parsed = await readJsonFromFile(file);
+        if (!parsed) continue;
+        ids.push(...resolveDeleteManagerIds(parsed));
+      }
+      const uniqueIds = Array.from(new Set(ids));
+      if (!uniqueIds.length) {
+        alert("삭제할 매니저 ID가 존재하지 않습니다.");
+        return;
+      }
+      await importManagerActions([{ type: "delete", managerIds: uniqueIds }]);
+    } catch (err: any) {
+      console.error("매니저 삭제 파일 오류:", err);
+      alert(err?.message || "삭제 리스트를 처리하는 중 오류가 발생했습니다.");
+    } finally {
+      event.target.value = "";
     }
   };
 
@@ -632,38 +769,12 @@ const ManagerManagementPage: React.FC = () => {
         `점검 완료\n스캔: ${result.scanned}\n중복: ${result.duplicates}\n삭제: ${result.removed}`,
       );
 
-      setLoading(true);
-      const q = query(
-        collection(db, "users"),
-        where("role", "==", "manager"),
-        orderBy("createdAt", "desc"),
-      );
-      const snap = await getDocs(q);
-      const list: Manager[] = snap.docs.map((d) => {
-        const data = d.data() as any;
-        return {
-          id: d.id,
-          managerId: data.managerId ?? "",
-          email: data.email ?? "",
-          password: data.password ?? "",
-          name: data.name ?? "",
-          position: data.position ?? "",
-          region: data.region ?? "",
-          office: data.office ?? data.branch ?? "",
-          teamLeaderId: data.teamLeaderId ?? "",
-          memo: data.memo ?? "",
-          isActive: data.isActive ?? true,
-          createdAt: data.createdAt,
-          updatedAt: data.updatedAt,
-        };
-      });
-      setManagers(list);
+      await reloadManagers();
     } catch (err: any) {
       console.error("중복 점검 오류:", err);
       alert("중복 점검 중 오류가 발생했습니다.");
     } finally {
       setDeduping(false);
-      setLoading(false);
     }
   };
 
@@ -805,7 +916,24 @@ const ManagerManagementPage: React.FC = () => {
   );
 
   return (
-    <PageWrapper>
+    <>
+      <input
+        type="file"
+        ref={createFileInputRef}
+        accept=".json,application/json"
+        multiple
+        style={{ display: "none" }}
+        onChange={handleCreateFilesChange}
+      />
+      <input
+        type="file"
+        ref={deleteFileInputRef}
+        accept=".json,application/json"
+        multiple
+        style={{ display: "none" }}
+        onChange={handleDeleteFilesChange}
+      />
+      <PageWrapper>
       <HeaderRow>
         <Title>매니저 관리</Title>
         <HeaderActions>
@@ -814,7 +942,14 @@ const ManagerManagementPage: React.FC = () => {
             onClick={handleImportManagers}
             disabled={importing}
           >
-            {importing ? "일괄등록 중..." : "일괄등록"}
+            {importing ? "파일 처리 중..." : "일괄등록"}
+          </CreateButton>
+          <CreateButton
+            type="button"
+            onClick={() => deleteFileInputRef.current?.click()}
+            disabled={importing}
+          >
+            {importing ? "파일 처리 중..." : "삭제 리스트 업로드"}
           </CreateButton>
           <CreateButton
             type="button"
@@ -1252,6 +1387,7 @@ const ManagerManagementPage: React.FC = () => {
         )}
       </OrganizationExplorerSection>
     </PageWrapper>
+  </>
   );
 };
 

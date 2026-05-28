@@ -277,17 +277,14 @@ export default function PrepayAdminPage() {
       const modelsForced30: string[] = []; // 50% 때문에 30%를 강제로 true로 만든 모델들
 
       for (const line of lines) {
-        // 공백, 탭, 콤마 구분 모두 허용
         const parts = line.split(/[\s,]+/).filter(Boolean);
         if (parts.length < 4) {
-          // 최소: 중분류, 모델, 30%, 50%
           continue;
         }
-
         const middle = parts[0]?.trim();
         const model = parts[1]?.trim();
-        const raw30 = (parts[2] || "").trim().toUpperCase();
-        const raw50 = (parts[3] || "").trim().toUpperCase();
+        const raw30 = (parts[parts.length - 2] || "").trim().toUpperCase();
+        const raw50 = (parts[parts.length - 1] || "").trim().toUpperCase();
 
         if (!middle || !model) continue;
 

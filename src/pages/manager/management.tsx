@@ -28,9 +28,11 @@ interface ManagerSession {
   office: string;
   position: string;
   teamLeaderId: string;
+  role?: "manager" | "admin" | string;
 }
 
 type Tier =
+  | "admin"
   | "areaAdmin"
   | "regionLeader"
   | "officeHead"
@@ -75,7 +77,8 @@ const aggregateStats = (items: any[], keyField: string, labelField: string) => {
   );
 };
 
-const getTier = (position?: string): Tier => {
+const getTier = (position?: string, role?: string): Tier => {
+  if (role === "admin") return "admin";
   if (!position) return "member";
   if (
     position.includes("지역행정") ||
@@ -104,6 +107,7 @@ const getAreaFromRegion = (region?: string) => {
 };
 
 const tierLabelMap: Record<Tier, string> = {
+  admin: "관리자",
   areaAdmin: "지역 관리자",
   regionLeader: "리더사무소장",
   officeHead: "사무소장",
@@ -157,6 +161,7 @@ const ManagerManagementPage: React.FC = () => {
   >([]);
   const PAGE_SIZE = 10;
   const [pageByTier, setPageByTier] = useState<Record<Tier, number>>({
+    admin: 1,
     areaAdmin: 1,
     regionLeader: 1,
     officeHead: 1,
@@ -171,7 +176,7 @@ const ManagerManagementPage: React.FC = () => {
     try {
       const parsed = JSON.parse(stored) as ManagerSession;
       setSession(parsed);
-      setTier(getTier(parsed.position));
+      setTier(getTier(parsed.position, parsed.role));
     } catch {
       setError("세션 정보를 불러오는 중 오류가 발생했습니다.");
     }
@@ -192,7 +197,27 @@ const ManagerManagementPage: React.FC = () => {
       try {
         let list: ManagerRecord[] = [];
 
-        if (tier === "areaAdmin") {
+        if (tier === "admin") {
+          const managerQuery = query(
+            collection(db, "users"),
+            where("role", "==", "manager"),
+          );
+          const snap = await getDocs(managerQuery);
+          list = snap.docs.map((docSnap) => {
+            const data = docSnap.data() as any;
+            return {
+              id: docSnap.id,
+              managerId: data.managerId ?? "",
+              name: data.name ?? "",
+              position: data.position ?? "",
+              region: data.region ?? "",
+              office: data.office ?? data.branch ?? "",
+              teamLeaderId: data.teamLeaderId ?? "",
+              password: data.password ?? "",
+              isActive: data.isActive ?? true,
+            };
+          });
+        } else if (tier === "areaAdmin") {
           const area = getAreaFromRegion(session.region);
           if (!area) {
             throw new Error("지역 정보가 없어 매니저를 불러올 수 없습니다.");
@@ -306,6 +331,7 @@ const ManagerManagementPage: React.FC = () => {
 
   useEffect(() => {
     setPageByTier({
+      admin: 1,
       areaAdmin: 1,
       regionLeader: 1,
       officeHead: 1,
@@ -555,13 +581,16 @@ const ManagerManagementPage: React.FC = () => {
 
     const currentTier = getTier(modalManager.position);
     const allowRegionEdit =
+      tier === "admin" ||
       (tier === "areaAdmin" && currentTier !== "areaAdmin") ||
       (tier === "regionLeader" && currentTier !== "regionLeader");
     const allowOfficeEdit =
+      tier === "admin" ||
       (tier === "areaAdmin" && currentTier !== "areaAdmin") ||
       ((tier === "regionLeader" || tier === "officeHead") &&
         currentTier !== "regionLeader");
-    const allowTeamLeaderEdit = tier !== "teamLeader" && currentTier === "member";
+    const allowTeamLeaderEdit =
+      tier === "admin" || (tier !== "teamLeader" && currentTier === "member");
 
     const updates: Partial<ManagerRecord> = {};
     if (trimmedName !== modalManager.name) updates.name = trimmedName;
@@ -732,29 +761,37 @@ const ManagerManagementPage: React.FC = () => {
 
       {!loading && !error && (
         <>
-          {tier === "areaAdmin" && (
+          {(tier === "admin" || tier === "areaAdmin") && (
             <>
               {renderSection(
                 "리더사무소장",
-                "담당 지역에 속한 권역 리더를 관리합니다.",
+                tier === "admin"
+                  ? "전체 권역 리더를 관리합니다."
+                  : "담당 지역에 속한 권역 리더를 관리합니다.",
                 regionLeaderManagers,
                 "regionLeader",
               )}
               {renderSection(
                 "사무소장",
-                "담당 지역 전체의 사무소장을 관리합니다.",
+                tier === "admin"
+                  ? "전체 사무소장을 관리합니다."
+                  : "담당 지역 전체의 사무소장을 관리합니다.",
                 officeHeadManagers,
                 "officeHead",
               )}
               {renderSection(
                 "팀장",
-                "담당 지역 전체의 팀장을 관리합니다.",
+                tier === "admin"
+                  ? "전체 팀장을 관리합니다."
+                  : "담당 지역 전체의 팀장을 관리합니다.",
                 teamLeaderManagers,
                 "teamLeader",
               )}
               {renderSection(
                 "팀원",
-                "담당 지역 전체의 일반 매니저를 관리합니다.",
+                tier === "admin"
+                  ? "전체 일반 매니저를 관리합니다."
+                  : "담당 지역 전체의 일반 매니저를 관리합니다.",
                 teamMemberManagers,
                 "member",
               )}

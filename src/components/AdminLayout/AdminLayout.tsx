@@ -8,7 +8,10 @@ import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
 import { app, db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import Link from "next/link";
-import { getAdminBoardNavigationItems } from "@/config/boardCategories";
+import {
+  getAdminBoardNavigationItems,
+  getAdminStandardEstimateNavigationItem,
+} from "@/config/boardCategories";
 
 interface Props {
   children: React.ReactNode;
@@ -86,26 +89,45 @@ export default function AdminLayout({ children }: Props) {
 
   // 게시판 하위 카테고리 구성 (코드에서 확장 가능)
   const boardChildren = useMemo(() => getAdminBoardNavigationItems(), []);
+  const standardEstimateNav = useMemo(
+    () => getAdminStandardEstimateNavigationItem(),
+    [],
+  );
 
   const navItems: NavItemType[] = useMemo(
-    () => [
-      { type: "link", label: "대시보드", path: "/admin" },
-      { type: "link", label: "견적내기", path: "/estimate" },
-      {
-        type: "group",
-        label: "게시판 관리",
-        path: "/admin/boards", // active 판단용(prefix)
-        children: boardChildren,
-      },
-      { type: "link", label: "제휴카드 관리", path: "/admin/card" },
-      { type: "link", label: "선결제 관리", path: "/admin/prepay" },
-      { type: "link", label: "구독교원 관리", path: "/admin/teacher" },
-      { type: "link", label: "상품 관리", path: "/admin/missing-images" },
-      { type: "link", label: "상품권 관리", path: "/admin/voucher" },
-      { type: "link", label: "매니저 관리", path: "/admin/manager" },
-      { type: "link", label: "캐시 관리", path: "/admin/cache" },
-    ],
-    [boardChildren],
+    () => {
+      const items: NavItemType[] = [
+        { type: "link", label: "대시보드", path: "/admin" },
+        { type: "link", label: "상세 분석", path: "/admin/analytics" },
+        { type: "link", label: "견적내기", path: "/estimate" },
+        ...(standardEstimateNav
+          ? [{ type: "link" as const, ...standardEstimateNav }]
+          : []),
+        { type: "link", label: "메인 배너 관리", path: "/admin/main-banners" },
+        {
+          type: "link",
+          label: "금주의 테마상품 관리",
+          path: "/admin/theme-products",
+        },
+        {
+          type: "group",
+          label: "게시판 관리",
+          path: "/admin/boards", // active 판단용(prefix)
+          children: boardChildren,
+        },
+        { type: "link", label: "팝업 관리", path: "/admin/popups" },
+        { type: "link", label: "제휴카드 관리", path: "/admin/card" },
+        { type: "link", label: "선결제 관리", path: "/admin/prepay" },
+        { type: "link", label: "구독교원 관리", path: "/admin/teacher" },
+        { type: "link", label: "상품 관리", path: "/admin/missing-images" },
+        { type: "link", label: "상품권 관리", path: "/admin/voucher" },
+        { type: "link", label: "매니저 관리", path: "/admin/manager" },
+        { type: "link", label: "캐시 관리", path: "/admin/cache" },
+      ];
+
+      return items;
+    },
+    [boardChildren, standardEstimateNav],
   );
 
   // 현재 경로가 게시판 하위 페이지면 자동으로 펼침
@@ -207,6 +229,7 @@ export default function AdminLayout({ children }: Props) {
             <SiteLinkButton href="https://lghicaresolution.com/">
               사이트로 이동
             </SiteLinkButton>
+            <SiteLinkButton href="/manager">매니저 페이지</SiteLinkButton>
             <LogoutButton onClick={handleLogout}>로그아웃</LogoutButton>
           </TopRight>
         </TopBar>

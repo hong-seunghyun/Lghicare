@@ -1,12 +1,26 @@
+export const WHITE_SWATCH = "#FFFFFF";
+export const COLOR_FALLBACK = WHITE_SWATCH;
+export const RAINBOW_SWATCH =
+  "linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)";
+const RAINBOW_CHIP_COLORS = [
+  "red",
+  "orange",
+  "yellow",
+  "green",
+  "blue",
+  "indigo",
+  "violet",
+];
+
 export const colorMap: Record<string, string> = {
   // 화이트/그레이/실버 계열
-  화이트: "#FFFFFF",
-  린넨화이트: "#F5F5F5",
-  에센스화이트: "#F8F8F8",
-  크림화이트: "#FDFBF7",
-  오브제크림화이트: "#FDFBF7",
+  화이트: WHITE_SWATCH,
+  린넨화이트: WHITE_SWATCH,
+  에센스화이트: WHITE_SWATCH,
+  크림화이트: WHITE_SWATCH,
+  오브제크림화이트: WHITE_SWATCH,
   샤이니퓨어: "#F8F8FF",
-  릴리화이트: "#FAFAFA",
+  릴리화이트: WHITE_SWATCH,
   스톤실버: "#C0C0C0",
   스테인리스: "#9FA6A9",
   스테인리스실버: "#A9A9A9",
@@ -24,7 +38,7 @@ export const colorMap: Record<string, string> = {
   스페이스블랙: "#1E1E1E",
   스페이스블랙스페이스블랙: "#1E1E1E",
   맨해튼미드나잇: "#2C3E50",
-  무드업: "rainbow", // 특수 처리 (그라데이션)
+  무드업: RAINBOW_SWATCH, // 특수 처리 (그라데이션)
 
   // 베이지/브라운 계열
   베이지: "#E6D9C6",
@@ -63,7 +77,7 @@ export const colorMap: Record<string, string> = {
   크림레몬: "#FFFACD",
   크림스카이: "#B2D7E6",
   크림그레이: "#D6D6D6",
-  솔리드크림화이트: "#FBF8F3",
+  솔리드크림화이트: WHITE_SWATCH,
   솔리드크림라벤더: "#D8BFD8",
   솔리드크림레몬: "#FFFACD",
   솔리드크림스카이: "#B0E0E6",
@@ -78,7 +92,7 @@ export const colorMap: Record<string, string> = {
   솔리드스페이스블랙: "#1E1E1E",
   솔리드미드블랙: "#2B2B2B",
   솔리드프라임실버: "#B0B0B0",
-  솔리드카밍크림화이트: "#F6F3F0",
+  솔리드카밍크림화이트: WHITE_SWATCH,
   솔리드카밍크림그레이: "#DDD9D5",
   솔리드아몬드: "#D9CAB3",
 
@@ -96,4 +110,45 @@ export const colorMap: Record<string, string> = {
   // 기타
   솔리드모던스테인리스: "#B5B5B5",
   오브제클레임핑크: "#F1C5C5",
+};
+
+const normalizeColorName = (colorName: string) =>
+  colorName
+    .replace(/\s+/g, "")
+    .replace(/[()（）]/g, "")
+    .trim();
+
+const splitColorNames = (colorName: string) =>
+  colorName
+    .split(/[,/|:：]/)
+    .map(normalizeColorName)
+    .filter(Boolean);
+
+export const resolveProductColor = (
+  colorName: string,
+  fallback = COLOR_FALLBACK,
+) => {
+  const normalized = normalizeColorName(colorName);
+
+  if (!normalized) return fallback;
+  if (normalized.includes("무드업")) return RAINBOW_SWATCH;
+  if (normalized.includes("화이트") || /white/i.test(normalized)) {
+    return WHITE_SWATCH;
+  }
+
+  return colorMap[normalized] || fallback;
+};
+
+export const getProductColorChipColors = (colorName: string) => {
+  const colorNames = splitColorNames(colorName);
+
+  if (colorNames.length === 0) {
+    return [COLOR_FALLBACK];
+  }
+
+  if (colorNames.some((name) => name.includes("무드업"))) {
+    return RAINBOW_CHIP_COLORS;
+  }
+
+  return colorNames.map((name) => resolveProductColor(name));
 };

@@ -17,6 +17,9 @@ interface EstimateProduct {
   // 👉 모달에서 저장한 값들
   baseMonthly?: number; // 기준 월 요금
   finalPrice?: number | string; // 혜택가 월 요금(총 체감 혜택)
+  contractPeriod?: number | string; // 계약기간 원본 값
+  contractMonths?: number | string; // 계약기간 개월 수
+  contractPeriodMonths?: number | string; // 레거시/외부 저장값 fallback
 
   // ✅ 할인 내역 표시용(추가)
   // - Firestore에 저장돼 있으면 그대로 표기
@@ -51,6 +54,8 @@ interface EstimateProduct {
     프로모션유형?: string;
     프로모션명?: string;
     할인전금액?: string | number;
+    할인후금액?: string | number;
+    정상가?: string | number;
   };
 
   voucherTotal?: number | string;
@@ -60,6 +65,8 @@ interface EstimateProduct {
     reason: string;
   }>;
   voucherMultiProductCount?: number;
+  voucherMultiProductCountOnly?: boolean;
+  voucherMultiProductNote?: string;
 }
 
 interface EstimateData {
@@ -78,6 +85,10 @@ interface EstimateData {
     amount: number;
     reason: string;
   }>;
+  multiProductVoucherPerUnitReward?: number;
+  multiProductTotalUnits?: number;
+  multiProductEligibleUnits?: number;
+  multiProductExceptionUnits?: number;
 }
 
 // 🔢 문자열/숫자 금액을 안전하게 숫자로 변환
@@ -92,6 +103,124 @@ function parseMoney(value: unknown): number {
   }
 
   return 0;
+}
+
+function parseSignedMoney(value: unknown): number {
+  if (!value && value !== 0) return 0;
+  if (typeof value === "number") return value;
+
+  if (typeof value === "string") {
+    const isNegative = value.trim().startsWith("-");
+    const num = parseMoney(value);
+    return isNegative ? -num : num;
+  }
+
+  return 0;
+}
+
+function formatPrice(value: number): string {
+  return `${value.toLocaleString("ko-KR")}원`;
+}
+
+function getContractMonths(contractPeriod: unknown): number {
+  if (!contractPeriod && contractPeriod !== 0) return 0;
+
+  if (typeof contractPeriod === "number") {
+    if (!Number.isFinite(contractPeriod) || contractPeriod <= 0) return 0;
+    return contractPeriod <= 10 ? contractPeriod * 12 : contractPeriod;
+  }
+
+  const text = String(contractPeriod).trim();
+  if (!text) return 0;
+
+  const yearMatch = text.match(/(\d+)\s*년/);
+  if (yearMatch) return Number(yearMatch[1]) * 12;
+
+  const monthMatch = text.match(/(\d+)\s*개월/);
+  if (monthMatch) return Number(monthMatch[1]);
+
+  const numberMatch = text.match(/\d+/);
+  if (!numberMatch) return 0;
+
+  const num = Number(numberMatch[0]);
+  if (num <= 0) return 0;
+
+  return num <= 10 ? num * 12 : num;
+}
+
+function getProductContractMonths(p: EstimateProduct): number {
+  const explicitMonths =
+    parseSignedMoney((p as any).contractMonths) ||
+    parseSignedMoney((p as any).contractPeriodMonths) ||
+    parseSignedMoney((p as any).contract_months) ||
+    parseSignedMoney((p as any).계약개월) ||
+    parseSignedMoney((p as any).계약기간개월);
+
+  if (explicitMonths > 0) return explicitMonths;
+
+  return getContractMonths(
+    p.contractPeriod ?? (p as any).계약기간 ?? p.selectedVariant?.계약기간,
+  );
+}
+
+function formatMonthlyPriceWithTotal(
+  monthlyPrice: number,
+  contractMonths: number,
+) {
+  const monthlyText = `월 ${formatPrice(monthlyPrice)}`;
+  const totalText =
+    contractMonths > 0
+      ? `(총 ${formatPrice(monthlyPrice * contractMonths)})`
+      : "";
+
+  return { monthlyText, totalText };
+}
+
+function formatMonthlyPriceWithContractTotal(
+  monthlyPrice: number,
+  totalPrice?: number,
+) {
+  return {
+    monthlyText: `월 ${formatPrice(monthlyPrice)}`,
+    totalText:
+      typeof totalPrice === "number" && Number.isFinite(totalPrice)
+        ? `(총 ${formatPrice(totalPrice)})`
+        : "",
+  };
+}
+
+function renderMonthlyPriceWithTotal(
+  monthlyPrice: number,
+  contractMonths: number,
+) {
+  const { monthlyText, totalText } = formatMonthlyPriceWithTotal(
+    monthlyPrice,
+    contractMonths,
+  );
+
+  return (
+    <MonthlyPriceText>
+      <span>{monthlyText}</span>
+      {totalText && <TotalPriceText>{totalText}</TotalPriceText>}
+    </MonthlyPriceText>
+  );
+}
+
+function renderMonthlyPriceWithContractTotal(
+  monthlyPrice: number,
+  totalPrice?: number,
+) {
+  const { monthlyText, totalText } = formatMonthlyPriceWithContractTotal(
+    monthlyPrice,
+    totalPrice,
+  );
+
+  return (
+    <MonthlyPriceText>
+      <span>{monthlyText}</span>
+      {totalText && <TotalPriceText>{totalText}</TotalPriceText>}
+    </MonthlyPriceText>
+  );
 }
 
 function getVoucherAmount(p: EstimateProduct): number {
@@ -136,6 +265,56 @@ function getBaseMonthly(p: EstimateProduct): number {
   // 예전 데이터 대비: baseMonthly 없으면 finalPrice를 기준으로 사용
   const fromFinal = parseMoney(p.finalPrice);
   return fromFinal > 0 ? fromFinal : 0;
+}
+
+// 🔹 상품 할인전금액(원본) 표시용
+function getPriceBeforeMonthly(p: EstimateProduct): number {
+  const variant = p.selectedVariant as any | undefined;
+  const priceBefore = parseMoney(variant?.할인전금액);
+  if (priceBefore > 0) return priceBefore;
+
+  return getBaseMonthly(p);
+}
+
+function getPrepayPaymentAmount(p: EstimateProduct): number {
+  return parseMoney(p.prepayAmount);
+}
+
+function getPrepayBillingBaseMonthly(p: EstimateProduct): number {
+  const variant = p.selectedVariant;
+  const discounted = parseMoney(variant?.할인후금액);
+  if (discounted > 0) return discounted;
+
+  const normal = parseMoney(variant?.정상가);
+  if (normal > 0) return normal;
+
+  const priceBefore = parseMoney(variant?.할인전금액);
+  if (priceBefore > 0) return priceBefore;
+
+  return getBaseMonthly(p);
+}
+
+function getDisplayPrepayMonthlyDiscount(
+  p: EstimateProduct,
+  savedPrepayDiscount: number,
+  contractMonths: number,
+): number {
+  if (savedPrepayDiscount > 0) return savedPrepayDiscount;
+
+  const prepayAmount = getPrepayPaymentAmount(p);
+  const billingBaseMonthly = getPrepayBillingBaseMonthly(p);
+  if (!p.prepayRate || prepayAmount <= 0 || billingBaseMonthly <= 0) return 0;
+
+  const months = contractMonths > 0 ? contractMonths : 72;
+  const totalBeforePrepay = billingBaseMonthly * months;
+  const prepayWithFee = prepayAmount * 1.135;
+  const monthlyAfterPrepay =
+    Math.floor((totalBeforePrepay - prepayWithFee) / months / 100) * 100;
+  const monthlyDiscount =
+    Math.floor(Math.max(billingBaseMonthly - monthlyAfterPrepay, 0) / 100) *
+    100;
+
+  return monthlyDiscount >= 1000 ? monthlyDiscount : 0;
 }
 
 // 🔹 혜택가 월 요금 계산 (finalPrice 우선)
@@ -257,6 +436,25 @@ function getVoucherSummaryDetails(data: EstimateData | null) {
     .map(([type, amount]) => ({ type, amount }));
 }
 
+function getProductMultiProductReward(
+  data: EstimateData | null,
+  product: EstimateProduct,
+) {
+  const perUnitReward = parseMoney(data?.multiProductVoucherPerUnitReward ?? 0);
+  const totalMultiVoucher = parseMoney(data?.multiProductVoucherTotal);
+  const count = Number(product.voucherMultiProductCount ?? 0);
+  const eligible = !product.voucherMultiProductCountOnly;
+  if (perUnitReward <= 0 || totalMultiVoucher <= 0 || count <= 0 || !eligible) {
+    return { amount: 0, perUnitReward, count, eligible };
+  }
+  return {
+    amount: perUnitReward * count,
+    perUnitReward,
+    count,
+    eligible,
+  };
+}
+
 export default function EstimateDetailPage() {
   const router = useRouter();
   const { id } = router.query;
@@ -269,6 +467,7 @@ export default function EstimateDetailPage() {
     "계약기간",
     "서비스유형",
     "서비스주기/월",
+    "프로모션 대분류",
     "프로모션유형",
     "프로모션명",
   ] as const;
@@ -365,23 +564,57 @@ export default function EstimateDetailPage() {
   }, [id]);
 
   // ✅ Hook은 early return 전에 항상 호출
-  const { totalBasePrice, totalFinalPrice, totalDiscount } = useMemo(() => {
+  const {
+    totalBasePrice,
+    totalFinalPrice,
+    totalDiscount,
+    totalBaseContractPrice,
+    totalFinalContractPrice,
+    totalDiscountContractPrice,
+    canShowSummaryContractTotal,
+  } = useMemo(() => {
     if (!data) {
-      return { totalBasePrice: 0, totalFinalPrice: 0, totalDiscount: 0 };
+      return {
+        totalBasePrice: 0,
+        totalFinalPrice: 0,
+        totalDiscount: 0,
+        totalBaseContractPrice: 0,
+        totalFinalContractPrice: 0,
+        totalDiscountContractPrice: 0,
+        canShowSummaryContractTotal: false,
+      };
     }
 
     const products = Array.isArray(data.products) ? data.products : [];
+    const contractMonthsByProduct = products.map(getProductContractMonths);
 
     const base = products.reduce((sum, p) => sum + getBaseMonthly(p), 0);
     const final = products.reduce((sum, p) => sum + getFinalMonthly(p), 0);
+    const baseContract = products.reduce(
+      (sum, p, index) =>
+        sum + getBaseMonthly(p) * contractMonthsByProduct[index],
+      0,
+    );
+    const finalContract = products.reduce(
+      (sum, p, index) =>
+        sum + getFinalMonthly(p) * contractMonthsByProduct[index],
+      0,
+    );
 
     // ✅ 총 할인금액은 base-final로 계산 (항상 일관)
     const discount = Math.max(base - final, 0);
+    const discountContract = Math.max(baseContract - finalContract, 0);
 
     return {
       totalBasePrice: base,
       totalFinalPrice: final,
       totalDiscount: discount,
+      totalBaseContractPrice: baseContract,
+      totalFinalContractPrice: finalContract,
+      totalDiscountContractPrice: discountContract,
+      canShowSummaryContractTotal:
+        products.length > 0 &&
+        contractMonthsByProduct.every((months) => months > 0),
     };
   }, [data]);
 
@@ -448,26 +681,46 @@ export default function EstimateDetailPage() {
           {data.products.map((p) => {
             const base = getBaseMonthly(p);
             const final = getFinalMonthly(p);
+            const priceBefore = getPriceBeforeMonthly(p);
+            const contractMonths = getProductContractMonths(p);
+            const prepayPaymentAmount = getPrepayPaymentAmount(p);
 
             // ✅ 할인 내역
             const breakdown = getDiscountBreakdown(p);
             const voucherBreakdown = getVoucherBreakdown(p);
+            const prepayMonthlyDiscount = getDisplayPrepayMonthlyDiscount(
+              p,
+              breakdown.prepay,
+              contractMonths,
+            );
+            const hasPrepay =
+              prepayMonthlyDiscount > 0 ||
+              Boolean(p.prepayRate && prepayPaymentAmount > 0);
             const hasDiscountDetail =
+              hasPrepay ||
               breakdown.prepay > 0 ||
               breakdown.cardDiscount > 0 ||
               breakdown.teacher > 0 ||
               voucherBreakdown.combineOrResubscribe > 0 ||
               voucherBreakdown.additionalDiscount > 0;
+            const multiProductReward = getProductMultiProductReward(data, p);
+            const multiProductNote =
+              p.voucherMultiProductNote ||
+              (p.voucherMultiProductCountOnly
+                ? "대수만 인정, 상품권 미적용"
+                : undefined);
 
             return (
               <Item key={p.모델코드}>
-                <Image
-                  src={p.thumbnailUrl || "/placeholder.png"}
-                  width={120}
-                  height={120}
-                  alt={p.상품명}
-                  unoptimized
-                />
+                <ProductImageWrap>
+                  <Image
+                    src={p.thumbnailUrl || "/placeholder.png"}
+                    width={120}
+                    height={120}
+                    alt={p.상품명}
+                    unoptimized
+                  />
+                </ProductImageWrap>
 
                 <Info>
                   <h4>{p.상품명}</h4>
@@ -476,10 +729,21 @@ export default function EstimateDetailPage() {
                   {renderVariantInfo(p.selectedVariant)}
                   {renderDiscountInfo(p)}
 
+                  <PriceSectionDivider />
+
+                  <PriceRow className="before">
+                    <span>상품 할인전금액</span>
+                    <strong>
+                      {renderMonthlyPriceWithTotal(priceBefore, contractMonths)}
+                    </strong>
+                  </PriceRow>
+
                   {/* ✅ 기준 월 요금 */}
-                  <PriceRow>
-                    <span>기준 월 요금 (할인전금액)</span>
-                    <strong>월 {base.toLocaleString()}원</strong>
+                  <PriceRow className="base">
+                    <span>기준 월 요금</span>
+                    <strong>
+                      {renderMonthlyPriceWithTotal(base, contractMonths)}
+                    </strong>
                   </PriceRow>
 
                   {/* ✅ (추가) 할인 내역 */}
@@ -487,27 +751,52 @@ export default function EstimateDetailPage() {
                     <DiscountBlock>
                       <DiscountTitle>할인/지원금 내역</DiscountTitle>
 
-                      {breakdown.prepay > 0 && (
-                        <DiscountRow>
-                          <span>
-                            선납
-                            {p.prepayRate ? ` (${p.prepayRate}%)` : ""}
-                          </span>
-                          <b>- {breakdown.prepay.toLocaleString()}원</b>
-                        </DiscountRow>
+                      {hasPrepay && (
+                        <>
+                          {prepayPaymentAmount > 0 && (
+                            <PrepayPaymentRow>
+                              <span>선납 금액</span>
+                              <b>{formatPrice(prepayPaymentAmount)}</b>
+                            </PrepayPaymentRow>
+                          )}
+                          {prepayMonthlyDiscount > 0 && (
+                            <DiscountRow>
+                              <span>
+                                선납 할인금액
+                                {p.prepayRate ? ` (${p.prepayRate}%)` : ""}
+                              </span>
+                              <b>
+                                {renderMonthlyPriceWithTotal(
+                                  -prepayMonthlyDiscount,
+                                  contractMonths,
+                                )}
+                              </b>
+                            </DiscountRow>
+                          )}
+                        </>
                       )}
 
                       {breakdown.cardDiscount > 0 && (
                         <DiscountRow>
                           <span>제휴카드 할인 금액</span>
-                          <b>- {breakdown.cardDiscount.toLocaleString()}원</b>
+                          <b>
+                            {renderMonthlyPriceWithTotal(
+                              -breakdown.cardDiscount,
+                              contractMonths,
+                            )}
+                          </b>
                         </DiscountRow>
                       )}
 
                       {breakdown.teacher > 0 && (
                         <DiscountRow>
                           <span>교원 할인 금액</span>
-                          <b>- {breakdown.teacher.toLocaleString()}원</b>
+                          <b>
+                            {renderMonthlyPriceWithTotal(
+                              -breakdown.teacher,
+                              contractMonths,
+                            )}
+                          </b>
                         </DiscountRow>
                       )}
                       {/* ✅ 상품권 표시 */}
@@ -533,31 +822,47 @@ export default function EstimateDetailPage() {
                   )}
 
                   {!hasDiscountDetail && getVoucherAmount(p) > 0 && (
-                      <DiscountBlock>
-                        <DiscountTitle>상품권 지급</DiscountTitle>
-                        <VoucherBox>
-                          <VoucherTitle>총 지급</VoucherTitle>
-                          <VoucherAmount>
-                            {getVoucherAmount(p).toLocaleString()}원
-                          </VoucherAmount>
-                        </VoucherBox>
-                        {getVoucherDetails(p).length > 0 && (
-                          <VoucherDetail>
-                            {getVoucherDetails(p).map((d, idx) => (
-                              <p key={`${p.모델코드}-voucher-only-${idx}`}>
-                                - {d.type}:{" "}
-                                {parseMoney(d.amount).toLocaleString()}원
-                              </p>
-                            ))}
-                          </VoucherDetail>
-                        )}
-                      </DiscountBlock>
-                    )}
+                    <DiscountBlock>
+                      <DiscountTitle>상품권 지급</DiscountTitle>
+                      <VoucherBox>
+                        <VoucherTitle>총 지급</VoucherTitle>
+                        <VoucherAmount>
+                          {getVoucherAmount(p).toLocaleString()}원
+                        </VoucherAmount>
+                      </VoucherBox>
+                      {getVoucherDetails(p).length > 0 && (
+                        <VoucherDetail>
+                          {getVoucherDetails(p).map((d, idx) => (
+                            <p key={`${p.모델코드}-voucher-only-${idx}`}>
+                              - {d.type}:{" "}
+                              {parseMoney(d.amount).toLocaleString()}원
+                            </p>
+                          ))}
+                        </VoucherDetail>
+                      )}
+                    </DiscountBlock>
+                  )}
 
                   {/* ✅ 총 체감 혜택 */}
+                  {(multiProductReward.amount > 0 || multiProductNote) && (
+                    <DiscountBlock>
+                      <DiscountTitle>다품목 상품권</DiscountTitle>
+                      {multiProductReward.amount > 0 && (
+                        <VoucherLine>
+                          <span>다품목 상품권</span>
+                          <b>{multiProductReward.amount.toLocaleString()}원</b>
+                        </VoucherLine>
+                      )}
+                      {multiProductNote && (
+                        <MultiProductNote>{multiProductNote}</MultiProductNote>
+                      )}
+                    </DiscountBlock>
+                  )}
                   <PriceRow className="benefit">
                     <span>월 체감요금 </span>
-                    <strong>월 {final.toLocaleString()}원</strong>
+                    <strong>
+                      {renderMonthlyPriceWithTotal(final, contractMonths)}
+                    </strong>
                   </PriceRow>
                 </Info>
               </Item>
@@ -568,23 +873,42 @@ export default function EstimateDetailPage() {
         <Summary>
           <SummaryFlex>
             <div>기준 이용 요금</div>
-            <strong>월 {totalBasePrice.toLocaleString()}원</strong>
+            <strong>
+              {renderMonthlyPriceWithContractTotal(
+                totalBasePrice,
+                canShowSummaryContractTotal
+                  ? totalBaseContractPrice
+                  : undefined,
+              )}
+            </strong>
           </SummaryFlex>
 
           <SummaryFlex
             style={{ color: "#b3b3b3", fontSize: "16px", marginBottom: 5 }}
           >
             <div style={{ color: "#b3b3b3" }}>총 할인/지원 금액</div>
-            <span>- {totalDiscount.toLocaleString()}원</span>
+            <span>
+              {renderMonthlyPriceWithContractTotal(
+                -totalDiscount,
+                canShowSummaryContractTotal
+                  ? -totalDiscountContractPrice
+                  : undefined,
+              )}
+            </span>
           </SummaryFlex>
 
           <SummaryFlex>
             <div style={{ color: "#ea1917" }}>월 체감요금</div>
             <strong style={{ color: "#ea1917" }}>
-              월 {totalFinalPrice.toLocaleString()}원
+              {renderMonthlyPriceWithContractTotal(
+                totalFinalPrice,
+                canShowSummaryContractTotal
+                  ? totalFinalContractPrice
+                  : undefined,
+              )}
             </strong>
           </SummaryFlex>
-          {(
+          {
             <SummaryFlex
               style={{
                 color: "#666",
@@ -596,7 +920,7 @@ export default function EstimateDetailPage() {
               <div>총 상품권</div>
               <span>{totalVoucher.toLocaleString()}원</span>
             </SummaryFlex>
-          )}
+          }
           {getVoucherSummaryDetails(data).length > 0 && (
             <VoucherDetail>
               {getVoucherSummaryDetails(data).map((d, idx) => (
@@ -653,30 +977,42 @@ const DiscountRow = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
   font-size: 14px;
   margin-bottom: 6px;
 
-  span {
+  > span {
     color: #666;
   }
-  b {
+  > b {
     color: #ea1917;
     font-weight: 700;
+  }
+
+  @media (max-width: 767px) {
+    align-items: flex-start;
+
+    > span {
+      min-width: 0;
+    }
+
+    > b {
+      min-width: 0;
+      text-align: right;
+    }
   }
 `;
 
-const DiscountTotalRow = styled(DiscountRow)`
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px dashed #ddd;
+const PrepayPaymentRow = styled(DiscountRow)`
+  margin-top: 2px;
 
-  span {
-    color: #444;
-    font-weight: 700;
+  > span {
+    color: #555;
   }
-  b {
-    color: #ea1917;
-    font-weight: 800;
+
+  > b {
+    color: #333;
+    font-weight: 700;
   }
 `;
 
@@ -696,11 +1032,21 @@ const Wrapper = styled.div`
   p {
     font-size: 14px;
   }
+
+  @media (max-width: 767px) {
+    margin: 24px 12px;
+    padding: 16px;
+  }
 `;
 const FlexTitle = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
+
+  @media (max-width: 767px) {
+    align-items: flex-start;
+    gap: 8px;
+  }
 `;
 const ProductList = styled.div`
   margin-top: 20px;
@@ -710,12 +1056,54 @@ const Item = styled.div`
   gap: 20px;
   border-bottom: 1px solid #eee;
   padding: 20px 0;
+
+  @media (max-width: 767px) {
+    flex-direction: column;
+    gap: 14px;
+    padding: 18px 0;
+  }
 `;
+
+const ProductImageWrap = styled.div`
+  flex: 0 0 120px;
+  width: 120px;
+
+  img {
+    display: block;
+    width: 120px;
+    height: 120px;
+    object-fit: contain;
+  }
+
+  @media (max-width: 767px) {
+    width: 100%;
+    flex-basis: auto;
+    display: flex;
+    justify-content: center;
+
+    img {
+      width: 140px;
+      height: 140px;
+    }
+  }
+`;
+
 const Info = styled.div`
   flex: 1;
+  min-width: 0;
+
   h4 {
     font-size: 18px;
     font-weight: 700;
+  }
+
+  @media (max-width: 767px) {
+    width: 100%;
+
+    h4 {
+      font-size: 17px;
+      line-height: 1.35;
+    }
   }
 `;
 const VariantBox = styled.div`
@@ -723,28 +1111,105 @@ const VariantBox = styled.div`
   font-size: 14px;
   margin-top: 10px;
 `;
+const PriceSectionDivider = styled.div`
+  margin-top: 12px;
+  border-top: 1px solid #ececec;
+`;
 const PriceRow = styled.div`
   margin-top: 8px;
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
   font-size: 16px;
+
+  &.before {
+    > span {
+      font-size: 12px;
+      color: #9a9a9a;
+    }
+
+    > strong {
+      font-size: 14px;
+      font-weight: 500;
+      color: #8a8a8a;
+    }
+  }
+
+  &.base {
+    > span {
+      font-size: 14px;
+      color: #333;
+      font-weight: 600;
+    }
+
+    > strong {
+      font-size: 20px;
+      font-weight: 800;
+      color: #111;
+    }
+  }
 
   &.benefit {
     color: #ea1917;
 
-    strong {
+    > strong {
       color: #ea1917;
     }
   }
 
-  span {
+  > span {
     font-size: 14px;
     color: #444;
   }
 
-  strong {
+  > strong {
     font-size: 18px;
     font-weight: bold;
+  }
+
+  @media (max-width: 767px) {
+    gap: 8px;
+
+    > span {
+      min-width: 0;
+    }
+
+    > strong {
+      min-width: 0;
+      text-align: right;
+    }
+  }
+`;
+
+const MonthlyPriceText = styled.span`
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: baseline;
+  column-gap: 4px;
+  row-gap: 2px;
+  line-height: 1.25;
+  text-align: right;
+
+  > span:first-child {
+    white-space: nowrap;
+  }
+
+  @media (max-width: 767px) {
+    max-width: 100%;
+  }
+`;
+
+const TotalPriceText = styled.span`
+  color: inherit;
+  font-size: 0.82em;
+  font-weight: 500;
+  opacity: 0.72;
+  white-space: nowrap;
+
+  @media (max-width: 767px) {
+    white-space: normal;
   }
 `;
 const Summary = styled.div`
@@ -754,11 +1219,32 @@ const Summary = styled.div`
   border-radius: 6px;
   font-size: 18px;
   font-weight: bold;
+
+  @media (max-width: 767px) {
+    margin-top: 28px;
+    padding: 18px 16px;
+  }
 `;
 const SummaryFlex = styled.div`
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
   margin-bottom: 15px;
+
+  @media (max-width: 767px) {
+    gap: 8px;
+
+    > div {
+      min-width: 0;
+    }
+
+    > strong,
+    > span {
+      min-width: 0;
+      text-align: right;
+    }
+  }
 `;
 const SummaryBottom = styled.div`
   font-size: 12px;
@@ -774,6 +1260,10 @@ const ButtonWrap = styled.div`
   padding: 20px;
   background: #fff;
   border-top: 1px solid #eee;
+
+  @media (max-width: 767px) {
+    padding: 14px 12px;
+  }
 `;
 const Button = styled.button`
   background: #222;
@@ -794,16 +1284,30 @@ const VoucherBox = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   color: #666;
+
+  @media (max-width: 767px) {
+    align-items: flex-start;
+  }
 `;
 
 const VoucherTitle = styled.div`
   font-size: 12px;
+
+  @media (max-width: 767px) {
+    min-width: 0;
+  }
 `;
 
 const VoucherAmount = styled.div`
   font-size: 14px;
   font-weight: 500;
+
+  @media (max-width: 767px) {
+    min-width: 0;
+    text-align: right;
+  }
 `;
 
 const VoucherDetail = styled.div`
@@ -814,4 +1318,32 @@ const VoucherDetail = styled.div`
   p {
     margin: 2px 0;
   }
+`;
+
+const VoucherLine = styled.div`
+  margin-top: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+
+  @media (max-width: 767px) {
+    align-items: flex-start;
+
+    > span {
+      min-width: 0;
+    }
+
+    > b {
+      min-width: 0;
+      text-align: right;
+    }
+  }
+`;
+
+const MultiProductNote = styled.div`
+  margin-top: 4px;
+  font-size: 12px;
+  color: #777;
 `;

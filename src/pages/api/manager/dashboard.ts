@@ -8,14 +8,13 @@ import {
   where,
   Timestamp,
   type QueryConstraint,
-  type QueryDocumentSnapshot,
-  type DocumentData,
 } from "firebase/firestore";
 
 export type ManagerDashboardRequest = {
   managerUid: string;
   managerId: string;
   position: string;
+  role?: string;
   region?: string;
   office?: string;
   startDate?: string;
@@ -60,7 +59,21 @@ const getAreaFromRegion = (region: string) => {
   return trimmed;
 };
 
-const getDashboardScope = (position: string): ManagerDashboardScope => {
+const getDashboardScope = (
+  body: Pick<
+    ManagerDashboardRequest,
+    "managerId" | "position" | "role" | "office"
+  >,
+): ManagerDashboardScope => {
+  if (body.role === "admin" || body.managerId === "admin") {
+    return "national";
+  }
+
+  if (body.managerId === "admin-global") {
+    return body.office ? "office" : "national";
+  }
+
+  const position = body.position ?? "";
   if (position.includes("지역담당") || position.includes("CSA")) {
     return "national";
   }
@@ -173,7 +186,7 @@ export default async function handler(
   }
 
   try {
-    const scope = getDashboardScope(body.position);
+    const scope = getDashboardScope(body);
     const managerQuery = getScopeQuery(
       scope,
       body.region,
@@ -181,19 +194,18 @@ export default async function handler(
       body.managerId,
     );
     const managerSnap = await getDocs(managerQuery);
-    const scopedManagers = managerSnap.docs
-      .map((docSnap) => {
-        const data = docSnap.data() as any;
-        return {
-          id: docSnap.id,
-          managerId: String(data.managerId ?? ""),
-          name: String(data.name ?? ""),
-          position: String(data.position ?? ""),
-          office: String(data.office ?? data.branch ?? ""),
-          region: String(data.region ?? ""),
-          teamLeaderId: String(data.teamLeaderId ?? ""),
-        };
-      });
+    const scopedManagers = managerSnap.docs.map((docSnap) => {
+      const data = docSnap.data() as any;
+      return {
+        id: docSnap.id,
+        managerId: String(data.managerId ?? ""),
+        name: String(data.name ?? ""),
+        position: String(data.position ?? ""),
+        office: String(data.office ?? data.branch ?? ""),
+        region: String(data.region ?? ""),
+        teamLeaderId: String(data.teamLeaderId ?? ""),
+      };
+    });
 
     const scopedArea = getAreaFromRegion(body.region ?? "");
     const filteredManagers = scopedManagers.filter((manager) => {

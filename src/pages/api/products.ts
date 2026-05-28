@@ -239,6 +239,7 @@ export default async function handler(
   const sub = req.query.sub as string | undefined;
   const id = req.query.id as string | undefined;
   const q = req.query.q as string | undefined;
+  const modelsQuery = req.query.models;
 
 	const groupBy = req.query.groupBy as string | undefined;
   const isModelCodeGrouping = groupBy === "modelCode";
@@ -254,6 +255,11 @@ export default async function handler(
     // (기존 normalize는 그대로 두되, 아래에서는 normalizeName 사용)
     const normalize = (s?: string) =>
       (s || "").replace(/\s+/g, "").trim().toLowerCase();
+    const modelFilters = (Array.isArray(modelsQuery) ? modelsQuery : [modelsQuery])
+      .flatMap((value) => (value ?? "").split(","))
+      .map((value) => normalizeName(value))
+      .filter(Boolean);
+    const modelFilterSet = new Set(modelFilters);
 
     //  요청 단위 썸네일/이미지 캐시 (UI 반응성 + 중복 연산 제거)
     const thumbCache = new Map<string, string>();
@@ -348,13 +354,6 @@ export default async function handler(
       return group || model; //  기존 동작 유지
     };
 
-    const grouped = products.reduce<Record<string, Product[]>>((acc, cur) => {
-      const key = getGroupKey(cur);
-      if (!key) return acc;
-      (acc[key] ||= []).push(cur);
-      return acc;
-    }, {});
-
     //  상세 조회
     if (id) {
       //  1️⃣ 현재 모델코드 기준 행만
@@ -442,6 +441,11 @@ export default async function handler(
         })
       );
     }
+    if (modelFilterSet.size > 0) {
+      filtered = filtered.filter((p) =>
+        modelFilterSet.has(normalizeName(p["모델코드"]))
+      );
+    }
 
     const groupedFiltered = filtered.reduce<Record<string, Product[]>>(
       (acc, cur) => {
@@ -468,6 +472,7 @@ export default async function handler(
               계약기간: p["계약기간"],
               서비스유형: p["서비스유형"],
               "서비스주기/월": p["서비스주기/월"],
+              "프로모션 대분류": p["프로모션 대분류"],
               프로모션유형: p["프로모션유형"],
               프로모션명: p["프로모션명"],
               정상가: p["정상가"],

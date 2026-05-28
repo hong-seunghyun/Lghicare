@@ -1,6 +1,7 @@
 ﻿type VoucherMaster = {
   version: number;
   rules: {
+    basePromoTypeKeywords?: string[];
     baseDefaultKeyword?: string; // "기본"
     baseResubscribeKeyword?: string; // "재구독"
     combineKeywords?: string[]; // ["신규결합","기존결합"]
@@ -51,6 +52,8 @@
         | { name?: string; amount?: number; startDate?: string; endDate?: string }
         | Array<{ name?: string; amount?: number; startDate?: string; endDate?: string }>;
       multiProductCount?: number;
+      multiProductNote?: string;
+      multiProductExcludeVoucher?: boolean;
     }
   >;
 };
@@ -65,6 +68,16 @@ export type VoucherBreakdown = {
   details: Array<{ type: string; amount: number; reason: string }>;
 };
 
+type MultiProductVoucherDetail = { type: string; amount: number; reason: string };
+
+export type MultiProductVoucherResult = {
+  total: number;
+  details: MultiProductVoucherDetail[];
+  perUnitReward: number;
+  totalUnits: number;
+  eligibleUnits: number;
+};
+
 const normalizeText = (value: string) =>
   value.replace(/\s+/g, "").replace(/[()]/g, "");
 
@@ -73,8 +86,34 @@ const includesAny = (text: string, keywords: string[]) => {
   return keywords.some((k) => normText.includes(normalizeText(k)));
 };
 
-const getStackingPolicy = (rules: VoucherMaster["rules"]) =>
-  rules.stackingPolicy?.categories ?? {};
+const expandKeywordTokens = (keywords: string[]) =>
+  keywords
+    .flatMap((word) => word.split(/[|,/]/))
+    .map((token) => token.trim())
+    .filter(Boolean);
+
+const PROMO_KEY_ALIASES: Record<string, string[]> = {
+  중고: ["자사보상", "자사"],
+  자사보상: ["중고", "자사"],
+  자사: ["자사보상", "중고"],
+};
+
+const withPromoAliases = (keywords: string[]) => {
+  const merged = new Set<string>();
+  keywords.forEach((keyword) => {
+    const clean = keyword.trim();
+    if (!clean) return;
+    merged.add(clean);
+    Object.entries(PROMO_KEY_ALIASES).forEach(([key, aliases]) => {
+      if (normalizeText(clean) === normalizeText(key)) {
+        aliases.forEach((alias) => {
+          if (alias?.trim()) merged.add(alias.trim());
+        });
+      }
+    });
+  });
+  return Array.from(merged);
+};
 
 type StackingCategory =
   | "base"
@@ -87,10 +126,10 @@ const getAllowMultiple = (
   rules: VoucherMaster["rules"],
   category: StackingCategory,
 ) => {
-  const policy = getStackingPolicy(rules);
-  if (policy?.[category]?.allowMultiple != null) {
-    return policy[category]?.allowMultiple ?? false;
-  }
+  // 항목 내 중복은 프로모션 상품권만 허용한다.
+  // (기본/서비스주기/테마판촉/다품목은 항목당 단일 적용)
+  void rules;
+  void category;
   return category === "promo";
 };
 
@@ -209,28 +248,54 @@ export function calcVoucher(params: {
     ];
   const baseDefaultKeyword = voucherMaster.rules.baseDefaultKeyword ?? "기본";
 
-  const isResubscribe = includesAny(promoType, [resubscribeKeyword]);
-  const isCombine = includesAny(promoType, combineKeywords);
-  const isDefault =
-    (!isResubscribe && !isCombine) ||
-    (promoType && includesAny(promoType, [baseDefaultKeyword]));
+  const resubscribeKeywords = expandKeywordTokens([resubscribeKeyword]);
+  const combineKeywordTokens = expandKeywordTokens(combineKeywords);
+  const defaultKeywordTokens = expandKeywordTokens([baseDefaultKeyword]);
+  const configuredBaseKeywords = expandKeywordTokens(
+    voucherMaster.rules.basePromoTypeKeywords ?? [],
+  );
+  const baseEligibilityKeywords = Array.from(
+    new Set([
+      ...configuredBaseKeywords,
+      ...resubscribeKeywords,
+      ...combineKeywordTokens,
+      ...defaultKeywordTokens,
+    ]),
+  );
 
-  if (isResubscribe) {
-    base = model.base.resubscribe || 0;
-    if (base > 0)
-      details.push({ type: "기본 상품권", amount: base, reason: "재구독" });
-  } else if (isCombine) {
-    base = model.base.combine_new_existing || 0;
-    if (base > 0)
-      details.push({
-        type: "기본 상품권",
-        amount: base,
-        reason: "기존/신규결합",
-      });
-  } else if (isDefault) {
-    base = model.base.default || 0;
-    if (base > 0)
-      details.push({ type: "기본 상품권", amount: base, reason: "기본" });
+  const hasBaseCondition =
+    promoType.length > 0 &&
+    includesAny(promoType, baseEligibilityKeywords);
+  const isResubscribe =
+    hasBaseCondition && includesAny(promoType, resubscribeKeywords);
+  const isCombine =
+    hasBaseCondition && includesAny(promoType, combineKeywordTokens);
+  const isDefault =
+    hasBaseCondition &&
+    !isResubscribe &&
+    !isCombine &&
+    (defaultKeywordTokens.length === 0 ||
+      includesAny(promoType, defaultKeywordTokens) ||
+      configuredBaseKeywords.length > 0);
+
+  if (hasBaseCondition) {
+    if (isResubscribe) {
+      base = model.base.resubscribe || 0;
+      if (base > 0)
+        details.push({ type: "기본 상품권", amount: base, reason: "재구독" });
+    } else if (isCombine) {
+      base = model.base.combine_new_existing || 0;
+      if (base > 0)
+        details.push({
+          type: "기본 상품권",
+          amount: base,
+          reason: "기존/신규결합",
+        });
+    } else if (isDefault) {
+      base = model.base.default || 0;
+      if (base > 0)
+        details.push({ type: "기본 상품권", amount: base, reason: "기본" });
+    }
   }
 
   // 2) 서비스주기 상품권
@@ -259,7 +324,13 @@ export function calcVoucher(params: {
         const target = serviceCycle.replace(/[^0-9]/g, "");
         if (target) {
           const matched = Object.entries(model.serviceCycle || {}).find(
-            ([key]) => key.replace(/[^0-9]/g, "") === target,
+            ([key]) => {
+              if (key.replace(/[^0-9]/g, "") !== target) return false;
+              // 숫자 기반 fallback은 "4개월"처럼 순수 주기 키에서만 허용.
+              // "4개월 신규, 결합" 같은 조건 키는 promoType 매칭을 통과해야만 적용.
+              const metadata = parseServiceCycleMetadata(key);
+              return metadata.targetKeywords.length === 0;
+            },
           );
           cycleAmt = matched ? Number(matched[1]) || 0 : 0;
         }
@@ -275,28 +346,84 @@ export function calcVoucher(params: {
 
   // 3) 프로모션별 상품권(부분 포함 매칭)
   let promotion = 0;
-  if (promoName) {
+  const promoSource = promoName.trim();
+  if (promoSource) {
     const matches: Array<{ key: string; amount: number }> = [];
 
     const legacyMap = voucherMaster.rules.promoNameKeywordMap;
+    const expandKeywords = (keywords: string[]) =>
+      keywords
+        .flatMap((word) => word.split(/[|,/]/))
+        .map((token) => token.trim())
+        .filter(Boolean);
+    const buildKeywordVariants = (keywords: string[]) =>
+      withPromoAliases(expandKeywords(keywords)).flatMap((value) =>
+        value.endsWith("전환")
+          ? [value, value.replace(/전환$/, "")]
+          : [value],
+      );
+
+    const promoEntries = Object.entries(model.promo || {})
+      .map(([key, amount]) => ({ key, amount: Number(amount) || 0 }))
+      .filter((entry) => entry.amount > 0);
+    const usedPromoKeys = new Set<string>();
+
+    const resolvePromoEntry = (label: string, keywords: string[]) => {
+      const preferredKeys = withPromoAliases([label, ...expandKeywords(keywords)]);
+      const exact = promoEntries.find((entry) =>
+        preferredKeys.some(
+          (candidate) =>
+            normalizeText(candidate) === normalizeText(entry.key),
+        ),
+      );
+      if (exact) return exact;
+
+      return (
+        promoEntries.find((entry) =>
+          preferredKeys.some(
+            (candidate) =>
+              includesAny(entry.key, [candidate]) ||
+              includesAny(candidate, [entry.key]),
+          ),
+        ) ?? null
+      );
+    };
+
     if (legacyMap && Object.keys(legacyMap).length > 0) {
       Object.entries(legacyMap).forEach(([label, keywords]) => {
-        if (!promoName) return;
-        if (!includesAny(promoName, keywords)) return;
-        const key = keywords[0];
-        const amt = Number(model.promo?.[key]) || 0;
-        if (amt <= 0) return;
-        matches.push({ key: label, amount: amt });
+        const triggerKeywords = buildKeywordVariants([label, ...keywords]);
+        if (!includesAny(promoSource, triggerKeywords)) return;
+
+        const resolved = resolvePromoEntry(label, keywords);
+        if (!resolved || resolved.amount <= 0) return;
+
+        const dedupeKey = normalizeText(resolved.key);
+        if (usedPromoKeys.has(dedupeKey)) return;
+        usedPromoKeys.add(dedupeKey);
+
+        matches.push({ key: label, amount: resolved.amount });
       });
     } else {
-      Object.entries(model.promo || {}).forEach(([key, amount]) => {
-        if (!includesAny(promoName, [key])) return;
-        const amt = Number(amount) || 0;
-        if (amt <= 0) return;
-        matches.push({ key, amount: amt });
+      promoEntries.forEach((entry) => {
+        const keywordVariants = buildKeywordVariants([entry.key]);
+        if (!includesAny(promoSource, keywordVariants)) return;
+        const dedupeKey = normalizeText(entry.key);
+        if (usedPromoKeys.has(dedupeKey)) return;
+        usedPromoKeys.add(dedupeKey);
+        matches.push({ key: entry.key, amount: entry.amount });
       });
     }
 
+    if (matches.length === 0) {
+      promoEntries.forEach((entry) => {
+        const keywordVariants = buildKeywordVariants([entry.key]);
+        if (!includesAny(promoSource, keywordVariants)) return;
+        const dedupeKey = normalizeText(entry.key);
+        if (usedPromoKeys.has(dedupeKey)) return;
+        usedPromoKeys.add(dedupeKey);
+        matches.push({ key: entry.key, amount: entry.amount });
+      });
+    }
     if (matches.length > 0) {
       if (getAllowMultiple(voucherMaster.rules, "promo")) {
         matches.forEach((match) => {
@@ -353,6 +480,7 @@ export function calcVoucher(params: {
     };
 
     const uniqueNames = Array.from(new Set(themeNames));
+    const hasThemeContext = uniqueNames.length > 0;
 
     if (Array.isArray(themePromoRaw)) {
       themePromoRaw.forEach((item) => {
@@ -361,13 +489,9 @@ export function calcVoucher(params: {
         if (amount <= 0) return;
         const hasDates = item?.startDate || item?.endDate;
         if (!hasDates) {
-          // 날짜 미지정: 상시 노출
-          if (
-            uniqueNames.length === 0 ||
-            uniqueNames.some((n) => matchByName(n, name))
-          ) {
-            addMatch(name, amount);
-          }
+          if (!hasThemeContext) return;
+          if (!uniqueNames.some((n) => matchByName(n, name))) return;
+          addMatch(name, amount);
           return;
         }
         const start = item?.startDate ? new Date(item.startDate) : null;
@@ -375,12 +499,9 @@ export function calcVoucher(params: {
         const inRange =
           (!start || themeDate >= start) && (!end || themeDate <= end);
         if (!inRange) return;
-        if (
-          uniqueNames.length === 0 ||
-          uniqueNames.some((n) => matchByName(n, name))
-        ) {
-          addMatch(name, amount, "기간");
-        }
+        if (hasThemeContext && !uniqueNames.some((n) => matchByName(n, name)))
+          return;
+        addMatch(name, amount, "기간");
       });
     } else if (
       typeof themePromoRaw === "object" &&
@@ -393,10 +514,7 @@ export function calcVoucher(params: {
       const hasDates = themePromoRaw?.startDate || themePromoRaw?.endDate;
       if (amount > 0) {
         if (!hasDates) {
-          if (
-            uniqueNames.length === 0 ||
-            uniqueNames.some((n) => matchByName(n, name))
-          ) {
+          if (hasThemeContext && uniqueNames.some((n) => matchByName(n, name))) {
             addMatch(name, amount);
           }
         } else {
@@ -410,8 +528,7 @@ export function calcVoucher(params: {
             (!start || themeDate >= start) && (!end || themeDate <= end);
           if (
             inRange &&
-            (uniqueNames.length === 0 ||
-              uniqueNames.some((n) => matchByName(n, name)))
+            (!hasThemeContext || uniqueNames.some((n) => matchByName(n, name)))
           ) {
             addMatch(name, amount, "기간");
           }
@@ -420,14 +537,7 @@ export function calcVoucher(params: {
     } else {
       const themePromoMap = (themePromoRaw as Record<string, number>) || {};
       if (Object.keys(themePromoMap).length > 0) {
-        if (uniqueNames.length === 0) {
-          // 상시 노출: 테마명이 없으면 등록된 테마판촉을 그대로 적용
-          Object.entries(themePromoMap).forEach(([key, amount]) => {
-            const amt = Number(amount) || 0;
-            if (amt <= 0) return;
-            matches.push({ key, amount: amt });
-          });
-        } else {
+        if (hasThemeContext) {
           uniqueNames.forEach((name) => {
             Object.entries(themePromoMap).forEach(([key, amount]) => {
               if (!name.includes(key)) return;
@@ -478,22 +588,72 @@ export function calcVoucher(params: {
 
 export function calcMultiProductVoucher(params: {
   voucherRules: VoucherMaster["rules"];
-  products: Array<{ modelCode: string; multiProductCount?: number }>;
-}): { total: number; details: Array<{ type: string; amount: number; reason: string }> } {
+  products: Array<{
+    modelCode: string;
+    multiProductCount?: number;
+    multiProductCountOnly?: boolean;
+    multiProductNote?: string;
+  }>;
+}): MultiProductVoucherResult {
   const { voucherRules, products } = params;
   const tiers = voucherRules.multiProductRule?.tiers ?? [];
   if (tiers.length === 0) {
-    return { total: 0, details: [] };
+    return {
+      total: 0,
+      details: [],
+      perUnitReward: 0,
+      totalUnits: 0,
+      eligibleUnits: 0,
+    };
   }
 
   const totalUnitsRaw = products.reduce(
     (sum, item) => sum + (Number(item.multiProductCount) || 0),
     0,
   );
+  const eligibleUnitsRaw = products.reduce(
+    (sum, item) =>
+      sum + (item.multiProductCountOnly ? 0 : Number(item.multiProductCount) || 0),
+    0,
+  );
   const rounding = voucherRules.multiProductRule?.rounding ?? "floor";
   const totalUnits = applyRounding(totalUnitsRaw, rounding);
+  const eligibleUnits = applyRounding(eligibleUnitsRaw, rounding);
+  const exceptionUnits = Math.max(totalUnits - eligibleUnits, 0);
+  const exceptionNotes = new Set<string>();
+  products.forEach((item) => {
+    if (
+      item.multiProductCount &&
+      item.multiProductCountOnly &&
+      item.multiProductNote
+    ) {
+      exceptionNotes.add(item.multiProductNote);
+    }
+  });
+  const exceptionReason =
+    exceptionNotes.size > 0
+      ? Array.from(exceptionNotes).join(", ")
+      : "상품권 미적용";
+
+  const createExceptionDetail = () =>
+    exceptionUnits
+      ? [
+          {
+            type: "다품목 상품권 예외",
+            amount: 0,
+            reason: `총 ${exceptionUnits}대는 ${exceptionReason}`,
+          },
+        ]
+      : [];
+
   if (totalUnits <= 0) {
-    return { total: 0, details: [] };
+    return {
+      total: 0,
+      details: createExceptionDetail(),
+      perUnitReward: 0,
+      totalUnits,
+      eligibleUnits,
+    };
   }
 
   const tier = tiers.find((t) => {
@@ -502,13 +662,26 @@ export function calcMultiProductVoucher(params: {
     return minOk && maxOk;
   });
 
-  if (!tier) {
-    return { total: 0, details: [] };
+  if (!tier || eligibleUnits <= 0) {
+    return {
+      total: 0,
+      details: createExceptionDetail(),
+      perUnitReward: tier?.rewardPerUnit ?? 0,
+      totalUnits,
+      eligibleUnits,
+    };
   }
 
-  const total = Math.max(tier.rewardPerUnit * totalUnits, 0);
+  const perUnitReward = Number(tier.rewardPerUnit) || 0;
+  const total = Math.max(perUnitReward * eligibleUnits, 0);
   if (total <= 0) {
-    return { total: 0, details: [] };
+    return {
+      total: 0,
+      details: createExceptionDetail(),
+      perUnitReward,
+      totalUnits,
+      eligibleUnits,
+    };
   }
 
   return {
@@ -517,8 +690,14 @@ export function calcMultiProductVoucher(params: {
       {
         type: "다품목 상품권",
         amount: total,
-        reason: `총 ${totalUnits}대 적용 (${tier.rewardPerUnit.toLocaleString()}원/대)`,
+        reason: exceptionUnits
+          ? `총 ${eligibleUnits}대 지급 (${perUnitReward.toLocaleString()}원/대, ${exceptionUnits}대 예외)`
+          : `총 ${eligibleUnits}대 적용 (${perUnitReward.toLocaleString()}원/대)`,
       },
+      ...createExceptionDetail(),
     ],
+    perUnitReward,
+    totalUnits,
+    eligibleUnits,
   };
 }

@@ -5,6 +5,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
 import { useRouter } from "next/router";
+import PopupDisplay from "@/components/Popups/PopupDisplay";
 
 import { db } from "@/lib/firebase";
 import {
@@ -19,7 +20,6 @@ import {
   getBoardCategoryById,
   getBoardCategoryChildren,
   getBoardCategoryFullLabel,
-  isSalesIndexedCategory,
   isSalesHubCategory,
 } from "@/config/boardCategories";
 
@@ -56,7 +56,6 @@ const ManagerBoardListPage: React.FC = () => {
   const isAllowedCategory =
     Boolean(category) &&
     (isSalesHubCategory(categoryId) || categoryId === "inquiry");
-  const isSalesCategory = isSalesIndexedCategory(categoryId);
   const canCreateInquiry = categoryId === "inquiry";
 
   const [posts, setPosts] = useState<BoardPostListItem[]>([]);
@@ -142,6 +141,15 @@ const ManagerBoardListPage: React.FC = () => {
       return title.includes(keyword) || author.includes(keyword);
     });
   }, [posts, searchTerm]);
+
+  const categoryPostIndexById = useMemo(() => {
+    const indexMap = new Map<string, number>();
+    [...posts].reverse().forEach((post, index) => {
+      indexMap.set(post.id, index + 1);
+    });
+    return indexMap;
+  }, [posts]);
+
   const pageSize = 12;
   const totalPages = Math.max(1, Math.ceil(filteredPosts.length / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -169,6 +177,9 @@ const ManagerBoardListPage: React.FC = () => {
 
   return (
     <PageWrapper>
+      {isSalesHubCategory(categoryId) && (
+        <PopupDisplay location="manager_saleshub" />
+      )}
       <HeaderRow>
         <Title>{pageTitle}</Title>
         {!isParentCategory && (
@@ -212,50 +223,56 @@ const ManagerBoardListPage: React.FC = () => {
       )}
       {!isParentCategory && error && <ErrorText>{error}</ErrorText>}
 
-      {!isParentCategory && !loading && !error && filteredPosts.length === 0 && (
-        <InfoText>등록된 게시글이 없습니다.</InfoText>
-      )}
+      {!isParentCategory &&
+        !loading &&
+        !error &&
+        filteredPosts.length === 0 && (
+          <InfoText>등록된 게시글이 없습니다.</InfoText>
+        )}
 
       {!isParentCategory && !loading && !error && filteredPosts.length > 0 && (
         <>
           <GalleryGrid>
             {pagedPosts.map((post) => (
-            <GalleryCard
-              key={post.id}
-              onClick={() => handleRowClick(post.id)}
-            >
-              <GalleryThumb>
-                {post.thumbnailUrl ? (
-                  <GalleryImage src={post.thumbnailUrl} alt="thumbnail" />
-                ) : (
-                  <ThumbPlaceholder>
-                    <ThumbLogo src={"/images/logo.png"} alt="logo" />
-                    <ThumbText>이미지 준비중</ThumbText>
-                  </ThumbPlaceholder>
-                )}
-              </GalleryThumb>
-              <GalleryBody>
-                <GalleryTitle>{post.title}</GalleryTitle>
-                <GalleryMetaRow>
-                  <MetaText>{post.author || "-"}</MetaText>
-                </GalleryMetaRow>
-                <GallerySubRow>
-                  <MetaText>
-                    {formatDate(post.publishedDate, post.createdAt)}
-                  </MetaText>
-                  <MetaText>
-                    {post.attachments && post.attachments.length > 0
-                      ? `파일 ${post.attachments.length}개`
-                      : "파일 -"}
-                  </MetaText>
-                  <MetaText>
-                    {post.links && post.links.length > 0
-                      ? `링크 ${post.links.length}개`
-                      : "링크 -"}
-                  </MetaText>
-                </GallerySubRow>
-              </GalleryBody>
-            </GalleryCard>
+              <GalleryCard
+                key={post.id}
+                onClick={() => handleRowClick(post.id)}
+              >
+                <GalleryThumb>
+                  {post.thumbnailUrl ? (
+                    <GalleryImage src={post.thumbnailUrl} alt="thumbnail" />
+                  ) : (
+                    <ThumbPlaceholder>
+                      <ThumbLogo src={"/images/logo.png"} alt="logo" />
+                      <ThumbText>이미지 준비중</ThumbText>
+                    </ThumbPlaceholder>
+                  )}
+                </GalleryThumb>
+                <GalleryBody>
+                  <GalleryNumber>
+                    #{categoryPostIndexById.get(post.id) ?? "-"}
+                  </GalleryNumber>
+                  <GalleryTitle>{post.title}</GalleryTitle>
+                  <GalleryMetaRow>
+                    <MetaText>{post.author || "-"}</MetaText>
+                  </GalleryMetaRow>
+                  <GallerySubRow>
+                    <MetaText>
+                      {formatDate(post.publishedDate, post.createdAt)}
+                    </MetaText>
+                    <MetaText>
+                      {post.attachments && post.attachments.length > 0
+                        ? `파일 ${post.attachments.length}개`
+                        : "파일 -"}
+                    </MetaText>
+                    <MetaText>
+                      {post.links && post.links.length > 0
+                        ? `링크 ${post.links.length}개`
+                        : "링크 -"}
+                    </MetaText>
+                  </GallerySubRow>
+                </GalleryBody>
+              </GalleryCard>
             ))}
           </GalleryGrid>
           {totalPages > 1 && (
@@ -425,7 +442,9 @@ const GalleryCard = styled.button`
   cursor: pointer;
   text-align: left;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 
   &:hover {
     transform: translateY(-2px);
@@ -453,6 +472,16 @@ const GalleryBody = styled.div`
   display: flex;
   flex-direction: column;
   gap: 8px;
+`;
+
+const GalleryNumber = styled.div`
+  align-self: flex-start;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #eef3fb;
+  color: #2f5b9d;
+  font-size: 11px;
+  font-weight: 700;
 `;
 
 const GalleryTitle = styled.div`
@@ -496,14 +525,14 @@ const ThumbPlaceholder = styled.div`
 `;
 
 const ThumbLogo = styled.img`
-  width: 36px;
-  height: 36px;
+  width: 50%;
+  height: auto;
   object-fit: contain;
   opacity: 0.9;
 `;
 
 const ThumbText = styled.div`
-  font-size: 11px;
+  font-size: 0px;
   color: #8a8a8a;
   line-height: 1;
   text-align: center;

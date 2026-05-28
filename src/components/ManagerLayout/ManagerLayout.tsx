@@ -8,7 +8,10 @@ import Link from "next/link";
 import { db, app } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
-import { getManagerSalesHubNavigationItems } from "@/config/boardCategories";
+import {
+  getManagerSalesHubNavigationItems,
+  getManagerStandardEstimateNavigationItem,
+} from "@/config/boardCategories";
 
 interface ManagerSession {
   id: string;
@@ -19,6 +22,7 @@ interface ManagerSession {
   office: string;
   position: string;
   teamLeaderId: string;
+  role?: "manager" | "admin" | string;
 }
 
 interface Props {
@@ -71,7 +75,11 @@ export default function ManagerLayout({ children }: Props) {
 
         const data = snap.data() as any;
 
-        if (data.role !== "manager") {
+        const role = data.role as string | undefined;
+        const isManager = role === "manager";
+        const isAdmin = role === "admin";
+
+        if (!isManager && !isAdmin) {
           if (typeof window !== "undefined") {
             localStorage.removeItem("managerSession");
           }
@@ -84,7 +92,7 @@ export default function ManagerLayout({ children }: Props) {
           return;
         }
 
-        if (data.isActive === false) {
+        if (isManager && data.isActive === false) {
           if (typeof window !== "undefined") {
             localStorage.removeItem("managerSession");
           }
@@ -111,13 +119,23 @@ export default function ManagerLayout({ children }: Props) {
 
         const session: ManagerSession = {
           id: fbUser.uid,
-          managerId: data.managerId || parsed?.managerId || "",
-          name: data.name || parsed?.name || "",
-          branch: data.branch || data.office || parsed?.branch || "",
-          region: data.region || parsed?.region || "",
-          office: data.office || data.branch || parsed?.office || "",
-          position: data.position || parsed?.position || "",
-          teamLeaderId: data.teamLeaderId || parsed?.teamLeaderId || "",
+          managerId: isAdmin ? "admin" : data.managerId || parsed?.managerId || "",
+          name:
+            data.name ||
+            parsed?.name ||
+            fbUser.displayName ||
+            fbUser.email ||
+            (isAdmin ? "관리자" : ""),
+          branch: isAdmin
+            ? "관리자"
+            : data.branch || data.office || parsed?.branch || "",
+          region: isAdmin ? "" : data.region || parsed?.region || "",
+          office: isAdmin
+            ? "관리자"
+            : data.office || data.branch || parsed?.office || "",
+          position: isAdmin ? "관리자" : data.position || parsed?.position || "",
+          teamLeaderId: isAdmin ? "" : data.teamLeaderId || parsed?.teamLeaderId || "",
+          role: isAdmin ? "admin" : "manager",
         };
 
         if (typeof window !== "undefined") {
@@ -154,8 +172,13 @@ export default function ManagerLayout({ children }: Props) {
   };
 
   const boardChildren = useMemo(() => getManagerSalesHubNavigationItems(), []);
+  const standardEstimateNav = useMemo(
+    () => getManagerStandardEstimateNavigationItem(),
+    [],
+  );
 
   const hasManagerManagementAccess = useMemo(() => {
+    if (manager?.role === "admin") return true;
     if (!manager?.position) return false;
     const position = manager.position;
     return (
@@ -173,6 +196,9 @@ export default function ManagerLayout({ children }: Props) {
       { type: "link", label: "대시보드", path: "/manager" },
 
       { type: "link", label: "견적내기", path: "/estimate" },
+      ...(standardEstimateNav
+        ? [{ type: "link" as const, ...standardEstimateNav }]
+        : []),
       {
         type: "group",
         label: "게시판",
@@ -187,7 +213,7 @@ export default function ManagerLayout({ children }: Props) {
     }
 
     return items;
-  }, [boardChildren, hasManagerManagementAccess]);
+  }, [boardChildren, hasManagerManagementAccess, standardEstimateNav]);
 
   useEffect(() => {
     const isBoardRoute =

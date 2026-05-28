@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 // pages/admin/boards/[category]/[id].tsx
 "use client";
 
@@ -7,7 +6,17 @@ import styled from "styled-components";
 import { useRouter } from "next/router";
 
 import { app, db } from "@/lib/firebase";
-import { deleteDoc, doc, getDoc, Timestamp } from "firebase/firestore";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  orderBy,
+  query,
+  Timestamp,
+  where,
+} from "firebase/firestore";
 import { deleteObject, getStorage, listAll, ref } from "firebase/storage";
 import { getBoardCategoryFullLabel } from "@/config/boardCategories";
 import PdfPreview from "@/components/PdfPreview";
@@ -60,6 +69,7 @@ const AdminBoardDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [displayIndex, setDisplayIndex] = useState<number | null>(null);
 
   const categoryLabel = useMemo(() => {
     const targetCategoryId = post?.categoryId || categoryId;
@@ -83,7 +93,27 @@ const AdminBoardDetailPage: React.FC = () => {
           return;
         }
 
-        const data = snap.data() as any;
+        const data = snap.data() as Partial<BoardPostDetail>;
+        const postCategoryId = data.categoryId ?? categoryId;
+
+        try {
+          const sameCategoryQuery = query(
+            collection(db, "boardPosts"),
+            where("categoryId", "==", postCategoryId),
+            orderBy("createdAt", "desc"),
+          );
+          const sameCategorySnap = await getDocs(sameCategoryQuery);
+          const descIndex = sameCategorySnap.docs.findIndex(
+            (docSnap) => docSnap.id === snap.id,
+          );
+          setDisplayIndex(
+            descIndex >= 0 ? sameCategorySnap.docs.length - descIndex : null,
+          );
+        } catch (indexErr) {
+          console.warn("게시글 카테고리 번호 계산 오류:", indexErr);
+          setDisplayIndex(data.salesIndex ?? null);
+        }
+
         setPost({
           id: snap.id,
           title: data.title ?? "(제목 없음)",
@@ -94,10 +124,10 @@ const AdminBoardDetailPage: React.FC = () => {
           attachments: data.attachments ?? [],
           links: data.links ?? [],
           thumbnailUrl: data.thumbnailUrl,
-          salesIndex: data.salesIndex ?? null,
-          categoryId: data.categoryId ?? categoryId,
+          salesIndex: data.salesIndex ?? undefined,
+          categoryId: postCategoryId,
         });
-      } catch (err: any) {
+      } catch (err) {
         console.error("게시글 상세 오류:", err);
         setError("게시글을 불러오는 중 오류가 발생했습니다.");
       } finally {
@@ -198,10 +228,10 @@ const AdminBoardDetailPage: React.FC = () => {
                 {formatDate(post.publishedDate, post.createdAt)}
               </MetaValue>
             </MetaItem>
-            {post.salesIndex ? (
+            {displayIndex || post.salesIndex ? (
               <MetaItem>
                 <MetaLabel>번호</MetaLabel>
-                <MetaValue>#{post.salesIndex}</MetaValue>
+                <MetaValue>#{displayIndex ?? post.salesIndex}</MetaValue>
               </MetaItem>
             ) : null}
           </MetaGrid>
@@ -232,7 +262,12 @@ const AdminBoardDetailPage: React.FC = () => {
               <List>
                 {post.attachments.map((file, idx) => (
                   <li key={`${file.url}-${idx}`}>
-                    <FileLink href={file.url} target="_blank" rel="noreferrer">
+                    <FileLink
+                      href={file.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      download={file.name}
+                    >
                       {file.name}
                     </FileLink>
                   </li>
@@ -420,4 +455,3 @@ const FileLink = styled.a`
     text-decoration: underline;
   }
 `;
-/* eslint-disable @typescript-eslint/no-explicit-any */

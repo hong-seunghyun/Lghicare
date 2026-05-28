@@ -185,6 +185,9 @@ export const categories: Category[] = [
         items: [
           { label: "OLED", url: "/products/TV/sub?name=OLED" },
           { label: "QNED", url: "/products/TV/sub?name=QNED" },
+          { label: "MRGB", url: "/products/TV/sub?name=MRGB" },
+          { label: "NANO", url: "/products/TV/sub?name=NANO" },
+          { label: "울트라TV", url: "/products/TV/sub?name=울트라TV" },
           { label: "스탠바이미", url: "/products/TV/sub?name=스탠바이미" },
         ],
       },

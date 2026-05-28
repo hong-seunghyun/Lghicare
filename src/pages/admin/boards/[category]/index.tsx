@@ -21,7 +21,9 @@ import {
   getBoardCategoryFullLabel,
   getBoardCategoryPath,
   isSalesIndexedCategory,
+  isSalesHubCategory,
 } from "@/config/boardCategories";
+import PopupDisplay from "@/components/Popups/PopupDisplay";
 
 type Attachment = {
   name: string;
@@ -138,6 +140,14 @@ const AdminBoardListPage: React.FC = () => {
     });
   }, [posts, searchTerm]);
 
+  const categoryPostIndexById = useMemo(() => {
+    const indexMap = new Map<string, number>();
+    [...posts].reverse().forEach((post, index) => {
+      indexMap.set(post.id, index + 1);
+    });
+    return indexMap;
+  }, [posts]);
+
   const pageTitle = category
     ? getBoardCategoryFullLabel(category.id)
     : "게시판";
@@ -152,6 +162,7 @@ const AdminBoardListPage: React.FC = () => {
 
   return (
     <PageWrapper>
+      {isSalesHubCategory(categoryId) && <PopupDisplay location="admin_saleshub" />}
       <HeaderRow>
         <Title>{pageTitle}</Title>
         {!isParentCategory && (
@@ -228,7 +239,9 @@ const AdminBoardListPage: React.FC = () => {
                 </CellThumb>
                 {isSalesCategory && (
                   <CellIndex>
-                    {post.salesIndex ? `#${post.salesIndex}` : "-"}
+                    {categoryPostIndexById.has(post.id)
+                      ? `#${categoryPostIndexById.get(post.id)}`
+                      : "-"}
                   </CellIndex>
                 )}
                 <CellTitle>{post.title}</CellTitle>
@@ -499,4 +512,3 @@ const ThumbText = styled.div`
   line-height: 1;
   text-align: center;
 `;
-/* eslint-disable @typescript-eslint/no-explicit-any */

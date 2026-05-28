@@ -17,6 +17,7 @@ import {
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
   SALES_HUB_ID,
+  getBoardCounterId,
   getBoardCategoryById,
   getBoardCategoryChildren,
   getBoardCategoryFullLabel,
@@ -242,13 +243,13 @@ const AdminBoardCreatePage: React.FC = () => {
       let salesIndex: number | null = null;
       if (isSalesIndexedCategory(categoryId)) {
         await runTransaction(db, async (tx) => {
-          const counterRef = doc(db, "boardCounters", "salesHub");
+          const counterRef = doc(db, "boardCounters", getBoardCounterId(categoryId));
           const counterSnap = await tx.get(counterRef);
           const current = counterSnap.exists()
             ? ((counterSnap.data() as any).current ?? 0)
             : 0;
           const next = Number(current) + 1;
-          tx.set(counterRef, { current: next }, { merge: true });
+          tx.set(counterRef, { categoryId, current: next }, { merge: true });
           salesIndex = next;
         });
       }
@@ -649,4 +650,3 @@ const PrimaryButton = styled.button`
     cursor: default;
   }
 `;
-/* eslint-disable @typescript-eslint/no-explicit-any */

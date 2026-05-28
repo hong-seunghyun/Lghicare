@@ -15,6 +15,7 @@ const KEY = {
   contract: "계약기간",
   serviceType: "서비스유형",
   serviceCycle: "서비스주기/월",
+  promoCategory: "프로모션 대분류",
   promoType: "프로모션유형",
   promoName: "프로모션명",
   normalPrice: "정상가",
@@ -31,6 +32,7 @@ interface ProductVariant {
   [KEY.contract]?: string;
   [KEY.serviceType]?: string;
   [KEY.serviceCycle]?: string;
+  [KEY.promoCategory]?: string;
   [KEY.promoType]?: string;
   [KEY.promoName]?: string;
   [KEY.normalPrice]?: string | number;
@@ -46,6 +48,7 @@ interface Product {
   [KEY.contract]?: string;
   [KEY.serviceType]?: string;
   [KEY.serviceCycle]?: string;
+  [KEY.promoCategory]?: string;
   [KEY.promoType]?: string;
   [KEY.promoName]?: string;
   [KEY.normalPrice]?: string | number;
@@ -95,6 +98,8 @@ export interface SelectedProduct {
   voucherTotal?: number;
   voucherDetails?: Array<{ type: string; amount: number; reason: string }>;
   voucherMultiProductCount?: number;
+  voucherMultiProductCountOnly?: boolean;
+  voucherMultiProductNote?: string;
 }
 
 interface TeacherPlan {
@@ -133,10 +138,13 @@ export default function ProductCard({
   const [serviceCycle, setServiceCycle] = useState("");
   const [promoType, setPromoType] = useState("");
   const [promo, setPromo] = useState("");
+  const [promoCategory, setPromoCategory] = useState("");
 
   const [voucherMasterForModel, setVoucherMasterForModel] = useState<
     any | null
   >(null);
+
+  console.log("KEY:", product);
 
   // ??? ??납 ??태
   const [prepayRate, setPrepayRate] = useState<string>(""); // "30" | "50" | ""
@@ -147,6 +155,13 @@ export default function ProductCard({
     null,
   );
 
+  const selectPromoCategory = (value: string) => {
+    setPromoCategory(value);
+    setPromoType("");
+    setPromo("");
+    setPrepayRate("");
+  };
+
   // ??? ??휴카드 / 구독교원 ??태
   const [selectedCardId, setSelectedCardId] = useState<string>("");
   const [teacherSelections, setTeacherSelections] = useState<
@@ -154,6 +169,15 @@ export default function ProductCard({
   >({});
 
   const variants = useMemo(() => product.variants ?? [], [product.variants]);
+  const normalizeNum = (v?: string | number) => {
+    if (v == null) return "";
+    return v
+      .toString()
+      .replace(/[^0-9]/g, "")
+      .trim();
+  };
+
+  const normalizeStr = (v?: unknown) => (v ?? "").toString().trim();
 
   //  ??롭??운 리스????성 (선택 상태에 따라 필터링)
   const contractList = useMemo(
@@ -199,21 +223,42 @@ export default function ProductCard({
     );
   }, [variantsByServiceType, serviceCycle]);
 
-  const promoTypeList = useMemo(
+  const promoCategoryList = useMemo(
     () =>
       Array.from(
         new Set(
-          variantsByServiceCycle.map((v) => v[KEY.promoType]).filter(Boolean),
+          variantsByServiceCycle
+            .map((v) => normalizeStr(v[KEY.promoCategory]))
+            .filter(Boolean),
         ),
       ),
     [variantsByServiceCycle],
   );
 
-  const variantsByPromoType = useMemo(() => {
-    if (!promoType) return variantsByServiceCycle;
-    return variantsByServiceCycle.filter((v) => v[KEY.promoType] === promoType);
-  }, [variantsByServiceCycle, promoType]);
+  const variantsByPromoCategory = useMemo(() => {
+    if (!promoCategory) return variantsByServiceCycle;
+    const normalized = normalizeStr(promoCategory);
+    return variantsByServiceCycle.filter(
+      (v) => normalizeStr(v[KEY.promoCategory]) === normalized,
+    );
+  }, [variantsByServiceCycle, promoCategory]);
 
+  const promoTypeList = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          variantsByPromoCategory.map((v) => v[KEY.promoType]).filter(Boolean),
+        ),
+      ),
+    [variantsByPromoCategory],
+  );
+
+  const variantsByPromoType = useMemo(() => {
+    if (!promoType) return variantsByPromoCategory;
+    return variantsByPromoCategory.filter(
+      (v) => v[KEY.promoType] === promoType,
+    );
+  }, [variantsByPromoCategory, promoType]);
   const promoList = useMemo(
     () =>
       Array.from(
@@ -224,15 +269,37 @@ export default function ProductCard({
     [variantsByPromoType],
   );
 
-  const normalizeNum = (v?: string | number) => {
-    if (v == null) return "";
-    return v
-      .toString()
-      .replace(/[^0-9]/g, "")
-      .trim();
-  };
-  const normalizeStr = (v?: unknown) => (v ?? "").toString().trim();
+  const referenceVariantForPrepay = useMemo(() => {
+    if (!product.variants || product.variants.length === 0) {
+      return undefined;
+    }
+    return (
+      product.variants.find(
+        (variant) =>
+          variant[KEY.priceBefore] ||
+          variant[KEY.normalPrice] ||
+          variant[KEY.priceAfter],
+      ) ?? product.variants[0]
+    );
+  }, [product.variants]);
 
+  const getVariantPriceBefore = (variant?: ProductVariant): number => {
+    if (!variant) return 0;
+    const raw =
+      variant[KEY.priceBefore] ??
+      variant[KEY.normalPrice] ??
+      variant[KEY.priceAfter];
+    return toSafeNumber(raw as string | number | undefined);
+  };
+
+  useEffect(() => {
+    if (!promoCategory && promoCategoryList.length > 0) {
+      const defaultCategory = promoCategoryList.includes("신규")
+        ? "신규"
+        : promoCategoryList[0];
+      selectPromoCategory(defaultCategory);
+    }
+  }, [promoCategory, promoCategoryList]);
   const getPriceValue = (
     variant: ProductVariant | undefined,
     hasPromo: boolean,
@@ -241,7 +308,10 @@ export default function ProductCard({
 
     // 기본: 할인전금액 우선
     let base =
-      variant[KEY.priceBefore] || variant[KEY.normalPrice] || variant[KEY.priceAfter] || "";
+      variant[KEY.priceBefore] ||
+      variant[KEY.normalPrice] ||
+      variant[KEY.priceAfter] ||
+      "";
 
     // 프로모션 선택 시 할인후금액 적용
     if (hasPromo && variant[KEY.priceAfter]) {
@@ -264,9 +334,10 @@ export default function ProductCard({
         normalizeStr(v[KEY.serviceType]) === normalizeStr(serviceType) &&
         normalizeNum(v[KEY.serviceCycle] as string | number) ===
           normalizeNum(serviceCycle) &&
+        (!promoCategory ||
+          normalizeStr(v[KEY.promoCategory]) === normalizeStr(promoCategory)) &&
         normalizeStr(v[KEY.promoType]) === normalizeStr(promoType) &&
-        (!promo ||
-          normalizeStr(v[KEY.promoName]) === normalizeStr(promo));
+        (!promo || normalizeStr(v[KEY.promoName]) === normalizeStr(promo));
       return match;
     });
   }, [contract, serviceType, serviceCycle, promoType, promo, variants]);
@@ -386,28 +457,85 @@ export default function ProductCard({
     return isNaN(num) ? 0 : num;
   }, [contract]);
 
+  const prepayContractVariant = useMemo(() => {
+    if (
+      contractMonths !== 72 ||
+      !contract ||
+      !serviceType ||
+      !serviceCycle ||
+      variants.length === 0
+    ) {
+      return undefined;
+    }
+
+    return variants.find((variant) => {
+      const variantContract = normalizeNum(
+        variant[KEY.contract] as string | number | undefined,
+      );
+      const variantService = normalizeStr(variant[KEY.serviceType]);
+      const variantCycle = normalizeNum(
+        variant[KEY.serviceCycle] as string | number | undefined,
+      );
+
+      const matchesContract =
+        variantContract && normalizeNum(contract) === variantContract;
+      const matchesServiceType =
+        variantService &&
+        normalizeStr(serviceType) === variantService;
+      const matchesServiceCycle =
+        variantCycle &&
+        normalizeNum(serviceCycle) === variantCycle;
+
+      return matchesContract && matchesServiceType && matchesServiceCycle;
+    });
+  }, [variants, contractMonths, contract, serviceType, serviceCycle]);
+
   // ??? ??재 ????용??금 (??로모션 반영) ??"기?? ????금"????천
   const usageFee = useMemo(() => {
     if (!current) return 0;
     return getPriceValue(current, !!promo);
   }, [current, promo]);
 
+  // 선납금 산정 기준: 할인전금액
+  const prepayBaseMonthly = useMemo(() => {
+    const sourceVariant =
+      current ?? prepayContractVariant ?? referenceVariantForPrepay;
+    if (!sourceVariant) return 0;
+    const safe = getVariantPriceBefore(sourceVariant);
+    return safe > 0 ? safe : 0;
+  }, [
+    current,
+    prepayContractVariant,
+    referenceVariantForPrepay,
+  ]);
+
+  // 선납 반영 월요금 계산 기준: 할인후금액(프로모션 반영 usageFee)
+  const prepayBillingBaseMonthly = useMemo(() => {
+    if (usageFee > 0) return usageFee;
+    return prepayBaseMonthly;
+  }, [usageFee, prepayBaseMonthly]);
+
   const floorTo10 = (v: number) => Math.floor(v / 100) * 100;
 
   // ??? ??납??계산 (72개월 & ??납 ??택 ??
   useEffect(() => {
-    if (!prepayRate || !current || !usageFee || contractMonths !== 72) {
+    if (
+      !prepayRate ||
+      !current ||
+      !prepayBaseMonthly ||
+      contractMonths !== 72
+    ) {
       setPrepayAmountDisplay(null);
       return;
     }
 
     const rate = Number(prepayRate); // 30 or 50
-    const total = usageFee * 72;
+    const total = prepayBaseMonthly * 72;
     const rawPrepay = total * (rate / 100);
     const truncatedPrepay = floorTo10(rawPrepay);
 
     setPrepayAmountDisplay(truncatedPrepay);
-  }, [prepayRate, current, usageFee, contractMonths]);
+  }, [prepayRate, current, prepayBaseMonthly, contractMonths]);
 
   // ??? ??휴카드 ??택
   const selectedCard = useMemo(() => {
@@ -503,20 +631,32 @@ export default function ProductCard({
 
   // 1??계: ??납까?? 반영??????용??금
   const finalUsageFee = useMemo(() => {
-    if (!current || !usageFee) return 0;
+    if (!current) return 0;
 
     // 6??& ??납 ??택??경우 (ProductDetail????일 로직)
-    if (contractMonths === 72 && prepayRate && prepayAmountDisplay) {
-      const total = usageFee * 72;
-      const discount = prepayAmountDisplay * 0.135; // ??납 ??인 13.5%
+    if (
+      contractMonths === 72 &&
+      prepayRate &&
+      prepayAmountDisplay &&
+      prepayBillingBaseMonthly
+    ) {
+      const total = prepayBillingBaseMonthly * 72;
+      const prepayWithFee = prepayAmountDisplay * 1.135; // 선납금 + 수수료
 
-      const newMonthlyRaw = (total - prepayAmountDisplay - discount) / 72;
+      const newMonthlyRaw = (total - prepayWithFee) / 72;
       const newMonthly = floorTo10(newMonthlyRaw);
       return newMonthly;
     }
 
     return usageFee;
-  }, [current, usageFee, contractMonths, prepayRate, prepayAmountDisplay]);
+  }, [
+    current,
+    usageFee,
+    contractMonths,
+    prepayRate,
+    prepayAmountDisplay,
+    prepayBillingBaseMonthly,
+  ]);
 
   // 2??계: ??휴카드까?? 반영??기본 ??체감 ??택
   const baseBestPrice = useMemo(() => {
@@ -550,14 +690,26 @@ export default function ProductCard({
     return toSafeNumber(base);
   }, [current, finalBestPriceWithTeacher, finalUsageFee]);
 
+  const currentVoucherModelCode = normalizeStr(current?.[KEY.modelCode]);
+  const fallbackVoucherModelCode = normalizeStr(product[KEY.modelCode]);
+  const voucherModelCode = currentVoucherModelCode || fallbackVoucherModelCode;
+  const voucherPromoType =
+    normalizeStr(current?.[KEY.promoType]) || normalizeStr(promoType);
+  const voucherServiceCycle =
+    normalizeStr(current?.[KEY.serviceCycle]) || normalizeStr(serviceCycle);
+  const voucherPromoName = normalizeStr(promo);
+
   useEffect(() => {
+    if (!voucherModelCode) {
+      setVoucherMasterForModel(null);
+      return;
+    }
+
     let cancelled = false;
 
     (async () => {
       try {
-        const master = await getVoucherMasterForModel(
-          (product[KEY.modelCode] as string) || "",
-        );
+        const master = await getVoucherMasterForModel(voucherModelCode);
         if (!cancelled) setVoucherMasterForModel(master);
       } catch (err) {
         console.error("상품권 마스터 불러오기 오류:", err);
@@ -568,38 +720,40 @@ export default function ProductCard({
     return () => {
       cancelled = true;
     };
-  }, [product[KEY.modelCode]]);
+  }, [voucherModelCode]);
 
   const voucher = useMemo(() => {
-    if (!current || !voucherMasterForModel) {
+    if (!current || !voucherMasterForModel || !voucherModelCode) {
       return { total: 0, details: [] };
     }
 
     return calcVoucher({
       voucherMaster: voucherMasterForModel as any,
-      modelCode: (product[KEY.modelCode] as string) || "",
-      promoType: promoType,
-      serviceCycle: serviceCycle,
-      promoName: promo,
+      modelCode: voucherModelCode,
+      promoType: voucherPromoType,
+      serviceCycle: voucherServiceCycle,
+      promoName: voucherPromoName,
     });
-  }, [
-    current,
-    voucherMasterForModel,
-    product[KEY.modelCode],
-    promoType,
-    serviceCycle,
-    promo,
-  ]);
+  }, [current, voucherMasterForModel, voucherModelCode, voucherPromoType, voucherServiceCycle, voucherPromoName]);
+
+  const modelCode = voucherModelCode;
+  const voucherModel = useMemo(() => {
+    if (!modelCode || !voucherMasterForModel) return null;
+    return voucherMasterForModel.products?.[modelCode] ?? null;
+  }, [voucherMasterForModel, modelCode]);
 
   const multiProductCount = useMemo(() => {
-    const model =
-      voucherMasterForModel?.products?.[
-        (product[KEY.modelCode] as string) || ""
-      ] ?? null;
-    if (!model) return 0;
-    const count = Number(model.multiProductCount);
+    if (!voucherModel) return 0;
+    const count = Number(voucherModel.multiProductCount);
     return Number.isFinite(count) ? count : 0;
-  }, [voucherMasterForModel, product[KEY.modelCode]]);
+  }, [voucherModel]);
+  const multiProductOnlyCount = Boolean(
+    voucherModel?.multiProductExcludeVoucher,
+  );
+  const multiProductNote =
+    typeof voucherModel?.multiProductNote === "string"
+      ? voucherModel.multiProductNote
+      : undefined;
 
   return (
     <Card>
@@ -681,6 +835,18 @@ export default function ProductCard({
                   label: v || "",
                   value: v || "",
                 }))}
+              />
+
+              <CustomSelect
+                label="프로모션 대분류"
+                value={promoCategory}
+                onChange={(val) => selectPromoCategory(val)}
+                options={[
+                  ...promoCategoryList.map((value) => ({
+                    label: value,
+                    value,
+                  })),
+                ]}
               />
 
               <CustomSelect
@@ -839,9 +1005,9 @@ export default function ProductCard({
                   return;
                 }
 
-                // 기준 월 요금(선납/카드/교원 할인 제외)
-                // = usageFee (프로모션/계약기간/서비스유형/방문주기/프로모션유형 조합으로 결정)
-                const baseMonthlyForCompare = usageFee || 0;
+                // 모달/상세의 "기본 월 요금"은 카드 UI의 "월 요금"과 동일 기준으로 맞춘다.
+                // (선납 적용 시 선납 반영 월요금, 미적용 시 일반 월요금)
+                const baseMonthlyForCompare = finalUsageFee || usageFee || 0;
 
                 // 선납 월 할인액 (기준월 - 선납반영월)
                 // - 백원 단위 절삭
@@ -859,10 +1025,11 @@ export default function ProductCard({
                     : 0;
 
                 // 최종 혜택가: 선납 + 카드 + 교원 모두 반영
-                const finalMonthlyForCompare =
-                  finalBestPriceWithTeacher && finalBestPriceWithTeacher > 0
-                    ? finalBestPriceWithTeacher
-                    : baseMonthlyForCompare;
+                const finalMonthlyForCompare = Number.isFinite(
+                  finalBestPriceWithTeacher,
+                )
+                  ? Math.max(finalBestPriceWithTeacher, 0)
+                  : baseMonthlyForCompare;
 
                 // 카드/교원 할인액
                 const monthlyCardDiscount = selectedCard
@@ -872,12 +1039,28 @@ export default function ProductCard({
                   ? teacherTotalDiscount
                   : 0;
 
+                const selectedVariantWithCategory = current
+                  ? {
+                      ...current,
+                      [KEY.promoCategory]:
+                        promoCategory ||
+                        (current[KEY.promoCategory] as string) ||
+                        "",
+                      [KEY.promoType]:
+                        promoType || (current[KEY.promoType] as string) || "",
+                      [KEY.promoName]:
+                        promo || (current[KEY.promoName] as string) || "",
+                    }
+                  : undefined;
+
                 onAdd({
                   ...product,
-                  [KEY.modelCode]: (product[KEY.modelCode] as string) || "",
+                  [KEY.modelCode]:
+                    voucherModelCode ||
+                    ((product[KEY.modelCode] as string) || ""),
                   [KEY.productName]: (product[KEY.productName] as string) || "",
                   thumbnailUrl: product.thumbnailUrl,
-                  selectedVariant: current,
+                  selectedVariant: selectedVariantWithCategory,
 
                   // 기준/최종
                   baseMonthly: baseMonthlyForCompare, // 선납/카드/교원 제외 기준 요금
@@ -909,6 +1092,8 @@ export default function ProductCard({
                   voucherTotal: voucher.total,
                   voucherDetails: voucher.details,
                   voucherMultiProductCount: multiProductCount,
+                  voucherMultiProductCountOnly: multiProductOnlyCount,
+                  voucherMultiProductNote: multiProductNote,
                 });
               }}
             >

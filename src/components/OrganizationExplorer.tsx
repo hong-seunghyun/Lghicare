@@ -8,6 +8,7 @@ import type {
   ManagerDashboardScope,
   ManagerSummary,
 } from "@/pages/api/manager/dashboard";
+import { scaleCountByMode, type AdminDataMode } from "@/lib/admin/adminDataMode";
 
 type DashboardFilterField =
   | "all"
@@ -35,6 +36,7 @@ type OrganizationExplorerProps = {
   onManagerSelect?: (manager: ManagerSummary) => void;
   title?: string;
   baseManagerLabel?: string;
+  dataMode?: AdminDataMode;
 };
 
 type ExplorerAggregateItem = {
@@ -195,7 +197,9 @@ const OrganizationExplorer: React.FC<OrganizationExplorerProps> = ({
   onManagerSelect,
   title = "조직 조회",
   baseManagerLabel,
+  dataMode = "real",
 }) => {
+  const displayCount = (value: number) => scaleCountByMode(value, dataMode);
   const [dashboardStats, setDashboardStats] = useState<ManagerDashboardResponse | null>(null);
   const [dashboardLoading, setDashboardLoading] = useState(false);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
@@ -525,25 +529,6 @@ const OrganizationExplorer: React.FC<OrganizationExplorerProps> = ({
     [filterOptions, filteredManagers, groupRankingFields, teamLeaderNameRegistry],
   );
 
-  const teamLeaderOptions = useMemo(() => {
-    const map = new Map<string, string>();
-    scopedManagers.forEach((manager) => {
-      if (manager.position.includes("팀장") && manager.managerId) {
-        map.set(manager.managerId, manager.name || manager.managerId);
-      }
-    });
-    if (dashboardStats?.scope === "team" && requestPayload.managerId) {
-      map.set(
-        requestPayload.managerId,
-        baseManagerLabel || requestPayload.managerId,
-      );
-    }
-    return Array.from(map.entries()).map(([value, label]) => ({
-      value,
-      label,
-    }));
-  }, [baseManagerLabel, dashboardStats?.scope, requestPayload.managerId, scopedManagers]);
-
   const selectedTargetTitle = useMemo(() => {
     if (filterField === "all" || filterValue === "all") {
       return scopeLabel(dashboardStats?.scope ?? null);
@@ -716,7 +701,7 @@ const OrganizationExplorer: React.FC<OrganizationExplorerProps> = ({
                         {row.managerId} · {row.office || "사무소 미정"}
                       </RankMeta>
                     </RankDetails>
-                    <RankValue>{row.estimateCount}</RankValue>
+                    <RankValue>{displayCount(row.estimateCount)}</RankValue>
                   </ClickableRankingRow>
                 ))}
               </RankList>
@@ -749,7 +734,7 @@ const OrganizationExplorer: React.FC<OrganizationExplorerProps> = ({
                         {row.managerId} · {row.office || "사무소 미정"}
                       </RankMeta>
                     </RankDetails>
-                    <RankValue>{row.shareCount}</RankValue>
+                    <RankValue>{displayCount(row.shareCount)}</RankValue>
                   </ClickableRankingRow>
                 ))}
               </RankList>
@@ -775,10 +760,11 @@ const OrganizationExplorer: React.FC<OrganizationExplorerProps> = ({
                           <RankDetails>
                             <RankName>{item.label}</RankName>
                             <RankMeta>
-                              견적 {item.estimateTotal} · 공유 {item.shareTotal}
+                              견적 {displayCount(item.estimateTotal)} · 공유{" "}
+                              {displayCount(item.shareTotal)}
                             </RankMeta>
                           </RankDetails>
-                          <RankValue>{item.total}</RankValue>
+                          <RankValue>{displayCount(item.total)}</RankValue>
                         </RankingRow>
                       ))}
                     </RankList>
@@ -812,9 +798,9 @@ const OrganizationExplorer: React.FC<OrganizationExplorerProps> = ({
                     filteredScopeCategoryStats.map((row) => (
                       <tr key={row.key}>
                         <td>{row.label}</td>
-                        <td>{row.estimateCount}</td>
-                        <td>{row.shareCount}</td>
-                        <td>{row.estimateCount + row.shareCount}</td>
+                        <td>{displayCount(row.estimateCount)}</td>
+                        <td>{displayCount(row.shareCount)}</td>
+                        <td>{displayCount(row.estimateCount + row.shareCount)}</td>
                       </tr>
                     ))
                   )}
@@ -848,9 +834,9 @@ const OrganizationExplorer: React.FC<OrganizationExplorerProps> = ({
                             {row.label || row.key}
                           </ProductName>
                         </td>
-                        <td>{row.estimateCount}</td>
-                        <td>{row.shareCount}</td>
-                        <td>{row.estimateCount + row.shareCount}</td>
+                        <td>{displayCount(row.estimateCount)}</td>
+                        <td>{displayCount(row.shareCount)}</td>
+                        <td>{displayCount(row.estimateCount + row.shareCount)}</td>
                       </tr>
                     ))
                   )}
@@ -900,8 +886,8 @@ const OrganizationExplorer: React.FC<OrganizationExplorerProps> = ({
                             manager.teamLeaderId
                           : "-"}
                       </td>
-                      <td>{manager.estimateCount}</td>
-                      <td>{manager.shareCount}</td>
+                      <td>{displayCount(manager.estimateCount)}</td>
+                      <td>{displayCount(manager.shareCount)}</td>
                     </DashboardTableRow>
                   ))
                 )}

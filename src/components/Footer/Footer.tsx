@@ -10,7 +10,8 @@ export default function Footer() {
             <b>서울특별시 강서구 마곡중앙5로 18(마곡동)</b>
           </p>
           <p>
-            대표 전화 <b>1544-7777</b> 사업자 등록번호 <b>460-81-02233</b>
+            대표 이메일 <b>caresolution@hi-caresolution.com</b> 사업자 등록번호{" "}
+            <b>460-81-02233</b>
           </p>
         </CompanyInfo>
         <Divider />
