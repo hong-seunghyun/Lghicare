@@ -48,13 +48,16 @@ interface EstimateProduct {
   }>;
 
   selectedVariant?: {
+    [key: string]: unknown;
     계약기간?: string;
     서비스유형?: string;
     "서비스주기/월"?: string;
+    "프로모션 대분류"?: string;
     프로모션유형?: string;
     프로모션명?: string;
     할인전금액?: string | number;
     할인후금액?: string | number;
+    할인금액?: string | number;
     정상가?: string | number;
   };
 
@@ -361,6 +364,131 @@ function getDiscountBreakdown(p: EstimateProduct) {
   };
 }
 
+type ProductOptionResponse = {
+  options?: Array<{
+    모델코드?: string;
+    variants?: Array<Record<string, unknown>>;
+  }>;
+};
+
+const variantMatchKeys = [
+  "계약기간",
+  "서비스유형",
+  "서비스주기/월",
+  "프로모션 대분류",
+  "프로모션유형",
+  "프로모션명",
+] as const;
+
+function normalizeMatchValue(value: unknown) {
+  return String(value ?? "")
+    .replace(/\s+/g, "")
+    .trim();
+}
+
+function findMatchedSheetVariant(
+  product: EstimateProduct,
+  variants: Array<Record<string, unknown>>,
+) {
+  if (!variants.length) return undefined;
+
+  const selected = product.selectedVariant;
+  if (!selected) return variants.length === 1 ? variants[0] : undefined;
+
+  return (
+    variants.find((variant) =>
+      variantMatchKeys.every((key) => {
+        const selectedValue = normalizeMatchValue(selected[key]);
+        if (!selectedValue) return true;
+        return normalizeMatchValue(variant[key]) === selectedValue;
+      }),
+    ) ??
+    variants.find((variant) =>
+      ["계약기간", "서비스유형", "서비스주기/월"].every((key) => {
+        const selectedValue = normalizeMatchValue(selected[key]);
+        if (!selectedValue) return true;
+        return normalizeMatchValue(variant[key]) === selectedValue;
+      }),
+    )
+  );
+}
+
+function getMonthlySubscriptionDiscount(p: EstimateProduct) {
+  return parseMoney(p.selectedVariant?.할인금액);
+}
+
+async function enrichEstimateDiscountAmounts(
+  estimateData: EstimateData,
+): Promise<EstimateData> {
+  const products = Array.isArray(estimateData.products)
+    ? estimateData.products
+    : [];
+  const models = Array.from(
+    new Set(products.map((p) => p.모델코드).filter(Boolean)),
+  );
+  const middles = Array.from(
+    new Set(
+      products
+        .map((p) =>
+          String(
+            (p as any).categoryName ??
+              (p as any).category ??
+              (p as any).중분류 ??
+              "",
+          ).trim(),
+        )
+        .filter(Boolean),
+    ),
+  );
+
+  if (!models.length) return estimateData;
+
+  const params = new URLSearchParams({
+    models: models.join(","),
+    groupBy: "modelCode",
+    includeImages: "false",
+  });
+  if (middles.length) {
+    params.set("middles", middles.join(","));
+  }
+  const response = await fetch(`/api/products?${params.toString()}`);
+  if (!response.ok) return estimateData;
+
+  const payload = (await response.json()) as ProductOptionResponse;
+  const options = Array.isArray(payload.options) ? payload.options : [];
+  const variantsByModel = new Map<string, Array<Record<string, unknown>>>();
+
+  options.forEach((option) => {
+    const modelCode = String(option.모델코드 ?? "").trim();
+    if (!modelCode || !Array.isArray(option.variants)) return;
+    variantsByModel.set(modelCode, option.variants);
+  });
+
+  return {
+    ...estimateData,
+    products: products.map((product) => {
+      if (getMonthlySubscriptionDiscount(product) > 0) return product;
+
+      const variants = variantsByModel.get(product.모델코드) ?? [];
+      const matchedVariant = findMatchedSheetVariant(product, variants);
+      const discountAmount =
+        typeof matchedVariant?.할인금액 === "number" ||
+        typeof matchedVariant?.할인금액 === "string"
+          ? matchedVariant.할인금액
+          : undefined;
+      if (parseMoney(discountAmount) <= 0) return product;
+
+      return {
+        ...product,
+        selectedVariant: {
+          ...(product.selectedVariant ?? {}),
+          할인금액: discountAmount,
+        },
+      };
+    }),
+  };
+}
+
 function getVoucherBreakdown(p: EstimateProduct) {
   const details = getVoucherDetails(p);
   const byType = details.reduce(
@@ -468,8 +596,6 @@ export default function EstimateDetailPage() {
     "서비스유형",
     "서비스주기/월",
     "프로모션 대분류",
-    "프로모션유형",
-    "프로모션명",
   ] as const;
 
   const renderVariantInfo = (variant?: EstimateProduct["selectedVariant"]) => {
@@ -553,7 +679,13 @@ export default function EstimateDetailPage() {
         const ref = doc(db, "estimates", id as string);
         const snap = await getDoc(ref);
         if (snap.exists()) {
-          setData(snap.data() as EstimateData);
+          const estimateData = snap.data() as EstimateData;
+          try {
+            setData(await enrichEstimateDiscountAmounts(estimateData));
+          } catch (error) {
+            console.warn("할인금액 보강 실패:", error);
+            setData(estimateData);
+          }
         }
       } finally {
         setLoading(false);
@@ -663,7 +795,7 @@ export default function EstimateDetailPage() {
   if (!data) return <p>견적 데이터를 찾을 수 없습니다.</p>;
 
   return (
-    <>
+    <DetailPage>
       {/* ✅ PDF에 포함될 메인 콘텐츠 */}
       <Wrapper ref={wrapperRef}>
         <FlexTitle>
@@ -688,6 +820,8 @@ export default function EstimateDetailPage() {
             // ✅ 할인 내역
             const breakdown = getDiscountBreakdown(p);
             const voucherBreakdown = getVoucherBreakdown(p);
+            const monthlySubscriptionDiscount =
+              getMonthlySubscriptionDiscount(p);
             const prepayMonthlyDiscount = getDisplayPrepayMonthlyDiscount(
               p,
               breakdown.prepay,
@@ -698,6 +832,7 @@ export default function EstimateDetailPage() {
               Boolean(p.prepayRate && prepayPaymentAmount > 0);
             const hasDiscountDetail =
               hasPrepay ||
+              monthlySubscriptionDiscount > 0 ||
               breakdown.prepay > 0 ||
               breakdown.cardDiscount > 0 ||
               breakdown.teacher > 0 ||
@@ -774,6 +909,18 @@ export default function EstimateDetailPage() {
                             </DiscountRow>
                           )}
                         </>
+                      )}
+
+                      {monthlySubscriptionDiscount > 0 && (
+                        <DiscountRow>
+                          <span>월 구독료 할인 금액</span>
+                          <b>
+                            {renderMonthlyPriceWithTotal(
+                              monthlySubscriptionDiscount,
+                              contractMonths,
+                            )}
+                          </b>
+                        </DiscountRow>
                       )}
 
                       {breakdown.cardDiscount > 0 && (
@@ -884,7 +1031,11 @@ export default function EstimateDetailPage() {
           </SummaryFlex>
 
           <SummaryFlex
-            style={{ color: "#b3b3b3", fontSize: "16px", marginBottom: 5 }}
+            style={{
+              color: "#b3b3b3",
+              fontSize: "clamp(16px, 4.4vw, 20px)",
+              marginBottom: 5,
+            }}
           >
             <div style={{ color: "#b3b3b3" }}>총 할인/지원 금액</div>
             <span>
@@ -913,7 +1064,7 @@ export default function EstimateDetailPage() {
               style={{
                 color: "#666",
                 fontWeight: "400",
-                fontSize: "14px",
+                fontSize: "clamp(13px, 3.6vw, 14px)",
                 marginBottom: 5,
               }}
             >
@@ -949,7 +1100,7 @@ export default function EstimateDetailPage() {
         <Button onClick={handleDownloadPDF}>PDF로 저장</Button>
         <Button onClick={handleCopyLink}>링크 복사</Button>
       </ButtonWrap>
-    </>
+    </DetailPage>
   );
 }
 
@@ -968,7 +1119,8 @@ const DiscountBlock = styled.div`
 
 const DiscountTitle = styled.div`
   font-size: 14px;
-  font-weight: 700;
+  line-height: 1.4;
+  font-weight: 600;
   margin-bottom: 8px;
   color: #222;
 `;
@@ -979,26 +1131,39 @@ const DiscountRow = styled.div`
   align-items: center;
   gap: 8px;
   font-size: 14px;
-  margin-bottom: 6px;
+  margin-bottom: 14px;
 
   > span {
+    min-width: 0;
     color: #666;
+    line-height: 1.45;
+    word-break: keep-all;
   }
   > b {
+    min-width: 0;
     color: #ea1917;
     font-weight: 700;
+    font-size: 20px;
+    line-height: 1.25;
+    text-align: right;
   }
 
   @media (max-width: 767px) {
+    flex-wrap: wrap;
     align-items: flex-start;
+    gap: 4px 8px;
+    font-size: 14px;
 
     > span {
-      min-width: 0;
+      flex: 1 1 108px;
     }
 
     > b {
-      min-width: 0;
+      display: flex;
+      flex: 1 1 162px;
+      justify-content: flex-end;
       text-align: right;
+      font-size: clamp(16px, 4.7vw, 18px);
     }
   }
 `;
@@ -1016,17 +1181,29 @@ const PrepayPaymentRow = styled(DiscountRow)`
   }
 `;
 
+const DetailPage = styled.main`
+  min-height: 100vh;
+  background: #f6f7f9;
+  padding: 32px 16px 0;
+
+  @media (max-width: 767px) {
+    padding: 18px 0 0;
+  }
+`;
+
 const Wrapper = styled.div`
-  max-width: 900px;
-  margin: 50px auto;
+  max-width: 960px;
+  margin: 0 auto 34px;
   background: #fff;
-  padding: 20px;
+  padding: 34px;
   border-radius: 8px;
+  border: 1px solid #ededed;
 
   h2 {
-    font-size: 18px;
+    font-size: 28px;
     font-weight: 700;
-    margin-bottom: 15px;
+    margin-bottom: 0;
+    color: #111;
   }
 
   p {
@@ -1034,39 +1211,60 @@ const Wrapper = styled.div`
   }
 
   @media (max-width: 767px) {
-    margin: 24px 12px;
-    padding: 16px;
+    margin: 0 12px 24px;
+    padding: 22px 16px;
   }
 `;
 const FlexTitle = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 16px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #eeeeee;
+
+  p {
+    color: #777;
+    font-weight: 600;
+  }
 
   @media (max-width: 767px) {
     align-items: flex-start;
+    flex-direction: column;
     gap: 8px;
+    padding-bottom: 18px;
   }
 `;
 const ProductList = styled.div`
-  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 22px;
 `;
 const Item = styled.div`
   display: flex;
   gap: 20px;
-  border-bottom: 1px solid #eee;
-  padding: 20px 0;
+  border: 1px solid #eeeeee;
+  border-radius: 8px;
+  padding: 20px;
+  background: #fff;
 
   @media (max-width: 767px) {
     flex-direction: column;
     gap: 14px;
-    padding: 18px 0;
+    padding: 16px;
   }
 `;
 
 const ProductImageWrap = styled.div`
-  flex: 0 0 120px;
-  width: 120px;
+  flex: 0 0 136px;
+  width: 136px;
+  height: 136px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #f8f8f8;
 
   img {
     display: block;
@@ -1093,8 +1291,16 @@ const Info = styled.div`
   min-width: 0;
 
   h4 {
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 700;
+    color: #111;
+    line-height: 1.35;
+  }
+
+  > p {
+    margin-top: 5px;
+    color: #888;
+    font-weight: 600;
   }
 
   @media (max-width: 767px) {
@@ -1109,14 +1315,21 @@ const Info = styled.div`
 const VariantBox = styled.div`
   color: #666;
   font-size: 14px;
-  margin-top: 10px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fafafa;
+
+  p + p {
+    margin-top: 4px;
+  }
 `;
 const PriceSectionDivider = styled.div`
-  margin-top: 12px;
+  margin-top: 14px;
   border-top: 1px solid #ececec;
 `;
 const PriceRow = styled.div`
-  margin-top: 8px;
+  margin-top: 10px;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -1151,33 +1364,75 @@ const PriceRow = styled.div`
   }
 
   &.benefit {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid #eeeeee;
     color: #ea1917;
+
+    > span {
+      color: #ea1917;
+      font-size: 16px;
+      font-weight: 800;
+    }
 
     > strong {
       color: #ea1917;
+      font-size: 22px;
     }
   }
 
   > span {
+    min-width: 0;
     font-size: 14px;
     color: #444;
+    line-height: 1.4;
+    word-break: keep-all;
   }
 
   > strong {
+    min-width: 0;
     font-size: 18px;
     font-weight: bold;
+    line-height: 1.25;
+    text-align: right;
   }
 
   @media (max-width: 767px) {
+    flex-wrap: wrap;
     gap: 8px;
+    font-size: 14px;
 
     > span {
-      min-width: 0;
+      flex: 1 1 112px;
     }
 
     > strong {
-      min-width: 0;
+      display: flex;
+      flex: 1 1 172px;
+      justify-content: flex-end;
       text-align: right;
+    }
+
+    &.before {
+      > strong {
+        font-size: clamp(12px, 3.6vw, 14px);
+      }
+    }
+
+    &.base {
+      > strong {
+        font-size: clamp(17px, 4.8vw, 18px);
+      }
+    }
+
+    &.benefit {
+      > span {
+        font-size: clamp(15px, 4.3vw, 16px);
+      }
+
+      > strong {
+        font-size: clamp(18px, 5.4vw, 22px);
+      }
     }
   }
 `;
@@ -1191,13 +1446,18 @@ const MonthlyPriceText = styled.span`
   row-gap: 2px;
   line-height: 1.25;
   text-align: right;
+  min-width: 0;
+  max-width: 100%;
 
   > span:first-child {
+    flex: 0 0 auto;
     white-space: nowrap;
   }
 
   @media (max-width: 767px) {
-    max-width: 100%;
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-end;
   }
 `;
 
@@ -1209,20 +1469,26 @@ const TotalPriceText = styled.span`
   white-space: nowrap;
 
   @media (max-width: 767px) {
+    min-width: 0;
     white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: keep-all;
   }
 `;
 const Summary = styled.div`
-  margin-top: 40px;
-  background: #f8f8f8;
+  margin-top: 24px;
+  background: #fff;
   padding: 24px;
-  border-radius: 6px;
-  font-size: 18px;
+  border: 1px solid #eeeeee;
+  border-radius: 8px;
+  font-size: 20px;
   font-weight: bold;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.04);
 
   @media (max-width: 767px) {
     margin-top: 28px;
     padding: 18px 16px;
+    font-size: clamp(17px, 4.8vw, 20px);
   }
 `;
 const SummaryFlex = styled.div`
@@ -1230,18 +1496,33 @@ const SummaryFlex = styled.div`
   justify-content: space-between;
   align-items: flex-start;
   gap: 16px;
-  margin-bottom: 15px;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #f0f0f0;
+
+  &:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
 
   @media (max-width: 767px) {
+    flex-wrap: wrap;
     gap: 8px;
 
     > div {
       min-width: 0;
+      flex: 1 1 116px;
+      line-height: 1.35;
+      word-break: keep-all;
     }
 
     > strong,
     > span {
+      display: flex;
       min-width: 0;
+      flex: 1 1 172px;
+      justify-content: flex-end;
       text-align: right;
     }
   }
@@ -1249,7 +1530,11 @@ const SummaryFlex = styled.div`
 const SummaryBottom = styled.div`
   font-size: 12px;
   color: #000;
-  margin-top: 30px;
+  margin-top: 24px;
+  padding: 18px;
+  border-radius: 8px;
+  background: #fafafa;
+  line-height: 1.7;
 `;
 const ButtonWrap = styled.div`
   position: sticky;
@@ -1260,12 +1545,14 @@ const ButtonWrap = styled.div`
   padding: 20px;
   background: #fff;
   border-top: 1px solid #eee;
+  z-index: 10;
 
   @media (max-width: 767px) {
     padding: 14px 12px;
   }
 `;
 const Button = styled.button`
+  min-width: 132px;
   background: #222;
   color: #fff;
   border: none;

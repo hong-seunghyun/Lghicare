@@ -8,7 +8,6 @@ import Image from "next/image";
 import HeaderSearch from "@/components/Search/HeaderSearch";
 import {
   SALES_HUB_ID,
-  SALES_TALK_BOARD_ID,
   getBoardCategoryLabel,
 } from "@/config/boardCategories";
 
@@ -28,7 +27,6 @@ export default function Header() {
 
   const auth = getAuth(app);
   const mobileTalkLabel = getBoardCategoryLabel(SALES_HUB_ID);
-  const salesTalkBoardLabel = getBoardCategoryLabel(SALES_TALK_BOARD_ID);
 
   // ✅ 라우트 변경 시 서브네비 닫기
   useEffect(() => {
@@ -117,7 +115,7 @@ export default function Header() {
           <Link href="https://lghicaresolution.com/">
             <Logo src={"/images/logo.png"} alt="logo" />
           </Link>
-          <div>
+          <AccountBox>
             {isLoggedIn && greeting && (
               <>
                 <GreetingText>{greeting}</GreetingText>
@@ -147,7 +145,7 @@ export default function Header() {
             {!isLoggedIn && (
               <ManagerLoginLink href="/portal">로그인</ManagerLoginLink>
             )}
-          </div>
+          </AccountBox>
         </LogoBox>
         <FlexWrap>
           <NavWrap>
@@ -266,18 +264,27 @@ const LogoBox = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 16px;
 
   @media (max-width: 850px) {
     padding: 20px 2.5% 10px;
+  }
+
+  @media (max-width: 650px) {
+    align-items: flex-start;
+    gap: 8px;
+    padding: 26px 8px 8px;
   }
 `;
 
 const Logo = styled.img`
   width: auto;
   height: 22px;
+  flex: 0 0 auto;
 
   @media (max-width: 499px) {
     height: 16px;
+    max-width: 145px;
   }
 `;
 
@@ -295,7 +302,17 @@ const NavWrap = styled.div`
     padding: 0px 2.5%;
   }
   @media (max-width: 650px) {
-    justify-content: space-between;
+    flex: 1 1 auto;
+    justify-content: flex-start;
+    gap: 16px;
+    min-width: 0;
+    overflow-x: auto;
+    padding: 0 8px;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
   }
 `;
 
@@ -310,7 +327,10 @@ const NavItem = styled.div`
   display: flex;
   align-items: center;
   @media (max-width: 650px) {
+    flex: 0 0 auto;
     font-size: 14px;
+    height: 50px;
+    line-height: 1.25;
   }
 `;
 
@@ -397,6 +417,10 @@ const FlexWrap = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
+
+  @media (max-width: 650px) {
+    gap: 4px;
+  }
 `;
 
 // 🔥 우측 영역 (검색 + 로그아웃 버튼)
@@ -404,6 +428,26 @@ const RightWrap = styled.div`
   display: flex;
   align-items: center;
   gap: 12px;
+
+  @media (max-width: 650px) {
+    flex: 0 0 auto;
+    padding-right: 8px;
+  }
+`;
+
+const AccountBox = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+
+  @media (max-width: 650px) {
+    flex: 1 1 auto;
+    max-width: calc(100% - 150px);
+    row-gap: 5px;
+  }
 `;
 
 // 🔥 로그아웃 버튼 스타일
@@ -418,6 +462,11 @@ const LogoutButton = styled.button`
 
   &:hover {
     background: #eee;
+  }
+
+  @media (max-width: 650px) {
+    padding: 5px 10px;
+    font-size: 12px;
   }
 `;
 
@@ -434,6 +483,12 @@ const SalesHubLink = styled(Link)`
   &:hover {
     background: #f4f4f4;
   }
+
+  @media (max-width: 650px) {
+    padding: 5px 10px;
+    margin-right: 0;
+    font-size: 12px;
+  }
 `;
 
 const ManagerLoginLink = styled(Link)`
@@ -448,6 +503,11 @@ const ManagerLoginLink = styled(Link)`
   &:hover {
     background: #f4f4f4;
   }
+
+  @media (max-width: 650px) {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
 `;
 
 const GreetingText = styled.span`
@@ -456,4 +516,14 @@ const GreetingText = styled.span`
   font-size: 14px;
   color: #333;
   white-space: nowrap;
+
+  @media (max-width: 650px) {
+    flex: 0 0 100%;
+    margin: 0;
+    text-align: right;
+    font-size: 12px;
+    line-height: 1.25;
+    white-space: normal;
+    word-break: keep-all;
+  }
 `;

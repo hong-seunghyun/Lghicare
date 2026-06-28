@@ -34,6 +34,7 @@ interface ProductVariant {
   정상가?: string | number;
   할인전금액?: string | number;
   할인후금액?: string | number;
+  할인금액?: string | number;
   thumbnailUrl?: string;
 }
 
@@ -76,11 +77,20 @@ export interface SelectedProduct {
   voucherMultiProductNote?: string;
 }
 
+export type EstimateSaveMeta = {
+  estimateSource?: string;
+  promotionPackageId?: string;
+  promotionPackageName?: string;
+  promotionSetId?: string;
+  promotionSetName?: string;
+};
+
 interface Props {
   products: SelectedProduct[];
   onReset: () => void;
   onConfirm: () => void;
   onRemove: (modelCode: string) => void;
+  saveMeta?: EstimateSaveMeta;
 }
 
 function parseMoney(value: unknown): number {
@@ -270,6 +280,7 @@ export default function EstimateModal({
   onReset,
   onConfirm,
   onRemove,
+  saveMeta,
 }: Props) {
   const [isOpen, setIsOpen] = useState(true);
   const [productList, setProductList] = useState(products);
@@ -499,6 +510,7 @@ export default function EstimateModal({
       );
 
       const payload: any = {
+        ...cleanData(saveMeta ?? {}),
         products: safeProducts,
         estimateProducts: estimateProductList,
         selectedProductCount,

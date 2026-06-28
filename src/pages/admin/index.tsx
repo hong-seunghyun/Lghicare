@@ -18,8 +18,9 @@ import {
   getDashboardSummaryData,
   getOverviewData,
   type ActivitySummaryResponse,
-  type DailyTopStatRow,
   type MultiProductCombinationStat,
+  type OverviewResponse,
+  type PromotionSetEstimateStat,
 } from "@/lib/admin/adminDataService";
 import type { AdminDataMode } from "@/lib/admin/adminDataMode";
 import PopupDisplay from "@/components/Popups/PopupDisplay";
@@ -54,7 +55,10 @@ const formatRangeLabel = (start: string, end: string) => {
   return `${start} ~ ${end}`;
 };
 
-const getQuickRange = (key: Exclude<QuickRangeKey, "custom">, baseDate: Date) => {
+const getQuickRange = (
+  key: Exclude<QuickRangeKey, "custom">,
+  baseDate: Date,
+) => {
   const end = new Date(baseDate);
   end.setHours(0, 0, 0, 0);
 
@@ -94,7 +98,42 @@ const escapeExcelCell = (value: unknown) =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
-const buildDailyExportHtml = (rows: DailyTopStatRow[]) => {
+const renderTableSection = (
+  title: string,
+  headers: string[],
+  rows: unknown[][],
+  emptyMessage = "데이터가 없습니다.",
+) => {
+  const headerHtml = headers
+    .map((header) => `<th>${escapeExcelCell(header)}</th>`)
+    .join("");
+  const bodyRows =
+    rows.length > 0
+      ? rows
+          .map(
+            (row) =>
+              `<tr>${row
+                .map((cell) => `<td>${escapeExcelCell(cell)}</td>`)
+                .join("")}</tr>`,
+          )
+          .join("")
+      : `<tr><td colspan="${headers.length}">${escapeExcelCell(
+          emptyMessage,
+        )}</td></tr>`;
+
+  return `
+  <h2>${escapeExcelCell(title)}</h2>
+  <table>
+    <thead><tr>${headerHtml}</tr></thead>
+    <tbody>${bodyRows}</tbody>
+  </table>`;
+};
+
+const buildDailyExportHtml = (
+  summary: ActivitySummaryResponse,
+  overview: OverviewResponse,
+) => {
+  const rows = summary.dailyTopRows ?? [];
   const headers = [
     "날짜",
     "오늘 견적 수",
@@ -105,48 +144,101 @@ const buildDailyExportHtml = (rows: DailyTopStatRow[]) => {
     "상위 카테고리 1개명",
   ];
 
-  const headerHtml = headers
-    .map((header) => `<th>${escapeExcelCell(header)}</th>`)
-    .join("");
-  const bodyHtml = rows
-    .map(
-      (row) => `<tr>
-        <td>${escapeExcelCell(row.date)}</td>
-        <td>${escapeExcelCell(row.estimateCount)}</td>
-        <td>${escapeExcelCell(row.shareCount)}</td>
-        <td>${escapeExcelCell(row.topBranchName || "-")}</td>
-        <td>${escapeExcelCell(row.topBranchManagerId || "-")}</td>
-        <td>${escapeExcelCell(row.topNationalManagerId || "-")}</td>
-        <td>${escapeExcelCell(row.topCategoryName || "-")}</td>
-      </tr>`,
-    )
-    .join("");
+  const topStats = overview.topStats ?? {};
+  const visitorSummary = summary.visitorSummary ?? {
+    today: 0,
+    yesterday: 0,
+    range: 0,
+    last30Days: 0,
+  };
+  const rangeLabel = formatRangeLabel(summary.rangeStart, summary.rangeEnd);
+  const combinationRows = (summary.topMultiProductCombinations ?? []).map(
+    (row) => [
+      row.rank,
+      `${row.productCount}종`,
+      row.combinationLabel,
+      row.estimateCount,
+      row.products
+        .map(
+          (product) =>
+            `${product.category} / ${product.productName} / ${product.modelName}`,
+        )
+        .join("\n"),
+    ],
+  );
 
   return `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />
   <style>
+    body { font-family: Arial, sans-serif; color: #111; }
+    h1 { font-size: 20px; margin: 0 0 14px; }
+    h2 { font-size: 15px; margin: 22px 0 8px; }
     table { border-collapse: collapse; }
-    th, td { border: 1px solid #999; padding: 6px 10px; }
+    th, td { border: 1px solid #999; padding: 6px 10px; mso-number-format: "\\@"; vertical-align: top; }
     th { background: #eef2f7; font-weight: 700; }
+    .meta td:first-child { background: #f8fafc; font-weight: 700; }
   </style>
 </head>
 <body>
-  <table>
-    <thead><tr>${headerHtml}</tr></thead>
-    <tbody>${bodyHtml}</tbody>
-  </table>
+  <h1>관리자 대시보드 엑셀 출력</h1>
+  ${renderTableSection(
+    "요약",
+    ["항목", "값"],
+    [
+      ["조회 기간", rangeLabel],
+      ["총 제품 수", topStats.totalProducts ?? 0],
+      ["총 매니저 수", topStats.managers ?? 0],
+      ["오늘 접속자 수", visitorSummary.today],
+      ["어제 접속자 수", visitorSummary.yesterday],
+      ["기간 내 총 접속자 수", visitorSummary.range],
+      ["최근 1개월 접속자 수", visitorSummary.last30Days],
+      ["오늘 견적 수", summary.todayEstimates ?? 0],
+      ["기간 내 견적 수", summary.totalEstimates ?? 0],
+      ["오늘 공유 수", summary.shareSummary?.today ?? 0],
+      ["기간 내 공유 수", summary.shareSummary?.range ?? 0],
+    ],
+  )}
+  ${renderTableSection(
+    "일별 주요 지표",
+    headers,
+    rows.map((row) => [
+      row.date,
+      row.estimateCount,
+      row.shareCount,
+      row.topBranchName || "-",
+      row.topBranchManagerId || "-",
+      row.topNationalManagerId || "-",
+      row.topCategoryName || "-",
+    ]),
+  )}
+  ${renderTableSection(
+    "제휴카드 통계",
+    ["순위", "제휴카드", "사용 건수", "비율"],
+    (summary.affiliateCardStats ?? []).map((row, index) => [
+      index + 1,
+      row.cardName,
+      row.count,
+      `${row.ratio.toFixed(1)}%`,
+    ]),
+  )}
+  ${renderTableSection(
+    "타품목 베스트 조합 TOP 10",
+    ["순위", "종수", "제품 조합", "견적 수", "상세 제품"],
+    combinationRows,
+  )}
 </body>
 </html>`;
 };
 
 const downloadDailyExport = (
-  rows: DailyTopStatRow[],
+  summary: ActivitySummaryResponse,
+  overview: OverviewResponse,
   rangeStart: string,
   rangeEnd: string,
 ) => {
-  const html = buildDailyExportHtml(rows);
+  const html = buildDailyExportHtml(summary, overview);
   const blob = new Blob(["\ufeff", html], {
     type: "application/vnd.ms-excel;charset=utf-8;",
   });
@@ -160,7 +252,9 @@ const downloadDailyExport = (
   URL.revokeObjectURL(url);
 };
 
-export function AdminDashboardPage({ dataMode = "demo" }: AdminDashboardPageProps) {
+export function AdminDashboardPage({
+  dataMode = "real",
+}: AdminDashboardPageProps) {
   const today = useMemo(() => {
     const next = new Date();
     next.setHours(0, 0, 0, 0);
@@ -183,6 +277,8 @@ export function AdminDashboardPage({ dataMode = "demo" }: AdminDashboardPageProp
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [selectedCombination, setSelectedCombination] =
     useState<MultiProductCombinationStat | null>(null);
+  const [selectedPromotionSetEstimate, setSelectedPromotionSetEstimate] =
+    useState<PromotionSetEstimateStat | null>(null);
   const [exportStart, setExportStart] = useState(initialRange.start);
   const [exportEnd, setExportEnd] = useState(initialRange.end);
   const [exportLoading, setExportLoading] = useState(false);
@@ -308,6 +404,7 @@ export function AdminDashboardPage({ dataMode = "demo" }: AdminDashboardPageProp
   const affiliateCardStats = summary?.affiliateCardStats ?? [];
   const topMultiProductCombinations =
     summary?.topMultiProductCombinations ?? [];
+  const topPromotionSetEstimates = summary?.topPromotionSetEstimates ?? [];
   const analyticsHref =
     dataMode === "real" ? "/admin/analytics-real" : "/admin/analytics";
 
@@ -361,12 +458,16 @@ export function AdminDashboardPage({ dataMode = "demo" }: AdminDashboardPageProp
     setExportLoading(true);
     setExportError(null);
     try {
-      const data = await getDashboardDailyExportData(
-        { rangeStart: exportStart, rangeEnd: exportEnd },
-        dataMode,
-      );
+      const [data, overview] = await Promise.all([
+        getDashboardDailyExportData(
+          { rangeStart: exportStart, rangeEnd: exportEnd },
+          dataMode,
+        ),
+        getOverviewData(dataMode),
+      ]);
       downloadDailyExport(
-        data.dailyTopRows ?? [],
+        data,
+        overview,
         data.rangeStart ?? exportStart,
         data.rangeEnd ?? exportEnd,
       );
@@ -387,19 +488,23 @@ export function AdminDashboardPage({ dataMode = "demo" }: AdminDashboardPageProp
         <TitleBlock>
           <PageTitle>대시보드</PageTitle>
           <PageSubTitle>
-            핵심 지표를 빠르게 확인하고, 상세 분석은 별도 페이지에서 조회할 수 있도록
-            구성했습니다.
+            핵심 지표를 빠르게 확인하고, 상세 분석은 별도 페이지에서 조회할 수
+            있도록 구성했습니다.
           </PageSubTitle>
         </TitleBlock>
         <HeaderActions>
-          <ShortcutLink href={analyticsHref}>상세 분석 페이지 이동</ShortcutLink>
+          <ShortcutLink href={analyticsHref}>
+            상세 분석 페이지 이동
+          </ShortcutLink>
           <ExportPanel>
             <ExportTitle>비공식 엑셀 출력</ExportTitle>
             <ExportControls>
               <ExportDateInput
                 type="date"
                 value={exportStart}
-                onChange={(event) => handleExportStartChange(event.target.value)}
+                onChange={(event) =>
+                  handleExportStartChange(event.target.value)
+                }
               />
               <RangeSeparator>~</RangeSeparator>
               <ExportDateInput
@@ -465,6 +570,15 @@ export function AdminDashboardPage({ dataMode = "demo" }: AdminDashboardPageProp
             <KpiUnit>명</KpiUnit>
           </KpiValueWrap>
         </KpiCard>
+
+        <KpiCard>
+          <KpiIcon>RNG</KpiIcon>
+          <KpiLabel>기간 내 접속자 수</KpiLabel>
+          <KpiValueWrap>
+            <KpiValue>{formatNumber(visitorSummary?.range ?? 0)}</KpiValue>
+            <KpiUnit>명</KpiUnit>
+          </KpiValueWrap>
+        </KpiCard>
       </KpiGrid>
 
       <FilterCard>
@@ -527,6 +641,48 @@ export function AdminDashboardPage({ dataMode = "demo" }: AdminDashboardPageProp
         {summaryError && <ErrorText>{summaryError}</ErrorText>}
       </FilterCard>
 
+      <SummaryGrid>
+        <SummaryCard>
+          <SummaryLabel>오늘 견적 수</SummaryLabel>
+          <SummaryValue>
+            {summaryLoading
+              ? "..."
+              : formatNumber(summary?.todayEstimates ?? 0)}
+            <SummaryUnit>건</SummaryUnit>
+          </SummaryValue>
+        </SummaryCard>
+
+        <SummaryCard>
+          <SummaryLabel>기간 내 견적 수</SummaryLabel>
+          <SummaryValue>
+            {summaryLoading
+              ? "..."
+              : formatNumber(summary?.totalEstimates ?? 0)}
+            <SummaryUnit>건</SummaryUnit>
+          </SummaryValue>
+        </SummaryCard>
+
+        <SummaryCard>
+          <SummaryLabel>오늘 공유 수</SummaryLabel>
+          <SummaryValue>
+            {summaryLoading
+              ? "..."
+              : formatNumber(summary?.shareSummary.today ?? 0)}
+            <SummaryUnit>건</SummaryUnit>
+          </SummaryValue>
+        </SummaryCard>
+
+        <SummaryCard>
+          <SummaryLabel>기간 내 공유 수</SummaryLabel>
+          <SummaryValue>
+            {summaryLoading
+              ? "..."
+              : formatNumber(summary?.shareSummary.range ?? 0)}
+            <SummaryUnit>건</SummaryUnit>
+          </SummaryValue>
+        </SummaryCard>
+      </SummaryGrid>
+
       <ChartCard>
         <CardHeader>
           <CardTitle>견적내기 / 공유하기 추이</CardTitle>
@@ -557,7 +713,10 @@ export function AdminDashboardPage({ dataMode = "demo" }: AdminDashboardPageProp
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={trendData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e8edf4" />
-                <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#64748b" }} />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fontSize: 12, fill: "#64748b" }}
+                />
                 <YAxis tick={{ fontSize: 12, fill: "#64748b" }} />
                 <Tooltip
                   formatter={(value: number, name: string) => [
@@ -599,12 +758,17 @@ export function AdminDashboardPage({ dataMode = "demo" }: AdminDashboardPageProp
             {summaryLoading ? (
               <InfoText>견적 구성 데이터를 불러오는 중입니다...</InfoText>
             ) : productMixTrendData.length === 0 ? (
-              <InfoText>선택한 기간에 표시할 견적 구성 데이터가 없습니다.</InfoText>
+              <InfoText>
+                선택한 기간에 표시할 견적 구성 데이터가 없습니다.
+              </InfoText>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={productMixTrendData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e8edf4" />
-                  <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#64748b" }} />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 12, fill: "#64748b" }}
+                  />
                   <YAxis tick={{ fontSize: 12, fill: "#64748b" }} />
                   <Tooltip
                     formatter={(value: number, name: string) => [
@@ -641,9 +805,13 @@ export function AdminDashboardPage({ dataMode = "demo" }: AdminDashboardPageProp
             <CardTitle>제휴카드 사용 통계</CardTitle>
           </CardHeader>
           {summaryLoading ? (
-            <CompactInfoText>제휴카드 통계를 불러오는 중입니다...</CompactInfoText>
+            <CompactInfoText>
+              제휴카드 통계를 불러오는 중입니다...
+            </CompactInfoText>
           ) : affiliateCardStats.length === 0 ? (
-            <CompactInfoText>선택한 기간에 제휴카드 데이터가 없습니다.</CompactInfoText>
+            <CompactInfoText>
+              선택한 기간에 제휴카드 데이터가 없습니다.
+            </CompactInfoText>
           ) : (
             <AffiliateList>
               {affiliateCardStats.map((row) => (
@@ -664,9 +832,13 @@ export function AdminDashboardPage({ dataMode = "demo" }: AdminDashboardPageProp
         </CardHeader>
 
         {summaryLoading ? (
-          <CompactInfoText>다품목 조합 데이터를 불러오는 중입니다...</CompactInfoText>
+          <CompactInfoText>
+            다품목 조합 데이터를 불러오는 중입니다...
+          </CompactInfoText>
         ) : topMultiProductCombinations.length === 0 ? (
-          <CompactInfoText>선택한 기간에 다품목 조합 데이터가 없습니다.</CompactInfoText>
+          <CompactInfoText>
+            선택한 기간에 다품목 조합 데이터가 없습니다.
+          </CompactInfoText>
         ) : (
           <CombinationTableWrap>
             <CombinationTable>
@@ -704,45 +876,63 @@ export function AdminDashboardPage({ dataMode = "demo" }: AdminDashboardPageProp
         )}
       </StatsCard>
 
-      <SummaryGrid>
-        <SummaryCard>
-          <SummaryLabel>오늘 견적 수</SummaryLabel>
-          <SummaryValue>
-            {summaryLoading ? "..." : formatNumber(summary?.todayEstimates ?? 0)}
-            <SummaryUnit>건</SummaryUnit>
-          </SummaryValue>
-        </SummaryCard>
+      <StatsCard>
+        <CardHeader>
+          <CardTitle>프로모션 견적서 통계 TOP 10</CardTitle>
+        </CardHeader>
 
-        <SummaryCard>
-          <SummaryLabel>기간 내 견적 수</SummaryLabel>
-          <SummaryValue>
-            {summaryLoading ? "..." : formatNumber(summary?.totalEstimates ?? 0)}
-            <SummaryUnit>건</SummaryUnit>
-          </SummaryValue>
-        </SummaryCard>
-
-        <SummaryCard>
-          <SummaryLabel>오늘 공유 수</SummaryLabel>
-          <SummaryValue>
-            {summaryLoading ? "..." : formatNumber(summary?.shareSummary.today ?? 0)}
-            <SummaryUnit>건</SummaryUnit>
-          </SummaryValue>
-        </SummaryCard>
-
-        <SummaryCard>
-          <SummaryLabel>기간 내 공유 수</SummaryLabel>
-          <SummaryValue>
-            {summaryLoading ? "..." : formatNumber(summary?.shareSummary.range ?? 0)}
-            <SummaryUnit>건</SummaryUnit>
-          </SummaryValue>
-        </SummaryCard>
-      </SummaryGrid>
+        {summaryLoading ? (
+          <CompactInfoText>
+            프로모션 견적서 통계를 불러오는 중입니다...
+          </CompactInfoText>
+        ) : topPromotionSetEstimates.length === 0 ? (
+          <CompactInfoText>
+            선택한 기간에 프로모션 견적서 데이터가 없습니다.
+          </CompactInfoText>
+        ) : (
+          <CombinationTableWrap>
+            <PromotionStatsTable>
+              <thead>
+                <tr>
+                  <th>패키지 종류</th>
+                  <th>세트 구성</th>
+                  <th>카테고리 - 모델명</th>
+                  <th>견적 수</th>
+                  <th>상세보기</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topPromotionSetEstimates.map((row) => (
+                  <tr
+                    key={`${row.rank}-${row.packageName}-${row.setName}-${row.productLabel}`}
+                  >
+                    <td>{row.packageName}</td>
+                    <td>{row.setName}</td>
+                    <CombinationCell title={row.productLabel}>
+                      {row.productLabel}
+                    </CombinationCell>
+                    <td>{formatNumber(row.estimateCount)}건</td>
+                    <td>
+                      <DetailSmallButton
+                        type="button"
+                        onClick={() => setSelectedPromotionSetEstimate(row)}
+                      >
+                        상세보기
+                      </DetailSmallButton>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </PromotionStatsTable>
+          </CombinationTableWrap>
+        )}
+      </StatsCard>
 
       <DetailCard>
         <DetailTitle>분리된 상세 분석 영역</DetailTitle>
         <DetailDesc>
-          인기카테고리, 지난달 상위 지점/매니저, 조직 조회는 별도 페이지로 이동해
-          메인 로딩을 경량화했습니다.
+          인기카테고리, 지난달 상위 지점/매니저, 조직 조회는 별도 페이지로
+          이동해 메인 로딩을 경량화했습니다.
         </DetailDesc>
         <DetailList>
           <li>인기카테고리 차트</li>
@@ -790,12 +980,51 @@ export function AdminDashboardPage({ dataMode = "demo" }: AdminDashboardPageProp
           </CombinationModal>
         </ModalBackdrop>
       )}
+
+      {selectedPromotionSetEstimate && (
+        <ModalBackdrop onClick={() => setSelectedPromotionSetEstimate(null)}>
+          <CombinationModal onClick={(event) => event.stopPropagation()}>
+            <ModalHeader>
+              <div>
+                <ModalTitle>프로모션 견적서 상세보기</ModalTitle>
+                <ModalSubTitle>
+                  {selectedPromotionSetEstimate.packageName} ·{" "}
+                  {selectedPromotionSetEstimate.setName} ·{" "}
+                  {formatNumber(selectedPromotionSetEstimate.estimateCount)}건
+                </ModalSubTitle>
+              </div>
+              <ModalCloseButton
+                type="button"
+                aria-label="상세보기 닫기"
+                onClick={() => setSelectedPromotionSetEstimate(null)}
+              >
+                ×
+              </ModalCloseButton>
+            </ModalHeader>
+
+            <ModalProductList>
+              {selectedPromotionSetEstimate.products.map((product, index) => (
+                <ModalProductItem
+                  key={`${product.category}-${product.modelName}-${index}`}
+                >
+                  <ModalProductIndex>{index + 1}</ModalProductIndex>
+                  <ModalProductInfo>
+                    <strong>{product.category}</strong>
+                    <span>{product.productName}</span>
+                    <b>{product.modelName}</b>
+                  </ModalProductInfo>
+                </ModalProductItem>
+              ))}
+            </ModalProductList>
+          </CombinationModal>
+        </ModalBackdrop>
+      )}
     </Page>
   );
 }
 
-export default function AdminDashboardDemoPage() {
-  return <AdminDashboardPage dataMode="demo" />;
+export default function AdminDashboardPageRoute() {
+  return <AdminDashboardPage dataMode="real" />;
 }
 
 function formatNumber(value: number) {
@@ -1207,6 +1436,32 @@ const CombinationTable = styled.table`
   td:nth-child(2) {
     width: 68px;
     text-align: center;
+  }
+
+  th:nth-child(4),
+  td:nth-child(4) {
+    width: 90px;
+    text-align: right;
+  }
+
+  th:nth-child(5),
+  td:nth-child(5) {
+    width: 104px;
+    text-align: center;
+  }
+`;
+
+const PromotionStatsTable = styled(CombinationTable)`
+  th:nth-child(1),
+  td:nth-child(1) {
+    width: 170px;
+    text-align: left;
+  }
+
+  th:nth-child(2),
+  td:nth-child(2) {
+    width: 132px;
+    text-align: left;
   }
 
   th:nth-child(4),

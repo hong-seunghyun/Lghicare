@@ -11,6 +11,7 @@ interface ProductVariant {
   정상가: string;
   할인전금액: string;
   할인후금액: string;
+  할인금액?: string;
   thumbnailUrl?: string;
 }
 

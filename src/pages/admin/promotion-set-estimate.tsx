@@ -1,620 +1,1045 @@
-import React, { useMemo, useState } from "react";
+"use client";
+
 import Image from "next/image";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styled from "styled-components";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import {
+  DEFAULT_PROMOTION_SET_CONFIG,
+  PROMOTION_SET_CATEGORIES,
+  PROMOTION_SET_CONFIG_COLLECTION,
+  PROMOTION_SET_CONFIG_DOC_ID,
+  PROMOTION_SET_TYPE_NAMES,
+  ProductSearchResult,
+  ProductSearchVariant,
+  PromotionSetEstimateConfig,
+  PromotionSetProduct,
+  PromotionSetPackage,
+  PromotionSetType,
+  compactPromotionSetConfig,
+  createPromotionSetProduct,
+  getDefaultPromotionVariant,
+  getPromotionPackageDiyProducts,
+  getVariantLabel,
+  getVariantMonthly,
+  normalizePromotionSetConfig,
+} from "@/lib/promotionSetEstimate";
 
-type PromotionSetId = "basic" | "pro" | "super" | "custom";
+type ProductTarget =
+  | { type: "set"; packageId: string; setId: string }
+  | { type: "diy"; packageId: string };
 
-type ProductCategoryId =
-  | "water"
-  | "cleaner"
-  | "massage"
-  | "air"
-  | "styler"
-  | "dishwasher";
-
-type Product = {
-  id: string;
-  categoryId: ProductCategoryId;
-  categoryName: string;
-  name: string;
-  modelName: string;
-  monthlyFee: number;
-  imageSrc: string;
-  promotion: string;
-  availableIn: PromotionSetId[];
+type ProductSearchResponse = {
+  options?: ProductSearchResult[];
+  error?: string;
 };
 
-type CategoryRule = {
-  categoryId: ProductCategoryId;
-  name: string;
-  minSelections: number;
-  maxSelections?: number;
-  allowMultiple: boolean;
+const cloneConfig = (config: PromotionSetEstimateConfig) =>
+  JSON.parse(JSON.stringify(config)) as PromotionSetEstimateConfig;
+
+const productListKey = (products: PromotionSetProduct[]) =>
+  products
+    .map((product) => `${product.category}:${product.modelCode}`)
+    .sort()
+    .join("|");
+
+const getVariantOptionKey = (variant: ProductSearchVariant, index: number) =>
+  [
+    index,
+    variant.계약기간 || "",
+    variant.서비스유형 || "",
+    variant["서비스주기/월"] || "",
+    variant["프로모션 대분류"] || "",
+    variant.프로모션유형 || "",
+    variant.프로모션명 || "",
+    variant.할인후금액 || "",
+    variant.할인전금액 || "",
+    variant.정상가 || "",
+  ].join("::");
+
+const findVariantIndex = (
+  variants: ProductSearchVariant[] | undefined,
+  selectedVariant: ProductSearchVariant | undefined,
+) => {
+  if (!variants?.length || !selectedVariant) return -1;
+  return variants.findIndex(
+    (variant) =>
+      String(variant.계약기간 || "") === String(selectedVariant.계약기간 || "") &&
+      String(variant.서비스유형 || "") ===
+        String(selectedVariant.서비스유형 || "") &&
+      String(variant["서비스주기/월"] || "") ===
+        String(selectedVariant["서비스주기/월"] || "") &&
+      String(variant["프로모션 대분류"] || "") ===
+        String(selectedVariant["프로모션 대분류"] || "") &&
+      String(variant.프로모션유형 || "") ===
+        String(selectedVariant.프로모션유형 || "") &&
+      String(variant.프로모션명 || "") ===
+        String(selectedVariant.프로모션명 || "") &&
+      String(variant.할인후금액 || "") ===
+        String(selectedVariant.할인후금액 || ""),
+  );
 };
 
-type PromotionSet = {
-  id: PromotionSetId;
-  name: string;
-  description: string;
-  mode: "curated" | "free";
-  benefitSummary: string;
-  minTotalSelections?: number;
-  categories: CategoryRule[];
+const parseProductSearchResponse = (bodyText: string, contentType: string) => {
+  if (!contentType.includes("application/json") || !bodyText) {
+    return {} as ProductSearchResponse;
+  }
+
+  try {
+    return JSON.parse(bodyText) as ProductSearchResponse;
+  } catch {
+    return {
+      error: bodyText.trim().slice(0, 160) || "검색 응답을 해석할 수 없습니다.",
+    };
+  }
 };
 
-const PROMOTION_SETS: PromotionSet[] = [
-  {
-    id: "basic",
-    name: "Basic 세트",
-    description: "필수 생활가전 중심으로 구성한 기본 프로모션 세트",
-    mode: "curated",
-    benefitSummary: "기본 프로모션 적용, 결합 상담 시 추가 혜택 확인",
-    categories: [
-      {
-        categoryId: "water",
-        name: "정수기",
-        minSelections: 1,
-        maxSelections: 1,
-        allowMultiple: false,
-      },
-      {
-        categoryId: "cleaner",
-        name: "청소기",
-        minSelections: 1,
-        maxSelections: 1,
-        allowMultiple: false,
-      },
-    ],
-  },
-  {
-    id: "pro",
-    name: "Pro 세트",
-    description: "생활 관리 제품을 함께 담은 확장형 프로모션 세트",
-    mode: "curated",
-    benefitSummary: "Pro 전용 결합 혜택 및 월요금 상담 적용",
-    categories: [
-      {
-        categoryId: "water",
-        name: "정수기",
-        minSelections: 1,
-        maxSelections: 1,
-        allowMultiple: false,
-      },
-      {
-        categoryId: "cleaner",
-        name: "청소기",
-        minSelections: 1,
-        maxSelections: 2,
-        allowMultiple: true,
-      },
-      {
-        categoryId: "air",
-        name: "공기청정기",
-        minSelections: 1,
-        maxSelections: 1,
-        allowMultiple: false,
-      },
-    ],
-  },
-  {
-    id: "super",
-    name: "Super 세트",
-    description: "프리미엄 제품군까지 포함한 고급형 프로모션 세트",
-    mode: "curated",
-    benefitSummary: "Super 전용 혜택, 프리미엄 제품군 상담 우선 적용",
-    categories: [
-      {
-        categoryId: "water",
-        name: "정수기",
-        minSelections: 1,
-        maxSelections: 1,
-        allowMultiple: false,
-      },
-      {
-        categoryId: "cleaner",
-        name: "청소기",
-        minSelections: 1,
-        maxSelections: 2,
-        allowMultiple: true,
-      },
-      {
-        categoryId: "massage",
-        name: "안마의자",
-        minSelections: 1,
-        maxSelections: 1,
-        allowMultiple: false,
-      },
-      {
-        categoryId: "air",
-        name: "공기청정기",
-        minSelections: 1,
-        maxSelections: 2,
-        allowMultiple: true,
-      },
-    ],
-  },
-  {
-    id: "custom",
-    name: "골라담기",
-    description: "세트 제한 없이 원하는 제품을 자유롭게 선택",
-    mode: "free",
-    benefitSummary: "선택 제품 기준으로 상담 후 적용 가능한 혜택 안내",
-    minTotalSelections: 1,
-    categories: [],
-  },
-];
+const createSetTemplates = (): PromotionSetType[] =>
+  PROMOTION_SET_TYPE_NAMES.map((name) => ({
+    id: name.toLowerCase(),
+    name,
+    description: `${name} 세트 구성`,
+    enabled: true,
+    products: [],
+  }));
 
-const PRODUCTS: Product[] = [
-  {
-    id: "wd521awb",
-    categoryId: "water",
-    categoryName: "정수기",
-    name: "오브제 정수기",
-    modelName: "WD521AWB",
-    monthlyFee: 29900,
-    imageSrc: "/images/main-category-1.png",
-    promotion: "기본 프로모션 적용",
-    availableIn: ["basic", "pro", "super", "custom"],
+const createNewPackage = (): PromotionSetPackage => ({
+  id: `package-${Date.now()}`,
+  name: "새 프로모션",
+  description: "프로모션 설명을 입력하세요.",
+  enabled: true,
+  sets: createSetTemplates(),
+  diy: {
+    enabled: true,
+    name: "DIY",
+    description: "원하는 제품을 자유롭게 선택",
+    minSelections: 1,
+    products: [],
   },
-  {
-    id: "wd720a",
-    categoryId: "water",
-    categoryName: "정수기",
-    name: "퓨리케어 정수기",
-    modelName: "WD720A",
-    monthlyFee: 26900,
-    imageSrc: "/images/main-category-18.png",
-    promotion: "방문관리 프로모션 적용",
-    availableIn: ["basic", "pro", "custom"],
-  },
-  {
-    id: "as9200ba",
-    categoryId: "cleaner",
-    categoryName: "청소기",
-    name: "코드제로 A9S",
-    modelName: "AS9200BA",
-    monthlyFee: 22900,
-    imageSrc: "/images/main-category-20.png",
-    promotion: "청소기 결합 혜택",
-    availableIn: ["basic", "pro", "super", "custom"],
-  },
-  {
-    id: "b95awbh",
-    categoryId: "cleaner",
-    categoryName: "청소기",
-    name: "코드제로 오브제컬렉션",
-    modelName: "B95AWBH",
-    monthlyFee: 24900,
-    imageSrc: "/images/main-category-9.png",
-    promotion: "Pro/Super 전용 구성",
-    availableIn: ["pro", "super", "custom"],
-  },
-  {
-    id: "as303dwfa",
-    categoryId: "air",
-    categoryName: "공기청정기",
-    name: "퓨리케어 360° 공기청정기",
-    modelName: "AS303DWFA",
-    monthlyFee: 19900,
-    imageSrc: "/images/main-category-7.png",
-    promotion: "공기청정 케어 혜택",
-    availableIn: ["pro", "super", "custom"],
-  },
-  {
-    id: "as065cwha",
-    categoryId: "air",
-    categoryName: "공기청정기",
-    name: "퓨리케어 미니 공기청정기",
-    modelName: "AS065CWHA",
-    monthlyFee: 16900,
-    imageSrc: "/images/main-category-23.png",
-    promotion: "소형 공간 추천 구성",
-    availableIn: ["super", "custom"],
-  },
-  {
-    id: "mhb0g",
-    categoryId: "massage",
-    categoryName: "안마의자",
-    name: "힐링 안마의자",
-    modelName: "MHB0G",
-    monthlyFee: 49900,
-    imageSrc: "/images/main-category-2.png",
-    promotion: "Super 전용 프리미엄 혜택",
-    availableIn: ["super", "custom"],
-  },
-  {
-    id: "s5mbua",
-    categoryId: "styler",
-    categoryName: "의류관리기",
-    name: "오브제 스타일러",
-    modelName: "S5MBUA",
-    monthlyFee: 32900,
-    imageSrc: "/images/main-category-8.png",
-    promotion: "골라담기 추천 제품",
-    availableIn: ["custom"],
-  },
-  {
-    id: "dee6ewe",
-    categoryId: "dishwasher",
-    categoryName: "식기세척기",
-    name: "디오스 식기세척기",
-    modelName: "DEE6EWE",
-    monthlyFee: 27900,
-    imageSrc: "/images/main-category-13.png",
-    promotion: "골라담기 주방 구성",
-    availableIn: ["custom"],
-  },
-];
+});
 
-const EMPTY_SELECTED_IDS: string[] = [];
-
-const formatPrice = (value: number) => `${value.toLocaleString()}원`;
-
-const getProductsForSet = (set: PromotionSet) =>
-  PRODUCTS.filter((product) => product.availableIn.includes(set.id));
-
-const CheckIcon = () => (
-  <svg viewBox="0 0 18 18" aria-hidden="true">
-    <path d="M7.3 12.2 4.1 9l1.2-1.2 2 2 5.2-5.2L13.8 6z" />
-  </svg>
-);
-
-export default function PromotionSetEstimatePage() {
-  const [activeSetId, setActiveSetId] = useState<PromotionSetId>("basic");
-  const [selectedBySet, setSelectedBySet] = useState<
-    Record<PromotionSetId, string[]>
-  >({
-    basic: ["wd521awb"],
-    pro: [],
-    super: [],
-    custom: [],
+export default function AdminPromotionSetEstimatePage() {
+  const [config, setConfig] = useState<PromotionSetEstimateConfig>(
+    DEFAULT_PROMOTION_SET_CONFIG,
+  );
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [activePackageId, setActivePackageId] = useState(
+    DEFAULT_PROMOTION_SET_CONFIG.packages[0]?.id ?? "",
+  );
+  const [activeSetId, setActiveSetId] = useState(
+    DEFAULT_PROMOTION_SET_CONFIG.packages[0]?.sets[0]?.id ?? "",
+  );
+  const [target, setTarget] = useState<ProductTarget>({
+    type: "set",
+    packageId: DEFAULT_PROMOTION_SET_CONFIG.packages[0]?.id ?? "",
+    setId: DEFAULT_PROMOTION_SET_CONFIG.packages[0]?.sets[0]?.id ?? "",
   });
+  const [category, setCategory] = useState(PROMOTION_SET_CATEGORIES[0]);
+  const [keyword, setKeyword] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [results, setResults] = useState<ProductSearchResult[]>([]);
+  const [productOptionsByModel, setProductOptionsByModel] = useState<
+    Record<string, ProductSearchResult>
+  >({});
+  const searchCacheRef = useRef<Record<string, ProductSearchResult[]>>({});
+  const productOptionsCacheRef = useRef<Record<string, ProductSearchResult[]>>({});
 
-  const activeSet =
-    PROMOTION_SETS.find((set) => set.id === activeSetId) ?? PROMOTION_SETS[0];
-  const visibleProducts = useMemo(() => getProductsForSet(activeSet), [activeSet]);
-  const selectedIds = selectedBySet[activeSet.id] || EMPTY_SELECTED_IDS;
+  useEffect(() => {
+    let cancelled = false;
 
-  const selectedProducts = useMemo(
-    () =>
-      selectedIds
-        .map((id) => PRODUCTS.find((product) => product.id === id))
-        .filter((product): product is Product => Boolean(product)),
-    [selectedIds],
-  );
+    const loadConfig = async () => {
+      try {
+        const snap = await getDoc(
+          doc(
+            db,
+            PROMOTION_SET_CONFIG_COLLECTION,
+            PROMOTION_SET_CONFIG_DOC_ID,
+          ),
+        );
+        const nextConfig = snap.exists()
+          ? normalizePromotionSetConfig(snap.data())
+          : DEFAULT_PROMOTION_SET_CONFIG;
 
-  const visibleCategoryIds = useMemo(
-    () => new Set(visibleProducts.map((product) => product.categoryId)),
-    [visibleProducts],
-  );
+        if (!cancelled) {
+          setConfig(nextConfig);
+          const firstPackage = nextConfig.packages[0];
+          const firstSetId = firstPackage?.sets[0]?.id ?? "";
+          setActivePackageId(firstPackage?.id ?? "");
+          setActiveSetId(firstSetId);
+          setTarget(
+            firstPackage && firstSetId
+              ? {
+                  type: "set",
+                  packageId: firstPackage.id,
+                  setId: firstSetId,
+                }
+              : { type: "diy", packageId: firstPackage?.id ?? "" },
+          );
+        }
+      } catch (error) {
+        console.error("프로모션 세트 설정 로드 오류:", error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
 
-  const categoryRules = useMemo<CategoryRule[]>(() => {
-    if (activeSet.mode === "free") {
-      return Array.from(
-        new Map(
-          visibleProducts.map((product) => [
-            product.categoryId,
-            {
-              categoryId: product.categoryId,
-              name: product.categoryName,
-              minSelections: 0,
-              allowMultiple: true,
-            } satisfies CategoryRule,
-          ]),
-        ).values(),
-      );
-    }
+    loadConfig();
 
-    return activeSet.categories.filter((rule) =>
-      visibleCategoryIds.has(rule.categoryId),
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const activePackage =
+    config.packages.find((item) => item.id === activePackageId) ??
+    config.packages[0];
+  const activeSet = activePackage?.sets.find((set) => set.id === activeSetId);
+  const targetProducts = useMemo(() => {
+    const targetPackage = config.packages.find(
+      (promotionPackage) => promotionPackage.id === target.packageId,
     );
-  }, [activeSet, visibleProducts, visibleCategoryIds]);
-
-  const selectedCategoryCount = new Set(
-    selectedProducts.map((product) => product.categoryId),
-  ).size;
-  const totalMonthlyFee = selectedProducts.reduce(
-    (sum, product) => sum + product.monthlyFee,
-    0,
+    if (!targetPackage) return [];
+    if (target.type === "diy") return getPromotionPackageDiyProducts(targetPackage);
+    return targetPackage.sets.find((set) => set.id === target.setId)?.products ?? [];
+  }, [config, target]);
+  const targetProductsKey = useMemo(
+    () => productListKey(targetProducts),
+    [targetProducts],
   );
 
-  const unmetRequirements = categoryRules.filter((rule) => {
-    if (rule.minSelections <= 0) return false;
-    const selectedCount = selectedProducts.filter(
-      (product) => product.categoryId === rule.categoryId,
-    ).length;
-    return selectedCount < rule.minSelections;
-  });
+  const updateConfig = useCallback((updater: (draft: PromotionSetEstimateConfig) => void) => {
+    setConfig((prev) => {
+      const draft = cloneConfig(prev);
+      updater(draft);
+      return draft;
+    });
+  }, []);
 
-  const freeModeUnmet =
-    activeSet.mode === "free" &&
-    selectedProducts.length < (activeSet.minTotalSelections ?? 1);
-  const canRequestEstimate = unmetRequirements.length === 0 && !freeModeUnmet;
-
-  const groupedProducts = useMemo(
-    () =>
-      categoryRules.map((rule) => ({
-        rule,
-        products: visibleProducts.filter(
-          (product) => product.categoryId === rule.categoryId,
-        ),
-      })),
-    [categoryRules, visibleProducts],
-  );
-
-  const handleSetChange = (setId: PromotionSetId) => {
-    setActiveSetId(setId);
+  const updateActivePackage = (patch: Partial<PromotionSetPackage>) => {
+    updateConfig((draft) => {
+      draft.packages = draft.packages.map((promotionPackage) =>
+        promotionPackage.id === activePackageId
+          ? { ...promotionPackage, ...patch }
+          : promotionPackage,
+      );
+    });
   };
 
-  const toggleProduct = (product: Product) => {
-    setSelectedBySet((prev) => {
-      const current = prev[activeSet.id] ?? [];
-      const isSelected = current.includes(product.id);
-
-      if (isSelected) {
-        return {
-          ...prev,
-          [activeSet.id]: current.filter((id) => id !== product.id),
-        };
-      }
-
-      const rule = categoryRules.find(
-        (category) => category.categoryId === product.categoryId,
+  const updateActiveSet = (patch: Partial<PromotionSetType>) => {
+    updateConfig((draft) => {
+      draft.packages = draft.packages.map((promotionPackage) =>
+        promotionPackage.id === activePackageId
+          ? {
+              ...promotionPackage,
+              sets: promotionPackage.sets.map((set) =>
+                set.id === activeSetId ? { ...set, ...patch } : set,
+              ),
+            }
+          : promotionPackage,
       );
+    });
+  };
 
-      if (!rule || activeSet.mode === "free") {
-        return { ...prev, [activeSet.id]: [...current, product.id] };
+  useEffect(() => {
+    if (target.type === "diy" || targetProducts.length === 0) return;
+
+    let cancelled = false;
+
+    const loadTargetProductOptions = async () => {
+      try {
+        const models = Array.from(
+          new Set(
+            targetProducts
+              .map((product) => product.modelCode.trim())
+              .filter(Boolean),
+          ),
+        );
+        const middles = Array.from(
+          new Set(
+            targetProducts
+              .map((product) => product.category.trim())
+              .filter(Boolean),
+          ),
+        );
+        if (!models.length || !middles.length) return;
+
+        const params = new URLSearchParams({
+          middles: middles.join(","),
+          models: models.join(","),
+          groupBy: "modelCode",
+          includeImages: "false",
+        });
+        const cacheKey = params.toString();
+        const cached = productOptionsCacheRef.current[cacheKey];
+        let products = cached;
+
+        if (!products) {
+          const response = await fetch(`/api/products?${params.toString()}`);
+          const contentType = response.headers.get("content-type") || "";
+          const bodyText = await response.text();
+          const data = parseProductSearchResponse(bodyText, contentType);
+          if (!response.ok) {
+            throw new Error(
+              data.error ||
+                bodyText.trim().slice(0, 160) ||
+                `HTTP ${response.status}`,
+            );
+          }
+          products = Array.isArray(data.options) ? data.options : [];
+          productOptionsCacheRef.current[cacheKey] = products;
+        }
+
+        if (cancelled) return;
+
+        const optionMap = Object.fromEntries(
+          products.map((product) => [product.모델코드, product]),
+        ) as Record<string, ProductSearchResult>;
+        setProductOptionsByModel((prev) => ({ ...prev, ...optionMap }));
+
+        const needsHydration = targetProducts.some((product) => {
+          const optionProduct = optionMap[product.modelCode];
+          return Boolean(
+            optionProduct?.variants?.length &&
+              (!product.selectedVariant || !product.variants?.length),
+          );
+        });
+
+        if (!needsHydration) return;
+
+        updateConfig((draft) => {
+          draft.packages = draft.packages.map((promotionPackage) => {
+            if (promotionPackage.id !== target.packageId) {
+              return promotionPackage;
+            }
+
+            return {
+              ...promotionPackage,
+              sets: promotionPackage.sets.map((set) => {
+                if (target.type !== "set" || set.id !== target.setId) {
+                  return set;
+                }
+
+                return {
+                  ...set,
+                  products: set.products.map((product) => {
+                    const optionProduct = optionMap[product.modelCode];
+                    const variants = optionProduct?.variants ?? product.variants;
+                    const selectedVariant =
+                      product.selectedVariant ??
+                      getDefaultPromotionVariant(variants);
+                    const monthly = getVariantMonthly(selectedVariant);
+
+                    if (!variants && !selectedVariant) return product;
+
+                    return {
+                      ...product,
+                      variants,
+                      selectedVariant,
+                      ...(monthly
+                        ? { baseMonthly: monthly, finalMonthly: monthly }
+                        : {}),
+                    };
+                  }),
+                };
+              }),
+            };
+          });
+        });
+      } catch (error) {
+        console.error("프로모션 구성 상품 옵션 로드 오류:", error);
       }
+    };
 
-      const idsInCategory = current.filter((id) => {
-        const target = PRODUCTS.find((item) => item.id === id);
-        return target?.categoryId === product.categoryId;
+    loadTargetProductOptions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [target, targetProducts, targetProductsKey, updateConfig]);
+
+  const selectPackage = (packageId: string) => {
+    const nextPackage = config.packages.find((item) => item.id === packageId);
+    const firstSetId = nextPackage?.sets[0]?.id ?? "";
+    setActivePackageId(packageId);
+    setActiveSetId(firstSetId);
+    setTarget(
+      firstSetId
+        ? { type: "set", packageId, setId: firstSetId }
+        : { type: "diy", packageId },
+    );
+  };
+
+  const addPackage = () => {
+    const nextPackage = createNewPackage();
+    updateConfig((draft) => {
+      draft.packages.push(nextPackage);
+    });
+    setActivePackageId(nextPackage.id);
+    setActiveSetId(nextPackage.sets[0]?.id ?? "");
+    setTarget({
+      type: "set",
+      packageId: nextPackage.id,
+      setId: nextPackage.sets[0]?.id ?? "",
+    });
+  };
+
+  const removeActivePackage = () => {
+    if (
+      !activePackage ||
+      !confirm(`${activePackage.name} 프로모션을 삭제하시겠어요?`)
+    ) {
+      return;
+    }
+    const remaining = config.packages.filter(
+      (promotionPackage) => promotionPackage.id !== activePackage.id,
+    );
+    updateConfig((draft) => {
+      draft.packages = remaining;
+    });
+    const nextPackage = remaining[0];
+    const nextSetId = nextPackage?.sets[0]?.id ?? "";
+    setActivePackageId(nextPackage?.id ?? "");
+    setActiveSetId(nextSetId);
+    setTarget(
+      nextPackage && nextSetId
+        ? { type: "set", packageId: nextPackage.id, setId: nextSetId }
+        : { type: "diy", packageId: nextPackage?.id ?? "" },
+    );
+  };
+
+  const saveConfig = async () => {
+    setSaving(true);
+    try {
+      const nextConfig = compactPromotionSetConfig(cloneConfig(config));
+      await setDoc(
+        doc(db, PROMOTION_SET_CONFIG_COLLECTION, PROMOTION_SET_CONFIG_DOC_ID),
+        {
+          ...nextConfig,
+          updatedAt: new Date(),
+        },
+      );
+      setConfig(nextConfig);
+      alert("프로모션 세트 설정이 저장되었습니다.");
+    } catch (error) {
+      console.error("프로모션 세트 설정 저장 오류:", error);
+      alert("저장 중 오류가 발생했습니다.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const searchProducts = async () => {
+    setSearching(true);
+    try {
+      const params = new URLSearchParams({
+        middle: category,
+        groupBy: "modelCode",
+        includeImages: "false",
       });
+      const trimmed = keyword.trim();
+      if (trimmed) params.set("q", trimmed);
+      const cacheKey = params.toString();
+      const cached = searchCacheRef.current[cacheKey];
+      if (cached) {
+        setResults(cached);
+        setSearching(false);
+        return;
+      }
 
-      if (!rule.allowMultiple || rule.maxSelections === 1) {
+      const response = await fetch(`/api/products?${params.toString()}`);
+      const contentType = response.headers.get("content-type") || "";
+      const bodyText = await response.text();
+      const data = parseProductSearchResponse(bodyText, contentType);
+
+      if (!response.ok) {
+        const message =
+          data.error ||
+          bodyText.trim().slice(0, 160) ||
+          `HTTP ${response.status}`;
+        throw new Error(message);
+      }
+
+      const nextResults = Array.isArray(data.options) ? data.options : [];
+      searchCacheRef.current[cacheKey] = nextResults;
+      setResults(nextResults);
+    } catch (error) {
+      console.error("제품 검색 오류:", error);
+      const message = error instanceof Error ? error.message : String(error);
+      alert(`제품 검색 중 오류가 발생했습니다.\n${message}`);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const addProduct = (result: ProductSearchResult) => {
+    const product = createPromotionSetProduct(result);
+    if (result.모델코드) {
+      setProductOptionsByModel((prev) => ({
+        ...prev,
+        [result.모델코드]: result,
+      }));
+    }
+
+    updateConfig((draft) => {
+      draft.packages = draft.packages.map((promotionPackage) => {
+        if (promotionPackage.id !== target.packageId) return promotionPackage;
+        if (target.type === "diy") {
+          const exists = promotionPackage.diy.products.some(
+            (item) => item.modelCode === product.modelCode,
+          );
+          if (exists) return promotionPackage;
+
+          return {
+            ...promotionPackage,
+            diy: {
+              ...promotionPackage.diy,
+              products: [...promotionPackage.diy.products, product],
+            },
+          };
+        }
+
         return {
-          ...prev,
-          [activeSet.id]: [
-            ...current.filter((id) => {
-              const target = PRODUCTS.find((item) => item.id === id);
-              return target?.categoryId !== product.categoryId;
-            }),
-            product.id,
-          ],
+          ...promotionPackage,
+          sets: promotionPackage.sets.map((set) =>
+            set.id === target.setId &&
+            !set.products.some((item) => item.modelCode === product.modelCode)
+              ? { ...set, products: [...set.products, product] }
+              : set,
+          ),
         };
-      }
+      });
+    });
+  };
 
-      if (rule.maxSelections && idsInCategory.length >= rule.maxSelections) {
-        return prev;
-      }
+  const updateProductVariant = (
+    productId: string,
+    variant: ProductSearchVariant,
+  ) => {
+    const monthly = getVariantMonthly(variant);
 
-      return { ...prev, [activeSet.id]: [...current, product.id] };
+    updateConfig((draft) => {
+      draft.packages = draft.packages.map((promotionPackage) => {
+        if (promotionPackage.id !== target.packageId) return promotionPackage;
+        if (target.type === "diy") return promotionPackage;
+
+        return {
+          ...promotionPackage,
+          sets: promotionPackage.sets.map((set) =>
+            set.id === target.setId
+              ? {
+                  ...set,
+                  products: set.products.map((product) =>
+                    product.id === productId
+                      ? {
+                          ...product,
+                          selectedVariant: variant,
+                          ...(monthly
+                            ? { baseMonthly: monthly, finalMonthly: monthly }
+                            : {}),
+                        }
+                      : product,
+                  ),
+                }
+              : set,
+          ),
+        };
+      });
     });
   };
 
   const removeProduct = (productId: string) => {
-    setSelectedBySet((prev) => ({
-      ...prev,
-      [activeSet.id]: (prev[activeSet.id] ?? []).filter((id) => id !== productId),
-    }));
+    updateConfig((draft) => {
+      draft.packages = draft.packages.map((promotionPackage) => {
+        if (promotionPackage.id !== target.packageId) return promotionPackage;
+        if (target.type === "diy") {
+          return {
+            ...promotionPackage,
+            diy: {
+              ...promotionPackage.diy,
+              products: promotionPackage.diy.products.filter(
+                (product) => product.id !== productId,
+              ),
+            },
+          };
+        }
+
+        return {
+          ...promotionPackage,
+          sets: promotionPackage.sets.map((set) =>
+            set.id === target.setId
+              ? {
+                  ...set,
+                  products: set.products.filter(
+                    (product) => product.id !== productId,
+                  ),
+                }
+              : set,
+          ),
+        };
+      });
+    });
   };
 
-  const clearActiveSet = () => {
-    setSelectedBySet((prev) => ({ ...prev, [activeSet.id]: [] }));
-  };
-
-  const handleRequestEstimate = () => {
-    if (!canRequestEstimate) return;
-    alert("선택한 프로모션 세트로 견적 문의가 준비되었습니다.");
-  };
+  if (loading) {
+    return <Page>프로모션 세트 설정을 불러오는 중입니다...</Page>;
+  }
 
   return (
     <Page>
-      <PageInner>
-        <MainPanel>
-          <Header>
-            <TitleBlock>
-              <h1>프로모션 세트 견적</h1>
-              <p>관리자가 지정한 프로모션 세트로 간편하게 견적을 받아보세요</p>
-            </TitleBlock>
-            <AdminNotice>관리자 전용 임시 페이지</AdminNotice>
-          </Header>
+      <Header>
+        <TitleBlock>
+          <h1>프로모션 세트 견적 관리</h1>
+          <p>
+            공개 페이지에서 노출할 프로모션, 세트 유형, 구성 모델을 관리합니다.
+          </p>
+        </TitleBlock>
+        <ActionGroup>
+          <PreviewLink href="/promotion-set-estimate" target="_blank">
+            공개 페이지 보기
+          </PreviewLink>
+          <SaveButton type="button" disabled={saving} onClick={saveConfig}>
+            {saving ? "저장 중..." : "저장"}
+          </SaveButton>
+        </ActionGroup>
+      </Header>
 
-          <Tabs role="tablist" aria-label="프로모션 세트 선택">
-            {PROMOTION_SETS.map((set) => (
-              <TabButton
-                key={set.id}
+      <Grid>
+        <Panel>
+          <PanelTitle>공개 문구</PanelTitle>
+          <FormGrid>
+            <Field>
+              <label>페이지 제목</label>
+              <input
+                value={config.labels.pageTitle}
+                onChange={(event) =>
+                  updateConfig((draft) => {
+                    draft.labels.pageTitle = event.target.value;
+                  })
+                }
+              />
+            </Field>
+            <Field>
+              <label>페이지 설명</label>
+              <input
+                value={config.labels.pageDescription}
+                onChange={(event) =>
+                  updateConfig((draft) => {
+                    draft.labels.pageDescription = event.target.value;
+                  })
+                }
+              />
+            </Field>
+            <Field>
+              <label>견적 버튼명</label>
+              <input
+                value={config.labels.estimateButton}
+                onChange={(event) =>
+                  updateConfig((draft) => {
+                    draft.labels.estimateButton = event.target.value;
+                  })
+                }
+              />
+            </Field>
+            <Field>
+              <label>요약 타이틀</label>
+              <input
+                value={config.labels.summaryTitle}
+                onChange={(event) =>
+                  updateConfig((draft) => {
+                    draft.labels.summaryTitle = event.target.value;
+                  })
+                }
+              />
+            </Field>
+            <Field>
+              <label>고정 세트 안내</label>
+              <input
+                value={config.labels.fixedSetNotice}
+                onChange={(event) =>
+                  updateConfig((draft) => {
+                    draft.labels.fixedSetNotice = event.target.value;
+                  })
+                }
+              />
+            </Field>
+            <Field>
+              <label>DIY 안내</label>
+              <input
+                value={config.labels.diyHelpText}
+                onChange={(event) =>
+                  updateConfig((draft) => {
+                    draft.labels.diyHelpText = event.target.value;
+                  })
+                }
+              />
+            </Field>
+          </FormGrid>
+        </Panel>
+
+        <Panel>
+          <PanelHeader>
+            <PanelTitle>프로모션명</PanelTitle>
+            <SmallButton type="button" onClick={addPackage}>
+              프로모션 추가
+            </SmallButton>
+          </PanelHeader>
+
+          <SetTabs>
+            {config.packages.map((promotionPackage) => (
+              <SetTab
+                key={promotionPackage.id}
                 type="button"
-                role="tab"
-                aria-selected={activeSet.id === set.id}
-                $active={activeSet.id === set.id}
-                onClick={() => handleSetChange(set.id)}
+                $active={promotionPackage.id === activePackageId}
+                onClick={() => selectPackage(promotionPackage.id)}
               >
-                {set.name}
-              </TabButton>
+                {promotionPackage.name}
+              </SetTab>
             ))}
-          </Tabs>
+          </SetTabs>
 
-          <SetMeta>
-            <strong>{activeSet.description}</strong>
-            <span>
-              세트는 관리자 지정 구성이며, 제품별 조건과 월요금은 선택 옵션에
-              따라 달라질 수 있습니다.
-            </span>
-          </SetMeta>
+          {activePackage && (
+            <FormGrid>
+              <Field>
+                <label>프로모션명</label>
+                <input
+                  value={activePackage.name}
+                  onChange={(event) =>
+                    updateActivePackage({ name: event.target.value })
+                  }
+                />
+              </Field>
+              <Field>
+                <label>프로모션 설명</label>
+                <input
+                  value={activePackage.description}
+                  onChange={(event) =>
+                    updateActivePackage({ description: event.target.value })
+                  }
+                />
+              </Field>
+              <CheckField>
+                <input
+                  id="active-package-enabled"
+                  type="checkbox"
+                  checked={activePackage.enabled}
+                  onChange={(event) =>
+                    updateActivePackage({ enabled: event.target.checked })
+                  }
+                />
+                <label htmlFor="active-package-enabled">공개 페이지에 노출</label>
+              </CheckField>
+              <DangerButton type="button" onClick={removeActivePackage}>
+                현재 프로모션 삭제
+              </DangerButton>
+            </FormGrid>
+          )}
+        </Panel>
 
-          <ProductSections>
-            {groupedProducts.map(({ rule, products }) => (
-              <CategorySection key={rule.categoryId}>
-                <CategoryHeader>
-                  <h2>{rule.name}</h2>
-                  {rule.minSelections > 0 ? (
-                    <span>최소 {rule.minSelections}개 이상 선택</span>
-                  ) : (
-                    <span>자유 선택</span>
-                  )}
-                </CategoryHeader>
+        <Panel>
+          <PanelTitle>세트 타입 구성</PanelTitle>
+          {activePackage && (
+            <SetTabs>
+              {activePackage.sets.map((set) => (
+                <SetTab
+                  key={set.id}
+                  type="button"
+                  $active={target.type === "set" && set.id === activeSetId}
+                  onClick={() => {
+                    setActiveSetId(set.id);
+                    setTarget({
+                      type: "set",
+                      packageId: activePackage.id,
+                      setId: set.id,
+                    });
+                  }}
+                >
+                  {set.name}
+                </SetTab>
+              ))}
+              <SetTab
+                type="button"
+                $active={target.type === "diy"}
+                onClick={() =>
+                  setTarget({ type: "diy", packageId: activePackage.id })
+                }
+              >
+                {activePackage.diy.name}
+              </SetTab>
+            </SetTabs>
+          )}
 
-                <ProductGrid>
-                  {products.map((product) => {
-                    const selected = selectedIds.includes(product.id);
+          {activeSet && target.type === "set" && (
+            <FormGrid>
+              <Field>
+                <label>세트명</label>
+                <input
+                  value={activeSet.name}
+                  onChange={(event) => updateActiveSet({ name: event.target.value })}
+                />
+              </Field>
+              <Field>
+                <label>세트 설명</label>
+                <input
+                  value={activeSet.description}
+                  onChange={(event) =>
+                    updateActiveSet({ description: event.target.value })
+                  }
+                />
+              </Field>
+              <CheckField>
+                <input
+                  id="active-set-enabled"
+                  type="checkbox"
+                  checked={activeSet.enabled}
+                  onChange={(event) =>
+                    updateActiveSet({ enabled: event.target.checked })
+                  }
+                />
+                <label htmlFor="active-set-enabled">공개 페이지에 노출</label>
+              </CheckField>
+            </FormGrid>
+          )}
 
-                    return (
-                      <ProductCard
-                        key={product.id}
-                        $selected={selected}
-                        onClick={() => toggleProduct(product)}
-                      >
-                        <SelectionMark $selected={selected}>
-                          {selected && <CheckIcon />}
-                        </SelectionMark>
+          {activePackage && target.type === "diy" && (
+            <FormGrid>
+              <CheckField>
+                <input
+                  id="diy-enabled"
+                  type="checkbox"
+                  checked={activePackage.diy.enabled}
+                  onChange={(event) =>
+                    updateConfig((draft) => {
+                      draft.packages = draft.packages.map((promotionPackage) =>
+                        promotionPackage.id === activePackage.id
+                          ? {
+                              ...promotionPackage,
+                              diy: {
+                                ...promotionPackage.diy,
+                                enabled: event.target.checked,
+                              },
+                            }
+                          : promotionPackage,
+                      );
+                    })
+                  }
+                />
+                <label htmlFor="diy-enabled">DIY 골라담기 사용</label>
+              </CheckField>
+              <Field>
+                <label>DIY 명칭</label>
+                <input
+                  value={activePackage.diy.name}
+                  onChange={(event) =>
+                    updateConfig((draft) => {
+                      draft.packages = draft.packages.map((promotionPackage) =>
+                        promotionPackage.id === activePackage.id
+                          ? {
+                              ...promotionPackage,
+                              diy: {
+                                ...promotionPackage.diy,
+                                name: event.target.value,
+                              },
+                            }
+                          : promotionPackage,
+                      );
+                    })
+                  }
+                />
+              </Field>
+              <Field>
+                <label>DIY 설명</label>
+                <input
+                  value={activePackage.diy.description}
+                  onChange={(event) =>
+                    updateConfig((draft) => {
+                      draft.packages = draft.packages.map((promotionPackage) =>
+                        promotionPackage.id === activePackage.id
+                          ? {
+                              ...promotionPackage,
+                              diy: {
+                                ...promotionPackage.diy,
+                                description: event.target.value,
+                              },
+                            }
+                          : promotionPackage,
+                      );
+                    })
+                  }
+                />
+              </Field>
+              <Field>
+                <label>최소 선택 수</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={activePackage.diy.minSelections}
+                  onChange={(event) =>
+                    updateConfig((draft) => {
+                      draft.packages = draft.packages.map((promotionPackage) =>
+                        promotionPackage.id === activePackage.id
+                          ? {
+                              ...promotionPackage,
+                              diy: {
+                                ...promotionPackage.diy,
+                                minSelections: Math.max(
+                                  Number(event.target.value) || 1,
+                                  1,
+                                ),
+                              },
+                            }
+                          : promotionPackage,
+                      );
+                    })
+                  }
+                />
+              </Field>
+            </FormGrid>
+          )}
+        </Panel>
 
-                        <ProductImageBox>
-                          <Image
-                            src={product.imageSrc}
-                            alt={product.name}
-                            width={116}
-                            height={116}
-                          />
-                        </ProductImageBox>
+        <Panel>
+          <PanelTitle>담긴 제품</PanelTitle>
+          {target.type === "diy" && (
+            <EmptyBox>
+              DIY는 Essential, Value, Premium 세트에 담긴 전 제품이 자동으로
+              노출됩니다. 모델 관리는 각 세트 탭에서 진행하세요.
+            </EmptyBox>
+          )}
+          {targetProducts.length === 0 ? (
+            <EmptyBox>아직 담긴 제품이 없습니다.</EmptyBox>
+          ) : (
+            <SelectedProductList>
+              {targetProducts.map((product) => {
+                const optionProduct = productOptionsByModel[product.modelCode];
+                const variants = optionProduct?.variants ?? product.variants ?? [];
+                const selectedVariant =
+                  (product.selectedVariant as ProductSearchVariant | undefined) ??
+                  getDefaultPromotionVariant(variants);
+                const selectedIndex = findVariantIndex(
+                  variants,
+                  selectedVariant,
+                );
 
-                        <ProductInfo>
-                          <h3>{product.name}</h3>
-                          <ModelName>{product.modelName}</ModelName>
-                          <MonthlyFee>월 {formatPrice(product.monthlyFee)}</MonthlyFee>
-                          <PromotionText>{product.promotion}</PromotionText>
-                        </ProductInfo>
-
-                        <SelectButton
-                          type="button"
-                          $selected={selected}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            toggleProduct(product);
-                          }}
-                        >
-                          {selected && <CheckIcon />}
-                          {selected ? "선택됨" : "선택하기"}
-                        </SelectButton>
-                      </ProductCard>
-                    );
-                  })}
-                </ProductGrid>
-              </CategorySection>
-            ))}
-          </ProductSections>
-
-          <BottomHelp>
-            <HelpText>
-              <strong>안내사항</strong>
-              <span>
-                각 세트별 요금과 혜택은 상담 시점의 프로모션 정책에 따라
-                달라질 수 있습니다.
-              </span>
-              <span>카테고리 최소 선택 조건을 충족하면 견적 문의가 가능합니다.</span>
-            </HelpText>
-            <HelpIcon aria-hidden="true">
-              <span />
-            </HelpIcon>
-          </BottomHelp>
-        </MainPanel>
-
-        <SummaryPanel>
-          <SummaryCard>
-            <SummaryTitle>선택한 견적 요약</SummaryTitle>
-
-            <SummarySection>
-              <SummaryLabel>선택 세트</SummaryLabel>
-              <SetName>{activeSet.name}</SetName>
-            </SummarySection>
-
-            <SummarySection>
-              <SummaryLabel>선택한 카테고리</SummaryLabel>
-              <CategoryCount>
-                {selectedCategoryCount}개
-                {activeSet.mode === "curated" && (
-                  <span> / 최소 {activeSet.categories.length}개 카테고리</span>
-                )}
-              </CategoryCount>
-              {!canRequestEstimate && (
-                <RequirementList>
-                  {freeModeUnmet && <li>제품을 최소 1개 이상 선택해주세요.</li>}
-                  {unmetRequirements.map((rule) => (
-                    <li key={rule.categoryId}>
-                      {rule.name} {rule.minSelections}개 이상 선택 필요
-                    </li>
-                  ))}
-                </RequirementList>
-              )}
-            </SummarySection>
-
-            <SummarySection>
-              <SummaryHeaderLine>
-                <SummaryLabel>선택한 제품</SummaryLabel>
-                {selectedProducts.length > 0 && (
-                  <ClearButton type="button" onClick={clearActiveSet}>
-                    전체 삭제
-                  </ClearButton>
-                )}
-              </SummaryHeaderLine>
-
-              {selectedProducts.length === 0 ? (
-                <EmptySelection>아직 선택한 제품이 없습니다.</EmptySelection>
-              ) : (
-                <SelectedList>
-                  {selectedProducts.map((product) => (
-                    <SelectedItem key={product.id}>
-                      <SelectedThumb>
-                        <Image
-                          src={product.imageSrc}
-                          alt={product.name}
-                          width={54}
-                          height={54}
-                        />
-                      </SelectedThumb>
-                      <SelectedInfo>
-                        <strong>{product.name}</strong>
-                        <span>{product.modelName}</span>
-                        <b>월 {formatPrice(product.monthlyFee)}</b>
-                      </SelectedInfo>
-                      <RemoveButton
+                return (
+                  <SelectedProductItem key={product.id}>
+                    <ImageBox>
+                      <Image
+                        src={product.thumbnailUrl || "/placeholder.png"}
+                        alt={product.productName}
+                        width={84}
+                        height={84}
+                        unoptimized
+                      />
+                    </ImageBox>
+                    <SelectedInfo>
+                      <strong>{product.productName}</strong>
+                      <span>{product.category} · {product.modelCode}</span>
+                      {target.type !== "diy" && (
+                        <VariantSelectWrap>
+                          <label htmlFor={`promotion-option-${product.id}`}>
+                            고정 옵션
+                          </label>
+                          <select
+                            id={`promotion-option-${product.id}`}
+                            value={selectedIndex >= 0 ? String(selectedIndex) : ""}
+                            disabled={!variants.length}
+                            onChange={(event) => {
+                              const nextVariant =
+                                variants[Number(event.target.value)];
+                              if (nextVariant) {
+                                updateProductVariant(product.id, nextVariant);
+                              }
+                            }}
+                          >
+                            {!variants.length && (
+                              <option value="">옵션을 불러오는 중</option>
+                            )}
+                            {variants.map((variant, index) => (
+                              <option
+                                key={getVariantOptionKey(variant, index)}
+                                value={index}
+                              >
+                                {getVariantLabel(variant)}
+                              </option>
+                            ))}
+                          </select>
+                        </VariantSelectWrap>
+                      )}
+                      {target.type === "diy" && selectedVariant && (
+                        <FixedOptionText>
+                          {getVariantLabel(selectedVariant)}
+                        </FixedOptionText>
+                      )}
+                    </SelectedInfo>
+                    {target.type !== "diy" && (
+                      <DangerButton
                         type="button"
-                        aria-label={`${product.name} 선택 해제`}
                         onClick={() => removeProduct(product.id)}
                       >
-                        ×
-                      </RemoveButton>
-                    </SelectedItem>
-                  ))}
-                </SelectedList>
-              )}
-            </SummarySection>
+                        삭제
+                      </DangerButton>
+                    )}
+                  </SelectedProductItem>
+                );
+              })}
+            </SelectedProductList>
+          )}
+        </Panel>
 
-            <TotalSection>
-              <SummaryLabel>월 예상 구독료</SummaryLabel>
-              <TotalPrice>{formatPrice(totalMonthlyFee)}</TotalPrice>
-            </TotalSection>
+        {target.type !== "diy" && (
+          <Panel>
+            <PanelTitle>제품 추가</PanelTitle>
+            <SearchBar>
+              <select value={category} onChange={(event) => setCategory(event.target.value)}>
+                {PROMOTION_SET_CATEGORIES.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+              <input
+                value={keyword}
+                placeholder="상품명 또는 모델코드"
+                onChange={(event) => setKeyword(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    searchProducts();
+                  }
+                }}
+              />
+              <SmallButton type="button" disabled={searching} onClick={searchProducts}>
+                {searching ? "검색 중..." : "검색"}
+              </SmallButton>
+            </SearchBar>
 
-            <SummarySection>
-              <SummaryLabel>프로모션 혜택 요약</SummaryLabel>
-              <BenefitText>{activeSet.benefitSummary}</BenefitText>
-            </SummarySection>
-
-            <RequestButton
-              type="button"
-              disabled={!canRequestEstimate}
-              onClick={handleRequestEstimate}
-            >
-              견적 문의하기
-            </RequestButton>
-
-            <FinePrint>
-              <li>월 금액은 예상 금액이며, 실제 금액은 상담을 통해 확정됩니다.</li>
-              <li>프로모션 혜택은 변경될 수 있습니다.</li>
-            </FinePrint>
-          </SummaryCard>
-        </SummaryPanel>
-      </PageInner>
+            <ResultList>
+              {results.map((result) => (
+                <ResultItem key={result.모델코드}>
+                  <ImageBox>
+                    <Image
+                      src={result.thumbnailUrl || "/placeholder.png"}
+                      alt={result.상품명}
+                      width={88}
+                      height={88}
+                      unoptimized
+                    />
+                  </ImageBox>
+                  <ResultInfo>
+                    <strong>{result.상품명}</strong>
+                    <span>{result.중분류 || category} · {result.모델코드}</span>
+                  </ResultInfo>
+                  <SmallButton type="button" onClick={() => addProduct(result)}>
+                    담기
+                  </SmallButton>
+                </ResultItem>
+              ))}
+            </ResultList>
+          </Panel>
+        )}
+      </Grid>
     </Page>
   );
 }
@@ -622,37 +1047,9 @@ export default function PromotionSetEstimatePage() {
 const accent = "rgb(234, 25, 23)";
 
 const Page = styled.main`
-  min-height: calc(100vh - 93px);
-  background: #f6f7f9;
-  padding: 32px;
-
-  @media (max-width: 768px) {
-    padding: 18px;
-  }
-`;
-
-const PageInner = styled.div`
-  display: grid;
-  grid-template-columns: minmax(0, 7fr) minmax(300px, 3fr);
-  gap: 28px;
-  max-width: 1360px;
-  margin: 0 auto;
-  align-items: start;
-
-  @media (max-width: 1100px) {
-    grid-template-columns: 1fr;
-  }
-`;
-
-const MainPanel = styled.section`
-  background: #ffffff;
-  border: 1px solid #ededed;
-  border-radius: 8px;
-  padding: 34px;
-
-  @media (max-width: 640px) {
-    padding: 22px 18px;
-  }
+  min-height: 100%;
+  padding: 30px 28px 48px;
+  background: #f4f5f7;
 `;
 
 const Header = styled.header`
@@ -660,456 +1057,253 @@ const Header = styled.header`
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 28px;
+  max-width: 1280px;
+  margin: 0 auto 24px;
 
-  @media (max-width: 640px) {
+  @media (max-width: 720px) {
     flex-direction: column;
-    margin-bottom: 22px;
   }
 `;
 
 const TitleBlock = styled.div`
   h1 {
-    margin: 0 0 10px;
-    font-size: 32px;
-    line-height: 1.2;
+    margin: 0 0 8px;
+    font-size: 28px;
     font-weight: 800;
-    letter-spacing: 0;
-    color: #111111;
+    color: #111;
   }
 
   p {
-    margin: 0;
-    font-size: 15px;
-    line-height: 1.6;
-    color: #666666;
-  }
-
-  @media (max-width: 640px) {
-    h1 {
-      font-size: 25px;
-    }
-
-    p {
-      font-size: 14px;
-    }
-  }
-`;
-
-const AdminNotice = styled.div`
-  flex: 0 0 auto;
-  padding: 8px 12px;
-  border: 1px solid #eeeeee;
-  border-radius: 6px;
-  color: #777777;
-  font-size: 13px;
-  font-weight: 700;
-  background: #fafafa;
-`;
-
-const Tabs = styled.div`
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 14px;
-
-  @media (max-width: 640px) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-`;
-
-const TabButton = styled.button<{ $active: boolean }>`
-  height: 52px;
-  border: 1px solid ${({ $active }) => ($active ? accent : "#dddddd")};
-  border-radius: 6px;
-  background: ${({ $active }) => ($active ? accent : "#ffffff")};
-  color: ${({ $active }) => ($active ? "#ffffff" : "#222222")};
-  font-size: 15px;
-  font-weight: 800;
-  cursor: pointer;
-  transition:
-    background 0.18s ease,
-    border-color 0.18s ease,
-    color 0.18s ease;
-
-  &:hover {
-    border-color: ${accent};
-  }
-`;
-
-const SetMeta = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 30px;
-  padding-left: 2px;
-  font-size: 13px;
-  line-height: 1.6;
-  color: #777777;
-
-  strong {
     font-size: 14px;
-    color: #333333;
+    color: #666;
   }
 `;
 
-const ProductSections = styled.div`
+const ActionGroup = styled.div`
   display: flex;
-  flex-direction: column;
-  gap: 30px;
+  gap: 8px;
+  flex-wrap: wrap;
 `;
 
-const CategorySection = styled.section``;
-
-const CategoryHeader = styled.div`
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 14px;
-  margin-bottom: 14px;
-
-  h2 {
-    margin: 0;
-    color: #111111;
-    font-size: 22px;
-    font-weight: 800;
-    line-height: 1.35;
-  }
-
-  span {
-    flex: 0 0 auto;
-    color: #777777;
-    font-size: 13px;
-    font-weight: 700;
-  }
-
-  @media (max-width: 640px) {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 4px;
-
-    h2 {
-      font-size: 20px;
-    }
-  }
-`;
-
-const ProductGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-
-  @media (max-width: 760px) {
-    grid-template-columns: 1fr;
-  }
-`;
-
-const ProductCard = styled.article<{ $selected: boolean }>`
-  position: relative;
-  display: grid;
-  grid-template-columns: 118px minmax(0, 1fr);
-  gap: 20px;
-  min-height: 210px;
-  padding: 24px 18px 72px;
-  border: 1px solid ${({ $selected }) => ($selected ? accent : "#e7e7e7")};
-  border-radius: 8px;
-  background: #ffffff;
-  cursor: pointer;
-  transition:
-    transform 0.18s ease,
-    border-color 0.18s ease,
-    box-shadow 0.18s ease;
-
-  &:hover {
-    transform: translateY(-3px);
-    border-color: ${({ $selected }) => ($selected ? accent : "#d5d5d5")};
-    box-shadow: 0 12px 26px rgba(0, 0, 0, 0.06);
-  }
-
-  @media (max-width: 520px) {
-    grid-template-columns: 86px minmax(0, 1fr);
-    gap: 14px;
-    min-height: 190px;
-    padding: 20px 14px 68px;
-  }
-`;
-
-const SelectionMark = styled.div<{ $selected: boolean }>`
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  width: 22px;
-  height: 22px;
-  display: flex;
+const PreviewLink = styled.a`
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  border: 1px solid ${({ $selected }) => ($selected ? accent : "#d8d8d8")};
-  border-radius: 5px;
-  background: ${({ $selected }) => ($selected ? accent : "#ffffff")};
-
-  svg {
-    width: 16px;
-    height: 16px;
-    fill: #ffffff;
-  }
-`;
-
-const ProductImageBox = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 0;
-  height: 122px;
-
-  img {
-    object-fit: contain;
-  }
-
-  @media (max-width: 520px) {
-    height: 96px;
-  }
-`;
-
-const ProductInfo = styled.div`
-  min-width: 0;
-  padding-right: 22px;
-
-  h3 {
-    margin: 8px 0 6px;
-    font-size: 16px;
-    line-height: 1.4;
-    color: #151515;
-    font-weight: 800;
-  }
-`;
-
-const ModelName = styled.div`
-  color: #777777;
-  font-size: 13px;
-  font-weight: 700;
-`;
-
-const MonthlyFee = styled.div`
-  margin-top: 16px;
-  color: ${accent};
-  font-size: 21px;
-  line-height: 1.25;
-  font-weight: 900;
-`;
-
-const PromotionText = styled.div`
-  margin-top: 10px;
-  color: #666666;
-  font-size: 13px;
-  line-height: 1.5;
-`;
-
-const SelectButton = styled.button<{ $selected: boolean }>`
-  position: absolute;
-  left: 18px;
-  right: 18px;
-  bottom: 16px;
-  height: 42px;
-  border: 1px solid ${({ $selected }) => ($selected ? accent : "#dedede")};
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid #ddd;
   border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  background: ${({ $selected }) => ($selected ? accent : "#ffffff")};
-  color: ${({ $selected }) => ($selected ? "#ffffff" : "#222222")};
+  background: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  color: #222;
+`;
+
+const SaveButton = styled.button`
+  min-height: 42px;
+  padding: 0 22px;
+  border-radius: 6px;
+  background: ${accent};
+  color: #fff;
   font-size: 14px;
   font-weight: 800;
   cursor: pointer;
-  transition:
-    background 0.18s ease,
-    color 0.18s ease,
-    border-color 0.18s ease;
 
-  svg {
-    width: 17px;
-    height: 17px;
-    fill: currentColor;
-  }
-
-  &:hover {
-    border-color: ${accent};
+  &:disabled {
+    background: #ccc;
   }
 `;
 
-const BottomHelp = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  margin-top: 30px;
-  padding: 20px 22px;
-  border: 1px solid #ececec;
-  border-radius: 8px;
-  background: #ffffff;
-`;
+const Grid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  max-width: 1280px;
+  margin: 0 auto;
 
-const HelpText = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
-  line-height: 1.55;
-  color: #666666;
-
-  strong {
-    color: #222222;
-    font-size: 14px;
+  > section:first-child,
+  > section:nth-child(4),
+  > section:last-child {
+    grid-column: 1 / -1;
   }
-`;
 
-const HelpIcon = styled.div`
-  flex: 0 0 58px;
-  width: 58px;
-  height: 58px;
-  border-radius: 50%;
-  background: #f2f3f5;
-  position: relative;
+  @media (max-width: 980px) {
+    grid-template-columns: minmax(0, 1fr);
 
-  span {
-    position: absolute;
-    inset: 14px 17px 12px;
-    border: 3px solid #aab3c2;
-    border-radius: 5px;
-
-    &::after {
-      content: "";
-      position: absolute;
-      right: -8px;
-      bottom: -8px;
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: ${accent};
+    > section:first-child,
+    > section:nth-child(4),
+    > section:last-child {
+      grid-column: auto;
     }
   }
-
-  @media (max-width: 520px) {
-    display: none;
-  }
 `;
 
-const SummaryPanel = styled.aside`
-  position: sticky;
-  top: 116px;
-
-  @media (max-width: 1100px) {
-    position: static;
-  }
-`;
-
-const SummaryCard = styled.div`
-  background: #ffffff;
-  border: 1px solid #eeeeee;
+const Panel = styled.section`
+  background: #fff;
+  border: 1px solid #e7e8eb;
   border-radius: 8px;
-  padding: 28px 24px;
+  padding: 24px;
+  box-shadow: 0 10px 28px rgba(16, 24, 40, 0.04);
 `;
 
-const SummaryTitle = styled.h2`
-  margin: 0 0 24px;
-  padding-bottom: 18px;
-  border-bottom: 1px solid #ededed;
-  color: #111111;
-  font-size: 20px;
-  line-height: 1.35;
-  font-weight: 900;
-`;
-
-const SummarySection = styled.section`
-  padding: 18px 0;
-  border-bottom: 1px solid #f0f0f0;
-`;
-
-const SummaryLabel = styled.div`
-  margin-bottom: 8px;
-  color: #555555;
-  font-size: 13px;
-  font-weight: 800;
-`;
-
-const SetName = styled.div`
-  color: ${accent};
-  font-size: 22px;
-  font-weight: 900;
-`;
-
-const CategoryCount = styled.div`
-  color: ${accent};
-  font-size: 20px;
-  font-weight: 900;
-
-  span {
-    color: #777777;
-    font-size: 13px;
-    font-weight: 700;
-  }
-`;
-
-const RequirementList = styled.ul`
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  margin: 10px 0 0;
-  padding: 0;
-
-  li {
-    color: #8b8b8b;
-    font-size: 12px;
-    line-height: 1.45;
-  }
-`;
-
-const SummaryHeaderLine = styled.div`
+const PanelHeader = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-`;
+  margin-bottom: 16px;
 
-const ClearButton = styled.button`
-  color: #888888;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-
-  &:hover {
-    color: ${accent};
+  h2 {
+    margin-bottom: 0;
   }
 `;
 
-const EmptySelection = styled.div`
-  padding: 18px 0 4px;
-  color: #999999;
-  font-size: 13px;
+const PanelTitle = styled.h2`
+  margin-bottom: 16px;
+  font-size: 18px;
+  font-weight: 800;
+  color: #111;
 `;
 
-const SelectedList = styled.div`
+const FormGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+`;
+
+const Field = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+
+  label {
+    font-size: 13px;
+    font-weight: 800;
+    color: #555;
+  }
+
+  input,
+  select {
+    height: 42px;
+    border: 1px solid #dcdfe5;
+    border-radius: 6px;
+    padding: 0 12px;
+    background: #fff;
+    color: #222;
+  }
+`;
+
+const CheckField = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+
+  input {
+    width: 16px;
+    height: 16px;
+  }
+
+  label {
+    font-size: 14px;
+    font-weight: 700;
+    color: #333;
+  }
+`;
+
+const SetTabs = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+`;
+
+const SetTab = styled.button<{ $active: boolean }>`
+  min-height: 38px;
+  padding: 0 16px;
+  border: 1px solid ${({ $active }) => ($active ? accent : "#ddd")};
+  border-radius: 6px;
+  background: ${({ $active }) => ($active ? accent : "#fff")};
+  color: ${({ $active }) => ($active ? "#fff" : "#222")};
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+`;
+
+const SmallButton = styled.button`
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 6px;
+  background: #222;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+
+  &:disabled {
+    background: #bbb;
+  }
+`;
+
+const DangerButton = styled.button`
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid #e2e2e2;
+  border-radius: 6px;
+  background: #fff;
+  color: ${accent};
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+`;
+
+const EmptyBox = styled.div`
+  padding: 18px;
+  border: 1px dashed #d6d9df;
+  border-radius: 8px;
+  background: #fafbfc;
+  color: #777;
+  font-size: 14px;
+  line-height: 1.55;
+
+  & + div {
+    margin-top: 12px;
+  }
+`;
+
+const SelectedProductList = styled.div`
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-top: 12px;
 `;
 
-const SelectedItem = styled.div`
+const SelectedProductItem = styled.div`
   display: grid;
-  grid-template-columns: 58px minmax(0, 1fr) 26px;
-  gap: 12px;
-  align-items: center;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: start;
+  padding: 16px;
+  border: 1px solid #e8eaee;
+  border-radius: 8px;
+  background: #fff;
+
+  @media (max-width: 720px) {
+    grid-template-columns: 84px minmax(0, 1fr);
+
+    > button {
+      grid-column: 2;
+      width: fit-content;
+    }
+  }
 `;
 
-const SelectedThumb = styled.div`
+const ImageBox = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 58px;
-  height: 58px;
-  background: #f7f7f7;
+  width: 96px;
+  height: 96px;
   border-radius: 6px;
+  background: #f8f9fb;
 
   img {
     object-fit: contain;
@@ -1121,98 +1315,121 @@ const SelectedInfo = styled.div`
 
   strong {
     display: block;
-    color: #222222;
-    font-size: 14px;
+    font-size: 15px;
     line-height: 1.35;
-    font-weight: 800;
+    font-weight: 900;
+    color: #111;
   }
 
   span {
     display: block;
-    margin-top: 3px;
-    color: #777777;
+    margin-top: 4px;
     font-size: 12px;
-    font-weight: 700;
+    color: #777;
   }
 
-  b {
-    display: block;
-    margin-top: 7px;
-    color: ${accent};
-    font-size: 14px;
-    font-weight: 900;
-  }
 `;
 
-const RemoveButton = styled.button`
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  color: #444444;
-  cursor: pointer;
-  font-size: 20px;
-  line-height: 1;
+const VariantSelectWrap = styled.div`
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
 
-  &:hover {
-    color: ${accent};
-    background: #fff3f3;
-  }
-`;
-
-const TotalSection = styled.section`
-  padding: 22px 0;
-  border-bottom: 1px solid #f0f0f0;
-`;
-
-const TotalPrice = styled.div`
-  color: ${accent};
-  font-size: 28px;
-  line-height: 1.2;
-  font-weight: 900;
-`;
-
-const BenefitText = styled.p`
-  margin: 0;
-  color: #555555;
-  font-size: 13px;
-  line-height: 1.6;
-`;
-
-const RequestButton = styled.button`
-  width: 100%;
-  height: 52px;
-  margin-top: 24px;
-  border-radius: 6px;
-  background: ${accent};
-  color: #ffffff;
-  font-size: 16px;
-  font-weight: 900;
-  cursor: pointer;
-  transition:
-    background 0.18s ease,
-    opacity 0.18s ease;
-
-  &:hover:not(:disabled) {
-    background: #c91515;
+  label {
+    font-size: 12px;
+    font-weight: 800;
+    color: #555;
   }
 
-  &:disabled {
-    cursor: not-allowed;
-    background: #d8d8d8;
-    color: #ffffff;
+  select {
+    width: 100%;
+    min-height: 38px;
+    border: 1px solid #dcdfe5;
+    border-radius: 6px;
+    padding: 0 10px;
+    background: #fff;
+    color: #222;
+    font-size: 13px;
   }
 `;
 
-const FinePrint = styled.ul`
+const FixedOptionText = styled.em`
+  display: block;
+  margin-top: 8px;
+  color: #555;
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.45;
+`;
+
+const SearchBar = styled.div`
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr) auto;
+  gap: 8px;
+  margin-bottom: 14px;
+
+  @media (max-width: 720px) {
+    grid-template-columns: 1fr;
+  }
+
+  input,
+  select {
+    height: 42px;
+    border: 1px solid #dcdfe5;
+    border-radius: 6px;
+    padding: 0 12px;
+    background: #fff;
+  }
+`;
+
+const ResultList = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin: 18px 0 0;
-  padding: 0;
+  gap: 10px;
+`;
 
-  li {
-    color: #777777;
+const ResultItem = styled.div`
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: start;
+  padding: 16px;
+  border: 1px solid #e8eaee;
+  border-radius: 8px;
+  background: #fff;
+
+  @media (max-width: 820px) {
+    grid-template-columns: 96px minmax(0, 1fr);
+
+    > button {
+      grid-column: 2;
+      width: fit-content;
+    }
+  }
+`;
+
+const ResultInfo = styled.div`
+  min-width: 0;
+
+  strong {
+    display: block;
+    font-size: 14px;
+    color: #111;
+  }
+
+  span {
+    display: block;
+    margin: 4px 0 8px;
     font-size: 12px;
-    line-height: 1.5;
+    color: #777;
+  }
+
+  select {
+    width: 100%;
+    height: 36px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 0 10px;
+    background: #fff;
   }
 `;

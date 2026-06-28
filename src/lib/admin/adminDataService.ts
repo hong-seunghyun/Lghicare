@@ -52,6 +52,15 @@ export type MultiProductCombinationStat = {
   products: EstimateCombinationProduct[];
 };
 
+export type PromotionSetEstimateStat = {
+  rank: number;
+  packageName: string;
+  setName: string;
+  productLabel: string;
+  estimateCount: number;
+  products: EstimateCombinationProduct[];
+};
+
 export type ActivitySummaryResponse = {
   totalEstimates: number;
   dailyCounts: DailyCountRow[];
@@ -67,11 +76,13 @@ export type ActivitySummaryResponse = {
   visitorSummary: {
     today: number;
     yesterday: number;
+    range: number;
     last30Days: number;
   };
   affiliateCardStats: AffiliateCardStat[];
   dailyProductMixCounts: DailyProductMixRow[];
   topMultiProductCombinations: MultiProductCombinationStat[];
+  topPromotionSetEstimates: PromotionSetEstimateStat[];
 };
 
 export type DashboardCategoryResponse = {
@@ -173,6 +184,10 @@ const toDemoActivitySummary = (
       estimateCount: scaleCountByMode(row.estimateCount, "demo"),
     }),
   ),
+  topPromotionSetEstimates: (real.topPromotionSetEstimates ?? []).map((row) => ({
+    ...row,
+    estimateCount: scaleCountByMode(row.estimateCount, "demo"),
+  })),
   shareSummary: {
     today: scaleCountByMode(real.shareSummary?.today ?? 0, "demo"),
     range: scaleCountByMode(real.shareSummary?.range ?? 0, "demo"),
@@ -180,6 +195,7 @@ const toDemoActivitySummary = (
   visitorSummary: {
     today: scaleVisitorCountByMode(real.visitorSummary?.today ?? 0, "demo"),
     yesterday: scaleVisitorCountByMode(real.visitorSummary?.yesterday ?? 0, "demo"),
+    range: scaleVisitorCountByMode(real.visitorSummary?.range ?? 0, "demo"),
     last30Days: scaleVisitorCountByMode(real.visitorSummary?.last30Days ?? 0, "demo"),
   },
 });

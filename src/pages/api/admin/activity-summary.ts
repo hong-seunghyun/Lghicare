@@ -64,6 +64,15 @@ type MultiProductCombinationStat = {
   products: EstimateCombinationProduct[];
 };
 
+type PromotionSetEstimateStat = {
+  rank: number;
+  packageName: string;
+  setName: string;
+  productLabel: string;
+  estimateCount: number;
+  products: EstimateCombinationProduct[];
+};
+
 type ShareSummary = {
   today: number;
   range: number;
@@ -72,6 +81,7 @@ type ShareSummary = {
 type VisitorSummary = {
   today: number;
   yesterday: number;
+  range: number;
   last30Days: number;
 };
 
@@ -91,6 +101,7 @@ type ActivitySummaryResponse = {
   affiliateCardStats: AffiliateCardStat[];
   dailyProductMixCounts: DailyProductMixRow[];
   topMultiProductCombinations: MultiProductCombinationStat[];
+  topPromotionSetEstimates: PromotionSetEstimateStat[];
 };
 
 type ManagerProfile = {
@@ -243,6 +254,29 @@ const buildCombinationLabel = (products: EstimateCombinationProduct[]) =>
   products
     .map((product) => `${product.category} - ${product.modelName}`)
     .join(" / ");
+
+const extractPromotionSetMeta = (data: any) => {
+  const source = pickMeaningfulText(data.estimateSource, data.source);
+  const packageName = pickMeaningfulText(
+    data.promotionPackageName,
+    data.packageName,
+    data.promotionPackage?.name,
+  );
+  const setName = pickMeaningfulText(
+    data.promotionSetName,
+    data.setName,
+    data.promotionSet?.name,
+  );
+
+  if (source !== "promotion-set" && (!packageName || !setName)) {
+    return null;
+  }
+
+  return {
+    packageName: packageName || "패키지 미상",
+    setName: setName || "세트 미상",
+  };
+};
 
 const toSafeDate = (value: any): Date | null => {
   if (!value) return null;
@@ -485,6 +519,15 @@ export default async function handler(
       string,
       { estimateCount: number; products: EstimateCombinationProduct[] }
     >();
+    const promotionSetMap = new Map<
+      string,
+      {
+        estimateCount: number;
+        packageName: string;
+        setName: string;
+        products: EstimateCombinationProduct[];
+      }
+    >();
 
     const dailyEstimateCounts = new Map<string, number>();
     const dailyShareUniqueMap = new Map<string, Set<string>>();
@@ -500,6 +543,7 @@ export default async function handler(
 
     const visitorsToday = new Set<string>();
     const visitorsYesterday = new Set<string>();
+    const visitorsInRange = new Set<string>();
     const visitorsLast30Days = new Set<string>();
 
     let totalEstimates = 0;
@@ -558,6 +602,33 @@ export default async function handler(
             products: normalizedProducts,
           });
         }
+      }
+
+      const promotionSetMeta = extractPromotionSetMeta(data);
+      if (promotionSetMeta && estimateProducts.length > 0) {
+        const normalizedProducts = normalizeCombinationProducts(estimateProducts);
+        const productKey = buildCombinationKey(normalizedProducts);
+        const promotionKey = [
+          promotionSetMeta.packageName,
+          promotionSetMeta.setName,
+          productKey,
+        ].join("|");
+        const prev = promotionSetMap.get(promotionKey);
+        if (prev) {
+          prev.estimateCount += 1;
+        } else {
+          promotionSetMap.set(promotionKey, {
+            estimateCount: 1,
+            packageName: promotionSetMeta.packageName,
+            setName: promotionSetMeta.setName,
+            products: normalizedProducts,
+          });
+        }
+      }
+
+      const visitorManagerId = extractEstimateManagerId(docSnap.id, data);
+      if (visitorManagerId) {
+        visitorsInRange.add(visitorManagerId);
       }
 
       if (!includeDetails) return;
@@ -629,6 +700,11 @@ export default async function handler(
       const daySet = dailyShareUniqueMap.get(dayKey) ?? new Set<string>();
       daySet.add(uniqueEventKey);
       dailyShareUniqueMap.set(dayKey, daySet);
+
+      const managerId = extractShareManagerId(docSnap.id, data);
+      if (managerId) {
+        visitorsInRange.add(managerId);
+      }
     });
 
     visitorEstimateSnap.forEach((docSnap) => {
@@ -753,6 +829,26 @@ export default async function handler(
         rank: index + 1,
         ...item,
       }));
+    const topPromotionSetEstimates = Array.from(promotionSetMap.values())
+      .map((item) => ({
+        packageName: item.packageName,
+        setName: item.setName,
+        productLabel: buildCombinationLabel(item.products),
+        estimateCount: item.estimateCount,
+        products: item.products,
+      }))
+      .sort(
+        (a, b) =>
+          b.estimateCount - a.estimateCount ||
+          a.packageName.localeCompare(b.packageName, "ko") ||
+          a.setName.localeCompare(b.setName, "ko") ||
+          a.productLabel.localeCompare(b.productLabel, "ko"),
+      )
+      .slice(0, 10)
+      .map((item, index) => ({
+        rank: index + 1,
+        ...item,
+      }));
     const dailyTopRows = includeDetails
       ? dailyCounts.map((row) => {
           const topBranchName = pickTopName(dailyBranchCounts.get(row.date));
@@ -790,11 +886,13 @@ export default async function handler(
       visitorSummary: {
         today: visitorsToday.size,
         yesterday: visitorsYesterday.size,
+        range: visitorsInRange.size,
         last30Days: visitorsLast30Days.size,
       },
       affiliateCardStats,
       dailyProductMixCounts,
       topMultiProductCombinations,
+      topPromotionSetEstimates,
     };
 
     return res.status(200).json(response);

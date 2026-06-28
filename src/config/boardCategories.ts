@@ -60,7 +60,7 @@ const buildSalesHubContentCategories = (
     },
     {
       id: `${STANDARD_ESTIMATE_CATEGORY_PREFIX}-${product.label}`,
-      label: "표준견적서",
+      label: "프로모션 견적서",
       parentId: product.id,
       salesIndexed: true,
     },
@@ -170,13 +170,13 @@ export const getStandardEstimateDefaultCategory = () =>
 export const getAdminStandardEstimateNavigationItem = () => {
   const category = getStandardEstimateDefaultCategory();
   if (!category) return null;
-  return { label: "표준견적서", path: getBoardCategoryPath(category.id) };
+  return { label: "프로모션 견적서", path: "/promotion-set-estimate" };
 };
 
 export const getManagerStandardEstimateNavigationItem = () => {
   const category = getStandardEstimateDefaultCategory();
   if (!category) return null;
-  return { label: "표준견적서", path: `/manager/boards/${category.id}` };
+  return { label: "프로모션 견적서", path: "/promotion-set-estimate" };
 };
 
 export const getAdminBoardNavigationItems = () => {

@@ -20,6 +20,7 @@ import {
   getBoardCategoryChildren,
   getBoardCategoryFullLabel,
   getBoardCategoryPath,
+  isStandardEstimateCategory,
   isSalesIndexedCategory,
   isSalesHubCategory,
 } from "@/config/boardCategories";
@@ -187,7 +188,13 @@ const AdminBoardListPage: React.FC = () => {
               <SubCategoryButton
                 key={child.id}
                 type="button"
-                onClick={() => router.push(getBoardCategoryPath(child.id))}
+                onClick={() =>
+                  router.push(
+                    isStandardEstimateCategory(child.id)
+                      ? "/promotion-set-estimate"
+                      : getBoardCategoryPath(child.id),
+                  )
+                }
               >
                 <SubCategoryLabel>{child.label}</SubCategoryLabel>
                 <SubCategoryMeta>

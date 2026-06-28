@@ -17,16 +17,35 @@ type MiddleCacheEntry = {
 };
 
 type Product = { [key: string]: string };
+type ProductVariantSummary = Record<string, string | undefined>;
+type ProductListOption = Record<string, unknown> & {
+  thumbnailUrl: string;
+  variants: ProductVariantSummary[];
+};
+type ProductListResponse = {
+  options: ProductListOption[];
+  subCategories: string[];
+};
+type ProductListCacheEntry = {
+  ts: number;
+  value: ProductListResponse;
+};
 
 //  전역 Drive 클라이언트 + 캐시 설정
 const g = globalThis as typeof globalThis & {
   __driveClient?: drive_v3.Drive;
+  __productListCache?: Record<string, ProductListCacheEntry>;
 };
 
 const DRIVE_PARENT_FOLDER_ID = "12kbRkg4PREBp6f5_tmXCu0_SYgUngIrw";
 const DRIVE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30일
+const PRODUCT_LIST_CACHE_TTL_MS = 30 * 60 * 1000; // 30분
 const DRIVE_MAX_RETRIES = 3;
 const DRIVE_BACKOFF_BASE_MS = 800; // 0.8s → 1.6s → 3.2s ...
+
+if (!g.__productListCache) {
+  g.__productListCache = {};
+}
 
 //  기존 전역 캐시 안전하게 초기화 (타입 충돌 방지)
 if (!globalThis.__driveCache) {
@@ -42,6 +61,15 @@ if (!driveCache.pending) {
 //  공통 정규화 함수 (폴더명/모델명 정규화에 사용)
 const normalizeName = (s?: string) =>
   normalizeModelName((s || "").replace(/\s+/g, "").trim().toLowerCase());
+
+const queryValueKey = (value: string | string[] | undefined) =>
+  Array.isArray(value) ? value.join(",") : value || "";
+
+const queryValues = (value: string | string[] | undefined) =>
+  (Array.isArray(value) ? value : [value])
+    .flatMap((item) => (item ?? "").split(","))
+    .map((item) => item.trim())
+    .filter(Boolean);
 
 //  전역 Drive 클라이언트 (1회 생성 후 재사용)
 async function getDriveClient(): Promise<drive_v3.Drive> {
@@ -236,27 +264,53 @@ export default async function handler(
   res: NextApiResponse
 ) {
   const middle = req.query.middle as string | undefined;
+  const middlesQuery = req.query.middles;
   const sub = req.query.sub as string | undefined;
   const id = req.query.id as string | undefined;
   const q = req.query.q as string | undefined;
   const modelsQuery = req.query.models;
+  const includeImages = req.query.includeImages !== "false";
 
 	const groupBy = req.query.groupBy as string | undefined;
   const isModelCodeGrouping = groupBy === "modelCode";
 
-  const sheet = middle || "정수기";
+  const middleValues = queryValues(middlesQuery);
+  const sheet = middleValues.length ? "__multi__" : middle || "정수기";
+  const listCacheKey = id
+    ? ""
+    : [
+        sheet,
+        middle || "",
+        queryValueKey(middlesQuery),
+        sub || "",
+        q || "",
+        queryValueKey(modelsQuery),
+        groupBy || "",
+        includeImages ? "images" : "no-images",
+      ].join("::");
 
   try {
-    const drive = await getDriveClient();
+    if (listCacheKey) {
+      const cached = g.__productListCache?.[listCacheKey];
+      if (cached && Date.now() - cached.ts < PRODUCT_LIST_CACHE_TTL_MS) {
+        res.setHeader(
+          "Cache-Control",
+          "public, s-maxage=300, stale-while-revalidate=1800"
+        );
+        return res.status(200).json(cached.value);
+      }
+    }
+
+    const drive = id || includeImages ? await getDriveClient() : null;
 
     //  1. 시트 데이터 (fetchSheetData 자체는 별도 캐시 사용)
-    const products = await fetchSheetData(sheet);
+    const sheets = middleValues.length ? middleValues : [sheet];
+    const products = (await Promise.all(sheets.map(fetchSheetData))).flat();
 
     // (기존 normalize는 그대로 두되, 아래에서는 normalizeName 사용)
     const normalize = (s?: string) =>
       (s || "").replace(/\s+/g, "").trim().toLowerCase();
-    const modelFilters = (Array.isArray(modelsQuery) ? modelsQuery : [modelsQuery])
-      .flatMap((value) => (value ?? "").split(","))
+    const modelFilters = queryValues(modelsQuery)
       .map((value) => normalizeName(value))
       .filter(Boolean);
     const modelFilterSet = new Set(modelFilters);
@@ -269,6 +323,7 @@ export default async function handler(
       middleName: string,
       modelId: string
     ): Promise<string> => {
+      if (!drive) return "";
       const cacheKey = `${middleName}::${modelId}`;
       if (thumbCache.has(cacheKey)) {
         return thumbCache.get(cacheKey)!;
@@ -302,6 +357,7 @@ export default async function handler(
       modelId: string,
       fallbackId?: string
     ): Promise<string[]> => {
+      if (!drive) return [];
       const cacheKey = `${middleName}::${modelId}::${fallbackId || ""}`;
       if (imagesCache.has(cacheKey)) {
         return imagesCache.get(cacheKey)!;
@@ -423,7 +479,7 @@ export default async function handler(
 
     //  목록 조회
     let filtered = products;
-    if (middle)
+    if (middle && !middleValues.length)
       filtered = filtered.filter(
         (p) => p["중분류"]?.trim() === middle.trim()
       );
@@ -459,44 +515,49 @@ export default async function handler(
     const enrichedFiltered = await Promise.all(
       Object.values(groupedFiltered).map(async (group) => {
         const representative = group[0];
-        const [thumbnailUrl, variants] = await Promise.all([
-          getThumbnailUrl(
-            representative["중분류"],
-            representative["모델코드"]
-          ),
-          Promise.all(
-            group.map(async (p) => ({
-              모델코드: p["모델코드"],
-              제품색상: p["제품색상"],
-              상품명: p["상품명"],
-              계약기간: p["계약기간"],
-              서비스유형: p["서비스유형"],
-              "서비스주기/월": p["서비스주기/월"],
-              "프로모션 대분류": p["프로모션 대분류"],
-              프로모션유형: p["프로모션유형"],
-              프로모션명: p["프로모션명"],
-              정상가: p["정상가"],
-              할인전금액: p["할인전금액"],
-              할인후금액: p["할인후금액"],
-              가격: p["할인후금액"] || p["정상가"],
-              thumbnailUrl: await getThumbnailUrl(
-                p["중분류"],
-                p["모델코드"]
-              ),
-            }))
-          ),
-        ]);
+        const thumbnailUrl =
+          includeImages && drive
+            ? await getThumbnailUrl(
+                representative["중분류"],
+                representative["모델코드"]
+              )
+            : "";
+        const variants = group.map((p) => ({
+          모델코드: p["모델코드"],
+          제품색상: p["제품색상"],
+          상품명: p["상품명"],
+          계약기간: p["계약기간"],
+          서비스유형: p["서비스유형"],
+          "서비스주기/월": p["서비스주기/월"],
+          "프로모션 대분류": p["프로모션 대분류"],
+          프로모션유형: p["프로모션유형"],
+          프로모션명: p["프로모션명"],
+          정상가: p["정상가"],
+          할인전금액: p["할인전금액"],
+          할인후금액: p["할인후금액"],
+          할인금액: p["할인금액"],
+          가격: p["할인후금액"] || p["정상가"],
+          thumbnailUrl,
+        }));
         return { ...representative, thumbnailUrl, variants };
       })
     );
 
     res.setHeader(
       "Cache-Control",
-      "public, s-maxage=60, stale-while-revalidate=300"
+      "public, s-maxage=300, stale-while-revalidate=1800"
     );
-    return res
-      .status(200)
-      .json({ options: enrichedFiltered, subCategories });
+    const responseBody: ProductListResponse = {
+      options: enrichedFiltered,
+      subCategories,
+    };
+    if (listCacheKey && g.__productListCache) {
+      g.__productListCache[listCacheKey] = {
+        ts: Date.now(),
+        value: responseBody,
+      };
+    }
+    return res.status(200).json(responseBody);
   } catch (error: unknown) {
     console.error("❌ products API 오류:", error);
     return res.status(500).json({ error: "서버 오류" });

@@ -110,6 +110,11 @@ export default function AdminLayout({ children }: Props) {
           path: "/admin/theme-products",
         },
         {
+          type: "link",
+          label: "프로모션 세트 견적 관리",
+          path: "/admin/promotion-set-estimate",
+        },
+        {
           type: "group",
           label: "게시판 관리",
           path: "/admin/boards", // active 판단용(prefix)

@@ -1,6 +1,6 @@
 ﻿/* eslint-disable @typescript-eslint/no-explicit-any */
 import Image from "next/image";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
 
 import CustomSelect from "@/components/Select/CustomSelect";
@@ -21,6 +21,7 @@ const KEY = {
   normalPrice: "정상가",
   priceBefore: "할인전금액",
   priceAfter: "할인후금액",
+  discountAmount: "할인금액",
   middle: "중분류",
   sub: "소분류",
 } as const;
@@ -38,6 +39,7 @@ interface ProductVariant {
   [KEY.normalPrice]?: string | number;
   [KEY.priceBefore]?: string | number;
   [KEY.priceAfter]?: string | number;
+  [KEY.discountAmount]?: string | number;
   thumbnailUrl?: string;
 }
 
@@ -54,8 +56,10 @@ interface Product {
   [KEY.normalPrice]?: string | number;
   [KEY.priceBefore]?: string | number;
   [KEY.priceAfter]?: string | number;
+  [KEY.discountAmount]?: string | number;
   thumbnailUrl?: string;
   variants?: ProductVariant[];
+  selectedVariant?: ProductVariant;
 }
 
 export interface SelectedProduct {
@@ -124,6 +128,8 @@ interface Props {
   onAdd: (item: SelectedProduct) => void;
   teacherPlans: TeacherPlan[];
   cardDiscounts: CardDiscount[];
+  displayMode?: "default" | "promotion";
+  optionsLocked?: boolean;
 }
 
 export default function ProductCard({
@@ -131,6 +137,8 @@ export default function ProductCard({
   onAdd,
   teacherPlans,
   cardDiscounts,
+  displayMode = "default",
+  optionsLocked = false,
 }: Props) {
   const [showOptions, setShowOptions] = useState(false);
   const [contract, setContract] = useState("");
@@ -143,8 +151,6 @@ export default function ProductCard({
   const [voucherMasterForModel, setVoucherMasterForModel] = useState<
     any | null
   >(null);
-
-  console.log("KEY:", product);
 
   // ??? ??납 ??태
   const [prepayRate, setPrepayRate] = useState<string>(""); // "30" | "50" | ""
@@ -283,14 +289,14 @@ export default function ProductCard({
     );
   }, [product.variants]);
 
-  const getVariantPriceBefore = (variant?: ProductVariant): number => {
+  const getVariantPriceBefore = useCallback((variant?: ProductVariant): number => {
     if (!variant) return 0;
     const raw =
       variant[KEY.priceBefore] ??
       variant[KEY.normalPrice] ??
       variant[KEY.priceAfter];
     return toSafeNumber(raw as string | number | undefined);
-  };
+  }, []);
 
   useEffect(() => {
     if (!promoCategory && promoCategoryList.length > 0) {
@@ -340,7 +346,15 @@ export default function ProductCard({
         (!promo || normalizeStr(v[KEY.promoName]) === normalizeStr(promo));
       return match;
     });
-  }, [contract, serviceType, serviceCycle, promoType, promo, variants]);
+  }, [
+    contract,
+    serviceType,
+    serviceCycle,
+    promoCategory,
+    promoType,
+    promo,
+    variants,
+  ]);
 
   const toSafeNumber = (val?: string | number): number => {
     if (!val) return 0;
@@ -367,22 +381,19 @@ export default function ProductCard({
         return priceA - priceB;
       });
 
-      // ??1) '기존결합' ??로모션??형????는지 ??선 ??색 (최??가 기????로)
-      const preferred =
-        sorted.find(
-          (v) => (v[KEY.promoType] ?? "").toString().trim() === "기존결합",
-        ) ?? sorted[0];
+      const preferred = product.selectedVariant ?? sorted[0];
 
       setContract((preferred?.[KEY.contract] as string) || "");
       setServiceType((preferred?.[KEY.serviceType] as string) || "");
       setServiceCycle((preferred?.[KEY.serviceCycle] as string) || "");
+      setPromoCategory((preferred?.[KEY.promoCategory] as string) || "");
       setPromoType((preferred?.[KEY.promoType] as string) || "");
       setPromo((preferred?.[KEY.promoName] as string) || "");
 
       // ??션??변경되????납/카드/교원 ??택??초기??
       setPrepayRate("");
     }
-  }, [product.variants]);
+  }, [product.selectedVariant, product.variants]);
 
   // ??? 구독교원 기본 ??택??0??로 초기??
   useEffect(() => {
@@ -507,6 +518,7 @@ export default function ProductCard({
     current,
     prepayContractVariant,
     referenceVariantForPrepay,
+    getVariantPriceBefore,
   ]);
 
   // 선납 반영 월요금 계산 기준: 할인후금액(프로모션 반영 usageFee)
@@ -550,7 +562,7 @@ export default function ProductCard({
   useEffect(() => {
     if (isTeacherAvailable) return;
     if (teacherPlans.length > 0) {
-      setTeacherSelections((prev) => {
+      setTeacherSelections(() => {
         const next: Record<string, number> = {};
         teacherPlans.forEach((p) => {
           next[p.id] = 0;
@@ -677,19 +689,6 @@ export default function ProductCard({
     return Math.max(baseBestPrice - teacherTotalDiscount, 0);
   }, [current, baseBestPrice, teacherTotalDiscount]);
 
-  // ??기??최종 가??(??체감 ??택 ??선, ??으????용??금)
-  const finalPriceForCompare = useMemo(() => {
-    if (finalBestPriceWithTeacher > 0) return finalBestPriceWithTeacher;
-    if (finalUsageFee > 0) return finalUsageFee;
-    if (!current) return 0;
-    const base =
-      (current[KEY.priceAfter] as string | number | undefined) ||
-      (current[KEY.normalPrice] as string | number | undefined) ||
-      (current[KEY.priceBefore] as string | number | undefined) ||
-      "0";
-    return toSafeNumber(base);
-  }, [current, finalBestPriceWithTeacher, finalUsageFee]);
-
   const currentVoucherModelCode = normalizeStr(current?.[KEY.modelCode]);
   const fallbackVoucherModelCode = normalizeStr(product[KEY.modelCode]);
   const voucherModelCode = currentVoucherModelCode || fallbackVoucherModelCode;
@@ -756,8 +755,8 @@ export default function ProductCard({
       : undefined;
 
   return (
-    <Card>
-      <ImageBox>
+    <Card $displayMode={displayMode}>
+      <ImageBox $displayMode={displayMode}>
         {product.thumbnailUrl ? (
           <StyledImage
             src={product.thumbnailUrl}
@@ -765,25 +764,29 @@ export default function ProductCard({
             width={280}
             height={280}
             loading="lazy"
+            $displayMode={displayMode}
           />
         ) : (
           <ImagePlaceholder>이미지 없음</ImagePlaceholder>
         )}
       </ImageBox>
 
-      <InfoBox>
+      <InfoBox $displayMode={displayMode}>
         <Title>{(product[KEY.productName] as string) || ""}</Title>
         <Model>{(product[KEY.modelCode] as string) || ""}</Model>
         <Spec>{(product["상품기능"] as string) || ""}</Spec>
-        <OptionsToggle
-          type="button"
-          onClick={() => setShowOptions((prev) => !prev)}
-        >
-          {showOptions ? "옵션 닫기" : "옵션 설정"}
-        </OptionsToggle>
+        {!optionsLocked && (
+          <OptionsToggle
+            type="button"
+            $displayMode={displayMode}
+            onClick={() => setShowOptions((prev) => !prev)}
+          >
+            {showOptions ? "옵션 닫기" : "옵션 설정"}
+          </OptionsToggle>
+        )}
 
-        {showOptions && (
-          <OptionsPanel>
+        {showOptions && !optionsLocked && (
+          <OptionsPanel $displayMode={displayMode}>
             <OptionBox>
               <CustomSelect
                 label="계약기간"
@@ -955,7 +958,7 @@ export default function ProductCard({
           </OptionsPanel>
         )}
 
-        <PriceBox>
+        <PriceBox $displayMode={displayMode}>
           <PriceText>이용 요금</PriceText>
           <FlexBox>
             <div>
@@ -999,6 +1002,7 @@ export default function ProductCard({
               </>
             )}
             <Button
+              $displayMode={displayMode}
               onClick={() => {
                 if (!current) {
                   alert("옵션을 모두 선택해주세요!");
@@ -1109,30 +1113,57 @@ export default function ProductCard({
 //
 //  styled-components ??의
 //
-const Card = styled.div`
-  padding: 12px 30px 32px;
+type DisplayMode = "default" | "promotion";
+
+const Card = styled.div<{ $displayMode: DisplayMode }>`
+  padding: ${({ $displayMode }) =>
+    $displayMode === "promotion" ? "20px" : "12px 30px 32px"};
   background: #fff;
   border-radius: 8px;
-  box-shadow: 2px 4px 12px 0 rgba(0, 0, 0, 0.14);
+  border: ${({ $displayMode }) =>
+    $displayMode === "promotion" ? "1px solid #e7e8eb" : "0"};
+  box-shadow: ${({ $displayMode }) =>
+    $displayMode === "promotion"
+      ? "none"
+      : "2px 4px 12px 0 rgba(0, 0, 0, 0.14)"};
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: ${({ $displayMode }) =>
+    $displayMode === "promotion" ? "360px" : "auto"};
+
+  ${({ $displayMode }) =>
+    $displayMode === "promotion"
+      ? `
+        transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+
+        &:hover {
+          border-color: rgb(234, 25, 23);
+          box-shadow: 0 12px 26px rgba(16, 24, 40, 0.07);
+          transform: translateY(-2px);
+        }
+      `
+      : ""}
 `;
 
-const ImageBox = styled.div`
+const ImageBox = styled.div<{ $displayMode: DisplayMode }>`
   width: 100%;
-  padding-bottom: 100%;
+  padding-bottom: ${({ $displayMode }) =>
+    $displayMode === "promotion" ? "0" : "100%"};
+  height: ${({ $displayMode }) =>
+    $displayMode === "promotion" ? "150px" : "auto"};
   position: relative;
   overflow: hidden;
 `;
 
-const StyledImage = styled(Image)`
+const StyledImage = styled(Image)<{ $displayMode: DisplayMode }>`
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: ${({ $displayMode }) =>
+    $displayMode === "promotion" ? "contain" : "cover"};
 `;
 
 const ImagePlaceholder = styled.div`
@@ -1148,8 +1179,9 @@ const ImagePlaceholder = styled.div`
   font-size: 14px;
 `;
 
-const InfoBox = styled.div`
-  margin-top: 16px;
+const InfoBox = styled.div<{ $displayMode: DisplayMode }>`
+  margin-top: ${({ $displayMode }) =>
+    $displayMode === "promotion" ? "18px" : "16px"};
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -1207,38 +1239,67 @@ const PriceText = styled.p`
   font-size: 16px;
 `;
 
-const PriceBox = styled.div`
+const PriceBox = styled.div<{ $displayMode: DisplayMode }>`
   margin-top: auto;
   display: flex;
   flex-direction: column;
   gap: 4px;
+  ${({ $displayMode }) =>
+    $displayMode === "promotion"
+      ? `
+        padding-top: 14px;
+        border-top: 1px solid #f1f2f4;
+      `
+      : ""}
 `;
 
-const OptionsToggle = styled.button`
-  margin-bottom: 12px;
+const OptionsToggle = styled.button<{ $displayMode: DisplayMode }>`
+  margin: ${({ $displayMode }) =>
+    $displayMode === "promotion" ? "14px 0 12px" : "0 0 12px"};
   align-self: flex-start;
-  padding: 0;
-  border: none;
-  background: none;
+  padding: ${({ $displayMode }) =>
+    $displayMode === "promotion" ? "0 12px" : "0 0 5px"};
+  border: ${({ $displayMode }) =>
+    $displayMode === "promotion" ? "1px solid #dfe2e8" : "none"};
+  background: ${({ $displayMode }) =>
+    $displayMode === "promotion" ? "#fff" : "none"};
+  min-height: ${({ $displayMode }) =>
+    $displayMode === "promotion" ? "36px" : "auto"};
+  border-radius: ${({ $displayMode }) =>
+    $displayMode === "promotion" ? "6px" : "0"};
   font-size: 12px;
-  font-weight: 600;
-  color: #666;
+  font-weight: 800;
+  color: ${({ $displayMode }) =>
+    $displayMode === "promotion" ? "#222" : "#666"};
   cursor: pointer;
   white-space: nowrap;
-  width: 100%;
-  border-bottom: 1px solid #ddd;
-  padding-bottom: 5px;
+  width: ${({ $displayMode }) =>
+    $displayMode === "promotion" ? "auto" : "100%"};
+  border-bottom: ${({ $displayMode }) =>
+    $displayMode === "promotion" ? "1px solid #dfe2e8" : "1px solid #ddd"};
 
   &:hover {
-    color: #333;
+    color: ${({ $displayMode }) =>
+      $displayMode === "promotion" ? "rgb(234, 25, 23)" : "#333"};
+    border-color: ${({ $displayMode }) =>
+      $displayMode === "promotion" ? "rgb(234, 25, 23)" : "#ddd"};
   }
 `;
 
-const OptionsPanel = styled.div`
+const OptionsPanel = styled.div<{ $displayMode: DisplayMode }>`
   margin-bottom: 12px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  ${({ $displayMode }) =>
+    $displayMode === "promotion"
+      ? `
+        padding: 14px;
+        border: 1px solid #eceef2;
+        border-radius: 8px;
+        background: #fafbfc;
+      `
+      : ""}
 `;
 
 const PriceLabel = styled.span`
@@ -1280,18 +1341,26 @@ const VoucherDetail = styled.div`
   }
 `;
 
-const Button = styled.button`
+const Button = styled.button<{ $displayMode: DisplayMode }>`
   display: inline-block;
   width: 100%;
   font-size: 16px;
   line-height: 26px;
   text-align: center;
   vertical-align: top;
-  font-weight: 500;
+  font-weight: ${({ $displayMode }) =>
+    $displayMode === "promotion" ? "900" : "500"};
   padding: 11px 31px;
   border-width: 1px;
   border-style: solid;
-  border-radius: 99px;
+  border-radius: ${({ $displayMode }) =>
+    $displayMode === "promotion" ? "6px" : "99px"};
+  background: ${({ $displayMode }) =>
+    $displayMode === "promotion" ? "rgb(234, 25, 23)" : "#fff"};
+  border-color: ${({ $displayMode }) =>
+    $displayMode === "promotion" ? "rgb(234, 25, 23)" : "currentColor"};
+  color: ${({ $displayMode }) =>
+    $displayMode === "promotion" ? "#fff" : "inherit"};
   cursor: pointer;
 
   &:hover {
@@ -1366,14 +1435,4 @@ const TeacherSeats = styled.span`
   font-size: 15px;
   width: 26px;
   text-align: center;
-`;
-
-const TeacherSummary = styled.div`
-  margin-top: 4px;
-  font-size: 12px;
-  color: #555;
-
-  b {
-    font-weight: 600;
-  }
 `;
