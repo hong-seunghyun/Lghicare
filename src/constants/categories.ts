@@ -217,6 +217,11 @@ export const categories: Category[] = [
         items: [],
       },
       {
+        name: "기획전",
+        url: "https://lghicaresolution.com/board/%EA%B8%B0%ED%9A%8D%EC%A0%84/3001/",
+        items: [],
+      },
+      {
         name: "통합구독 전단",
         url: "https://lghicaresolution.com/board/%ED%86%B5%ED%95%A9%EA%B5%AC%EB%8F%85%20%EC%A0%84%EB%8B%A8/13/",
         items: [],
@@ -229,6 +234,12 @@ export const categories: Category[] = [
           { label: "제품 사용 꿀팁", url: "https://www.hi-caresolution.com/user/service/usage.do",external: true, },
           { label: "LG ThinQ 사용 꿀팁", url: "https://www.hi-caresolution.com/user/service/lgThinQ.do",external: true, },
         ],
+      },
+
+      {
+        name: "관할지역찾기",
+        url: "/benefits/service-area",
+        items: [],
       },
     ],
   },

@@ -244,7 +244,7 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
     new Set(options.map((o) => o["서비스유형"])),
   );
   const allCycles = Array.from(new Set(options.map((o) => o["서비스주기/월"])));
-  
+
   const normalizeValue = (value?: string) => (value ?? "").toString().trim();
 
   const filteredByCycle = options.filter((o) => {
@@ -312,7 +312,7 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
         )
       : [];
 
-const [disclaimerText, setDisclaimerText] = useState<string | null>(null);
+  const [disclaimerText, setDisclaimerText] = useState<string | null>(null);
 
   const [prepayRate, setPrepayRate] = useState(""); // 30 / 50 / ""
   const [prepayAvailableRate, setPrepayAvailableRate] = useState<
@@ -2120,6 +2120,10 @@ const [disclaimerText, setDisclaimerText] = useState<string | null>(null);
                 </>
               )}
             </PSTextBox>
+            <ConsultationButton href="/benefits/service-area">
+              상담신청
+              <span aria-hidden="true">→</span>
+            </ConsultationButton>
           </ProductInfo>
         </ProductDetailWrap>
 
@@ -2425,6 +2429,47 @@ const PSTextBox = styled.div`
 
   @media (max-width: 768px) {
     font-size: 12px;
+  }
+`;
+
+const ConsultationButton = styled(Link)`
+  width: 100%;
+  min-height: 56px;
+  margin-top: 14px;
+  padding: 0 22px;
+  border-radius: 10px;
+  border: 1px solid #ea1917;
+  background: none;
+  color: #ea1917;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 700;
+  transition:
+    background-color 0.2s ease,
+    transform 0.2s ease;
+
+  span {
+    color: inherit;
+    font-size: 19px;
+    line-height: 1;
+    transition: transform 0.2s ease;
+  }
+
+  &:hover {
+    background: #ea1917;
+    color: #fff;
+
+    span {
+      transform: translateX(3px);
+    }
+  }
+
+  @media (max-width: 768px) {
+    min-height: 52px;
+    font-size: 15px;
   }
 `;
 

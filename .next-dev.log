@@ -1,11 +1,6 @@
-yarn run v1.22.22
-$ cross-env NODE_OPTIONS=--openssl-legacy-provider --max-old-space-size=4096 next dev
- ⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
- We detected multiple lockfiles and selected the directory of C:\Users\User\yarn.lock as the root directory.
- To silence this warning, set `outputFileTracingRoot` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
-   See https://nextjs.org/docs/app/api-reference/config/next-config-js/output#caveats for more information.
- Detected additional lockfiles: 
-   * C:\Users\User\Desktop\workspace\lg\package-lock.json
+
+> lg@0.1.0 dev
+> cross-env NODE_OPTIONS=--openssl-legacy-provider --max-old-space-size=4096 next dev
 
    ▲ Next.js 15.5.4
    - Local:        http://localhost:3000
@@ -13,50 +8,19 @@ $ cross-env NODE_OPTIONS=--openssl-legacy-provider --max-old-space-size=4096 nex
    - Environments: .env.local
 
  ✓ Starting...
- ✓ Ready in 2.1s
- ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
- ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
- ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
- ○ Compiling /promotion-set-estimate ...
- ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
- ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
- ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
- ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
- ✓ Compiled /admin/promotion-set-estimate in 1765ms (448 modules)
- ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
- ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
- GET /admin/promotion-set-estimate 200 in 874ms
- GET /promotion-set-estimate 200 in 871ms
- ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
-Warning: <title> should not be used in _document.js's <Head>. https://nextjs.org/docs/messages/no-document-title
-Warning: <title> should not be used in _document.js's <Head>. https://nextjs.org/docs/messages/no-document-title
-Invalid DOM property `stroke-linecap`. Did you mean `strokeLinecap`?
-Invalid DOM property `stroke-linejoin`. Did you mean `strokeLinejoin`?
-Invalid DOM property `stroke-width`. Did you mean `strokeWidth`?
-Warning: <title> should not be used in _document.js's <Head>. https://nextjs.org/docs/messages/no-document-title
-Warning: <title> should not be used in _document.js's <Head>. https://nextjs.org/docs/messages/no-document-title
-Warning: <title> should not be used in _document.js's <Head>. https://nextjs.org/docs/messages/no-document-title
-Warning: <title> should not be used in _document.js's <Head>. https://nextjs.org/docs/messages/no-document-title
-Warning: <title> should not be used in _document.js's <Head>. https://nextjs.org/docs/messages/no-document-title
-Warning: <title> should not be used in _document.js's <Head>. https://nextjs.org/docs/messages/no-document-title
-Warning: <title> should not be used in _document.js's <Head>. https://nextjs.org/docs/messages/no-document-title
-Warning: <title> should not be used in _document.js's <Head>. https://nextjs.org/docs/messages/no-document-title
- GET /promotion-set-estimate 200 in 596ms
- GET /admin/promotion-set-estimate 200 in 596ms
- GET /promotion-set-estimate 200 in 577ms
- ○ Compiling /api/products ...
- ✓ Compiled /api/products in 576ms (223 modules)
- GET /api/products?middles=%EC%A0%95%EC%88%98%EA%B8%B0&models=WD521AWB&groupBy=modelCode&includeImages=false 200 in 3519ms
- ✓ Compiled /api/prepay/rate in 106ms (229 modules)
- GET /api/prepay/rate?middle=%EC%9B%8C%EC%8B%9C%ED%83%80%EC%9B%8C&sub=%EC%9B%8C%EC%8B%9C%ED%83%80%EC%9B%8C&model=W20WHN 304 in 728ms
- GET /api/prepay/rate?middle=%EB%B0%94%EC%8A%A4%EC%97%90%EC%96%B4%EC%8B%9C%EC%8A%A4%ED%85%9C&sub=%EB%B0%94%EC%8A%A4%EC%97%90%EC%96%B4&model=M-X0120BASV 304 in 733ms
- GET /api/prepay/rate?middle=%EC%9D%98%EB%A5%98%EA%B1%B4%EC%A1%B0%EA%B8%B0&sub=%EC%9D%98%EB%A5%98%EA%B1%B4%EC%A1%B0%EA%B8%B0&model=RG20EN 304 in 766ms
- GET /api/prepay/rate?middle=%EC%9B%8C%EC%8B%9C%ED%83%80%EC%9B%8C&sub=%EC%9B%8C%EC%8B%9C%ED%83%80%EC%9B%8C&model=W20WHN 304 in 762ms
- GET /api/prepay/rate?middle=%EB%B0%94%EC%8A%A4%EC%97%90%EC%96%B4%EC%8B%9C%EC%8A%A4%ED%85%9C&sub=%EB%B0%94%EC%8A%A4%EC%97%90%EC%96%B4&model=M-X0120BASV 304 in 794ms
- GET /api/prepay/rate?middle=%EC%97%90%EC%96%B4%EC%BB%A8&sub=2in1&model=FQ18GV3EA2 304 in 808ms
- GET /api/prepay/rate?middle=%EC%9D%98%EB%A5%98%EA%B1%B4%EC%A1%B0%EA%B8%B0&sub=%EC%9D%98%EB%A5%98%EA%B1%B4%EC%A1%B0%EA%B8%B0&model=RG20EN 304 in 804ms
- GET /api/prepay/rate?middle=%EC%97%90%EC%96%B4%EC%BB%A8&sub=2in1&model=FQ18GV3EA2 304 in 825ms
- GET /api/products?middles=%EC%A0%95%EC%88%98%EA%B8%B0&models=WD521AWB&groupBy=modelCode&includeImages=false 200 in 8203ms
- GET /api/products?middles=%EC%97%90%EC%96%B4%EC%BB%A8%2C%EC%9D%98%EB%A5%98%EA%B1%B4%EC%A1%B0%EA%B8%B0%2C%EB%B0%94%EC%8A%A4%EC%97%90%EC%96%B4%EC%8B%9C%EC%8A%A4%ED%85%9C%2C%EC%9B%8C%EC%8B%9C%ED%83%80%EC%9B%8C&models=FQ18GV3EA2%2CRG20EN%2CM-X0120BASV%2CW20WHN&groupBy=modelCode&includeImages=false 304 in 5346ms
-error Command failed with exit code 4294967295.
-info Visit https://yarnpkg.com/en/docs/cli/run for documentation about this command.
+ ✓ Ready in 7s
+ ○ Compiling /benefits/service-area ...
+ ✓ Compiled /benefits/service-area in 1761ms (442 modules)
+ GET /benefits/service-area 200 in 3345ms
+ GET /benefits/service-area 200 in 3336ms
+ GET /benefits/service-area 200 in 5568ms
+ GET /benefits/service-area 200 in 275ms
+ ✓ Compiled in 325ms (442 modules)
+ ✓ Compiled in 201ms (442 modules)
+ GET /benefits/service-area 200 in 347ms
+ GET /benefits/service-area 200 in 272ms
+ ✓ Compiled in 291ms (442 modules)
+ ✓ Compiled in 181ms (442 modules)
+ GET /benefits/service-area 200 in 342ms
+ ✓ Compiled in 324ms (442 modules)
+ GET /benefits/service-area 200 in 346ms

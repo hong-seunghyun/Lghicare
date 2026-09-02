@@ -115,6 +115,11 @@ export default function AdminLayout({ children }: Props) {
           path: "/admin/promotion-set-estimate",
         },
         {
+          type: "link",
+          label: "관할지역 관리",
+          path: "/admin/service-areas",
+        },
+        {
           type: "group",
           label: "게시판 관리",
           path: "/admin/boards", // active 판단용(prefix)

@@ -6,10 +6,7 @@ import styled from "styled-components";
 import { categories } from "@/constants/categories";
 import Image from "next/image";
 import HeaderSearch from "@/components/Search/HeaderSearch";
-import {
-  SALES_HUB_ID,
-  getBoardCategoryLabel,
-} from "@/config/boardCategories";
+import { SALES_HUB_ID, getBoardCategoryLabel } from "@/config/boardCategories";
 
 // 🔥 Firebase Auth 추가
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
@@ -239,6 +236,20 @@ export default function Header() {
                 )}
               </NavItem>
             ))}
+            <KakaoFriendLink
+              href="http://pf.kakao.com/_JMIJd"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="카카오 플친 추가 새 창 열기"
+            >
+              <Image
+                src="/images/icon-kakaoch.png"
+                alt=""
+                width={20}
+                height={20}
+              />
+              <span>플친 추가</span>
+            </KakaoFriendLink>
           </NavWrap>
 
           <RightWrap>
@@ -331,6 +342,48 @@ const NavItem = styled.div`
     font-size: 14px;
     height: 50px;
     line-height: 1.25;
+  }
+`;
+
+const KakaoFriendLink = styled.a`
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 3px;
+  height: 60px;
+  color: #191919;
+  font-size: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: color 0.2s ease;
+
+  img {
+    width: 20px;
+    height: 20px;
+    border-radius: 7px;
+    transition:
+      transform 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+
+  &:hover {
+    color: #6b5900;
+  }
+
+  &:hover img {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 12px rgba(96, 79, 0, 0.18);
+  }
+
+  @media (max-width: 650px) {
+    height: 50px;
+    gap: 5px;
+    font-size: 14px;
+
+    img {
+      width: 18px;
+      height: 18px;
+    }
   }
 `;
 
