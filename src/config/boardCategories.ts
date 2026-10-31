@@ -66,6 +66,12 @@ const buildSalesHubContentCategories = (
     },
   ]);
 
+const salesHubMonthlyPromotionCategory: BoardCategory = {
+  id: `${SALES_HUB_ID}-monthly-promotion`,
+  label: "이달의 판촉",
+  parentId: SALES_HUB_ID,
+};
+
 const salesHubCommonCategory: BoardCategory = {
   id: `${SALES_HUB_ID}-common`,
   label: "공통",
@@ -73,7 +79,11 @@ const salesHubCommonCategory: BoardCategory = {
 };
 
 const salesHubProductCategories = buildSalesHubProductCategories();
-const salesHubProducts = [salesHubCommonCategory, ...salesHubProductCategories];
+const salesHubProducts = [
+  salesHubMonthlyPromotionCategory,
+  salesHubCommonCategory,
+  ...salesHubProductCategories,
+];
 const salesHubContentCategories = buildSalesHubContentCategories(salesHubProducts);
 
 export const boardCategories: BoardCategory[] = [

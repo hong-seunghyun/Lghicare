@@ -2,6 +2,13 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { db } from "@/lib/firebase";
 import {
+  createVisitorStats,
+  DAY_MS,
+  koreaDateKey,
+  koreaDayStart,
+  type MonthlyVisitorRow,
+} from "@/lib/admin/visitorStats";
+import {
   collection,
   getDocs,
   orderBy,
@@ -98,6 +105,8 @@ type ActivitySummaryResponse = {
   shareSummary: ShareSummary;
   todayEstimates: number;
   visitorSummary: VisitorSummary;
+  dailyVisitorCounts: Array<{ date: string; count: number }>;
+  monthlyVisitorCounts: MonthlyVisitorRow[];
   affiliateCardStats: AffiliateCardStat[];
   dailyProductMixCounts: DailyProductMixRow[];
   topMultiProductCombinations: MultiProductCombinationStat[];
@@ -113,20 +122,14 @@ type ManagerProfile = {
   region: string;
 };
 
-const padDate = (value: number) => String(value).padStart(2, "0");
-
-const formatDateKey = (date: Date) =>
-  `${date.getFullYear()}-${padDate(date.getMonth() + 1)}-${padDate(
-    date.getDate(),
-  )}`;
+const formatDateKey = koreaDateKey;
 
 const parseDateInput = (value?: string, fallback?: Date) => {
-  if (!value) return fallback ?? new Date();
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return fallback ?? new Date();
+  const parsed = koreaDayStart(value);
+  if (Number.isNaN(parsed.getTime()) || formatDateKey(parsed) !== value) {
     return fallback ?? new Date();
   }
-  parsed.setHours(0, 0, 0, 0);
   return parsed;
 };
 
@@ -311,7 +314,7 @@ const buildDateSeries = (
       date: key,
       count: source.get(key) ?? 0,
     });
-    cursor.setDate(cursor.getDate() + 1);
+    cursor.setTime(cursor.getTime() + DAY_MS);
   }
   return rows;
 };
@@ -347,28 +350,6 @@ const pickTopName = (source?: Map<string, number>) => {
     ([nameA, countA], [nameB, countB]) =>
       countB - countA || nameA.localeCompare(nameB, "ko"),
   )[0][0];
-};
-
-const extractEstimateManagerId = (docId: string, data: any) => {
-  const managerUid = normalizeText(data.managerUid);
-  if (managerUid) return managerUid;
-
-  const managerId = normalizeText(data.managerId);
-  if (managerId) return managerId;
-
-  return docId;
-};
-
-const extractShareManagerId = (docId: string, data: any) => {
-  const managerUid = normalizeText(data.managerUid);
-  if (managerUid) return managerUid;
-
-  const matched = /^manager_([^_]+)_/.exec(docId);
-  if (matched?.[1]) {
-    return matched[1];
-  }
-
-  return "";
 };
 
 const resolveBranchName = (data: any, profile?: ManagerProfile) => {
@@ -416,20 +397,11 @@ export default async function handler(
 
   const includeDetails = normalizeIncludeDetails(req.query.includeDetails);
 
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-
-  const todayStart = new Date(now);
-  const tomorrowStart = new Date(todayStart);
-  tomorrowStart.setDate(tomorrowStart.getDate() + 1);
-
-  const yesterdayStart = new Date(todayStart);
-  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-
-  const monthStart = new Date(todayStart);
-  monthStart.setDate(monthStart.getDate() - 29);
-
-  const defaultStart = new Date(todayStart.getFullYear(), todayStart.getMonth(), 1);
+  const todayStart = koreaDayStart(formatDateKey(new Date()));
+  const tomorrowStart = new Date(todayStart.getTime() + DAY_MS);
+  const yesterdayStart = new Date(todayStart.getTime() - DAY_MS);
+  const monthStart = new Date(todayStart.getTime() - 29 * DAY_MS);
+  const defaultStart = koreaDayStart(formatDateKey(todayStart).slice(0, 7) + "-01");
 
   const startParam = Array.isArray(req.query.start)
     ? req.query.start[0]
@@ -445,8 +417,7 @@ export default async function handler(
   if (normalizedEnd < startDate) {
     normalizedEnd.setTime(startDate.getTime());
   }
-  normalizedEnd.setDate(normalizedEnd.getDate() + 1);
-  normalizedEnd.setHours(0, 0, 0, 0);
+  normalizedEnd.setTime(normalizedEnd.getTime() + DAY_MS);
 
   const startTimestamp = Timestamp.fromDate(startDate);
   const endTimestamp = Timestamp.fromDate(normalizedEnd);
@@ -488,7 +459,7 @@ export default async function handler(
     const managerProfilesByUid = new Map<string, ManagerProfile>();
     const managerProfilesByManagerId = new Map<string, ManagerProfile>();
 
-    if (includeDetails) {
+    {
       const managerSnap = await getDocs(
         query(collection(db, "users"), where("role", "==", "manager")),
       );
@@ -508,6 +479,19 @@ export default async function handler(
         }
       });
     }
+
+    const resolveVisitorId = (docId: string, data: any, isShare = false) => {
+      const uid = pickMeaningfulText(data.managerUid);
+      const managerId = pickMeaningfulText(data.managerId);
+      const shareUid = isShare ? /^manager_([^_]+)_/.exec(docId)?.[1] ?? "" : "";
+      const profile =
+        managerProfilesByUid.get(uid || shareUid) ||
+        managerProfilesByManagerId.get(managerId) ||
+        managerProfilesByUid.get(managerId);
+      // Anonymous estimate document IDs are not people.
+      return profile?.uid || uid || shareUid || managerId;
+    };
+    const visitorStats = createVisitorStats(startDate, normalizedEnd);
 
     const managerMap = new Map<string, ActivityManager>();
     const branchMap = new Map<string, number>();
@@ -543,8 +527,7 @@ export default async function handler(
 
     const visitorsToday = new Set<string>();
     const visitorsYesterday = new Set<string>();
-    const visitorsInRange = new Set<string>();
-    const visitorsLast30Days = new Set<string>();
+    const visitorsLast30Days = createVisitorStats(monthStart, tomorrowStart);
 
     let totalEstimates = 0;
     let todayEstimateCount = 0;
@@ -626,10 +609,8 @@ export default async function handler(
         }
       }
 
-      const visitorManagerId = extractEstimateManagerId(docSnap.id, data);
-      if (visitorManagerId) {
-        visitorsInRange.add(visitorManagerId);
-      }
+      const visitorManagerId = resolveVisitorId(docSnap.id, data);
+      if (createdAt) visitorStats.add(createdAt, visitorManagerId);
 
       if (!includeDetails) return;
 
@@ -701,10 +682,8 @@ export default async function handler(
       daySet.add(uniqueEventKey);
       dailyShareUniqueMap.set(dayKey, daySet);
 
-      const managerId = extractShareManagerId(docSnap.id, data);
-      if (managerId) {
-        visitorsInRange.add(managerId);
-      }
+      const managerId = resolveVisitorId(docSnap.id, data, true);
+      visitorStats.add(updatedAt, managerId);
     });
 
     visitorEstimateSnap.forEach((docSnap) => {
@@ -716,11 +695,11 @@ export default async function handler(
         todayEstimateCount += 1;
       }
 
-      const managerId = extractEstimateManagerId(docSnap.id, data);
+      const managerId = resolveVisitorId(docSnap.id, data);
       if (!managerId) return;
 
       if (isWithinRange(createdAt, monthStart, tomorrowStart)) {
-        visitorsLast30Days.add(managerId);
+        visitorsLast30Days.add(createdAt, managerId);
       }
       if (isWithinRange(createdAt, todayStart, tomorrowStart)) {
         visitorsToday.add(managerId);
@@ -742,11 +721,11 @@ export default async function handler(
         shareTodayUnique.add(uniqueEventKey);
       }
 
-      const managerId = extractShareManagerId(docSnap.id, data);
+      const managerId = resolveVisitorId(docSnap.id, data, true);
       if (!managerId) return;
 
       if (isWithinRange(updatedAt, monthStart, tomorrowStart)) {
-        visitorsLast30Days.add(managerId);
+        visitorsLast30Days.add(updatedAt, managerId);
       }
       if (isWithinRange(updatedAt, todayStart, tomorrowStart)) {
         visitorsToday.add(managerId);
@@ -868,6 +847,7 @@ export default async function handler(
         })
       : [];
 
+    const visitorCounts = visitorStats.toJSON();
     const response: ActivitySummaryResponse = {
       totalEstimates,
       topManagers,
@@ -886,9 +866,11 @@ export default async function handler(
       visitorSummary: {
         today: visitorsToday.size,
         yesterday: visitorsYesterday.size,
-        range: visitorsInRange.size,
-        last30Days: visitorsLast30Days.size,
+        range: visitorCounts.count,
+        last30Days: visitorsLast30Days.toJSON().count,
       },
+      dailyVisitorCounts: visitorCounts.daily,
+      monthlyVisitorCounts: visitorCounts.monthly,
       affiliateCardStats,
       dailyProductMixCounts,
       topMultiProductCombinations,

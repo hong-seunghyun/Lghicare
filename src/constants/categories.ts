@@ -218,7 +218,7 @@ export const categories: Category[] = [
       },
       {
         name: "기획전",
-        url: "https://lghicaresolution.com/board/%EA%B8%B0%ED%9A%8D%EC%A0%84/3001/",
+        url: "https://lghicaresolution.com/board/%EA%B8%B0%ED%9A%8D%EC%A0%84/8/",
         items: [],
       },
       {

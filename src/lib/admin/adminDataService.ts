@@ -3,6 +3,7 @@ import {
   scaleVisitorCountByMode,
   type AdminDataMode,
 } from "@/lib/admin/adminDataMode";
+import type { MonthlyVisitorRow } from "@/lib/admin/visitorStats";
 
 export type OverviewResponse = {
   topStats?: {
@@ -65,6 +66,8 @@ export type ActivitySummaryResponse = {
   totalEstimates: number;
   dailyCounts: DailyCountRow[];
   dailyShareCounts: DailyCountRow[];
+  dailyVisitorCounts: DailyCountRow[];
+  monthlyVisitorCounts: MonthlyVisitorRow[];
   dailyTopRows?: DailyTopStatRow[];
   rangeStart: string;
   rangeEnd: string;
@@ -164,6 +167,14 @@ const toDemoActivitySummary = (
   todayEstimates: scaleCountByMode(real.todayEstimates, "demo"),
   dailyCounts: toDemoDailyRows(real.dailyCounts),
   dailyShareCounts: toDemoDailyRows(real.dailyShareCounts),
+  dailyVisitorCounts: (real.dailyVisitorCounts ?? []).map((row) => ({
+    ...row,
+    count: scaleVisitorCountByMode(row.count, "demo"),
+  })),
+  monthlyVisitorCounts: (real.monthlyVisitorCounts ?? []).map((row) => ({
+    ...row,
+    count: scaleVisitorCountByMode(row.count, "demo"),
+  })),
   dailyTopRows: (real.dailyTopRows ?? []).map((row) => ({
     ...row,
     estimateCount: scaleCountByMode(row.estimateCount, "demo"),

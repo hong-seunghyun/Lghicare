@@ -14,9 +14,10 @@ import {
   YAxis,
 } from "recharts";
 import {
-  getDashboardDailyExportData,
+  getDashboardDailyExportRealData,
   getDashboardSummaryData,
   getOverviewData,
+  getOverviewRealData,
   type ActivitySummaryResponse,
   type MultiProductCombinationStat,
   type OverviewResponse,
@@ -134,8 +135,12 @@ const buildDailyExportHtml = (
   overview: OverviewResponse,
 ) => {
   const rows = summary.dailyTopRows ?? [];
+  const dailyVisitors = new Map(
+    (summary.dailyVisitorCounts ?? []).map((row) => [row.date, row.count]),
+  );
   const headers = [
     "날짜",
+    "일별 접속자 수(1인당 하루 1회)",
     "오늘 견적 수",
     "오늘 공유",
     "상위 지점명",
@@ -183,6 +188,9 @@ const buildDailyExportHtml = (
 </head>
 <body>
   <h1>관리자 대시보드 엑셀 출력</h1>
+  <p>실제 저장 데이터 기준이며, 데모 배수를 적용하지 않습니다. 날짜는 한국 시간 기준입니다.</p>
+  <p>접속자 수는 견적·공유 기록에서 식별 가능한 활동자 수입니다. 단순 방문·로그인만 한 사람과 식별 정보가 없는 기록은 포함하지 않습니다. 공유 기록은 저장된 최종 활동 시각 기준이므로 과거의 모든 접속을 복원한 수치는 아닙니다.</p>
+  <p>같은 사람은 하루에 1회 집계하고, 다른 날 다시 활동하면 추가 집계합니다. 예: 어제와 오늘 각각 활동하면 합계 2회입니다. 월별·기간 합계·최근 30일 수치는 일별 접속자 수의 합계이며, 월별 수치는 선택한 조회 기간에 포함된 날짜만 집계합니다.</p>
   ${renderTableSection(
     "요약",
     ["항목", "값"],
@@ -192,8 +200,8 @@ const buildDailyExportHtml = (
       ["총 매니저 수", topStats.managers ?? 0],
       ["오늘 접속자 수", visitorSummary.today],
       ["어제 접속자 수", visitorSummary.yesterday],
-      ["기간 내 총 접속자 수", visitorSummary.range],
-      ["최근 1개월 접속자 수", visitorSummary.last30Days],
+      ["기간 내 총 접속자 수(일별 합산)", visitorSummary.range],
+      ["최근 30일 접속자 수(일별 합산)", visitorSummary.last30Days],
       ["오늘 견적 수", summary.todayEstimates ?? 0],
       ["기간 내 견적 수", summary.totalEstimates ?? 0],
       ["오늘 공유 수", summary.shareSummary?.today ?? 0],
@@ -201,10 +209,18 @@ const buildDailyExportHtml = (
     ],
   )}
   ${renderTableSection(
+    "월별 접속자 수",
+    ["월", "집계 시작일", "집계 종료일", "접속자 수(일별 합산)"],
+    (summary.monthlyVisitorCounts ?? []).map((row) => [
+      row.month, row.rangeStart, row.rangeEnd, row.count,
+    ]),
+  )}
+  ${renderTableSection(
     "일별 주요 지표",
     headers,
     rows.map((row) => [
       row.date,
+      dailyVisitors.get(row.date) ?? 0,
       row.estimateCount,
       row.shareCount,
       row.topBranchName || "-",
@@ -459,11 +475,10 @@ export function AdminDashboardPage({
     setExportError(null);
     try {
       const [data, overview] = await Promise.all([
-        getDashboardDailyExportData(
+        getDashboardDailyExportRealData(
           { rangeStart: exportStart, rangeEnd: exportEnd },
-          dataMode,
         ),
-        getOverviewData(dataMode),
+        getOverviewRealData(),
       ]);
       downloadDailyExport(
         data,
@@ -497,7 +512,7 @@ export function AdminDashboardPage({
             상세 분석 페이지 이동
           </ShortcutLink>
           <ExportPanel>
-            <ExportTitle>비공식 엑셀 출력</ExportTitle>
+            <ExportTitle>실제 데이터 엑셀 출력 · 월별/일별 접속자</ExportTitle>
             <ExportControls>
               <ExportDateInput
                 type="date"
