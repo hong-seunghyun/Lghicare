@@ -101,8 +101,11 @@ export function clearSheetCache(sheet?: string) {
 
 //  시트 데이터 가져오기 (30일 TTL + 전역 캐시 + pending 공유)
 export async function fetchSheetData(sheet: string) {
+  return fetchSheetDataWithPolicy(sheet);
+}
+export async function fetchSheetDataWithPolicy(sheet: string, options?: { maxAgeMs?: number; allowStale?: boolean }) {
   const now = Date.now();
-  const ttl = 30 * 24 * 60 * 60 * 1000; //  30일 TTL
+  const ttl = options?.maxAgeMs ?? 30 * 24 * 60 * 60 * 1000;
 
   // 1) 캐시 유효하면 바로 반환
   const cached = sheetGlobal.dataCache[sheet];
@@ -114,7 +117,7 @@ export async function fetchSheetData(sheet: string) {
   const existing = sheetGlobal.pending[sheet];
   if (existing) {
     const result = await existing;
-    if (result) return result.data;
+    if (result && (options?.allowStale !== false || Date.now() - result.ts < ttl)) return result.data;
     // pending이 null을 반환했다면 새로 시도
   }
 
@@ -145,7 +148,7 @@ export async function fetchSheetData(sheet: string) {
 
       //  에러인데 이전 캐시라도 있으면 그걸 반환
       const fallback = sheetGlobal.dataCache[sheet];
-      if (fallback) return fallback;
+      if (fallback && options?.allowStale !== false) return fallback;
 
       // 캐시도 없으면 null → 호출측에서 throw
       return null;

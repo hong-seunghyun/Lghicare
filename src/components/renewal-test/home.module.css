@@ -1,0 +1,1018 @@
+.container {
+  width: calc(100% - 96px);
+  max-width: 1440px;
+  margin-inline: auto;
+}
+.hero {
+  width: 100%;
+  overflow: hidden;
+  background: #f4f3ef;
+}
+.liveBanner {
+  position: relative;
+  width: 100%;
+}
+.liveBanner a,
+.liveBanner picture {
+  display: block;
+  width: 100%;
+}
+.liveBanner img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.bannerControls {
+  position: absolute;
+  right: max(40px, calc((100% - 1440px) / 2));
+  bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #ffffffec;
+  color: #30302e;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 2px 14px #00000004;
+}
+.bannerControls button {
+  width: 32px;
+  height: 32px;
+  font-size: 25px;
+  line-height: 1;
+  background: transparent;
+  border: 0;
+}
+.heroInner {
+  max-width: 1440px;
+  width: calc(100% - 96px);
+  margin-inline: auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  min-height: 440px;
+}
+.heroCopy {
+  padding-block: 60px;
+}
+.heroCopy h1 {
+  margin: 18px 0;
+  font-size: 42px;
+  line-height: 1.5;
+  letter-spacing: -0.05em;
+}
+.heroCopy p {
+  font-size: 18px;
+  line-height: 1.8;
+  color: #666;
+  margin-bottom: 24px;
+}
+.heroLoading {
+  min-height: 300px;
+}
+.categorySection {
+  padding-block: 32px 42px;
+}
+.mainCategoryRail {
+  --rail-gap: 14px;
+}
+.mainCategoryRail > div > div {
+  gap: var(--rail-gap);
+}
+.mainCategoryRail .mainCategoryLink {
+  position: relative;
+  width: 112px;
+  flex: none;
+  scroll-snap-align: start;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 8px 14px;
+  border: 1px solid transparent;
+  border-radius: 22px;
+  background: transparent;
+  color: #565650;
+  transition:
+    background 0.2s,
+    color 0.2s;
+}
+.mainCategoryRail .mainCategoryLink:hover {
+  background: #f7f6f3;
+  color: #222;
+}
+.mainCategoryRail .mainCategoryLink[aria-current="true"] {
+  background: #efefed;
+  color: #30302e;
+  border-color: #e2e2df;
+  font-weight: 600;
+}
+.mainCategoryRail .mainCategoryLink > img {
+  width: 66px;
+  height: 66px;
+  object-fit: contain;
+  pointer-events: none;
+}
+.mainCategoryRail .mainCategoryLink > span:last-child {
+  white-space: nowrap;
+  font-size: 14px;
+  letter-spacing: -0.03em;
+}
+.categoryGlyph {
+  width: 66px;
+  height: 66px;
+  display: grid;
+  place-items: center;
+  color: #55534e;
+  border-radius: 50%;
+  background: #eeede8;
+}
+.productsSection {
+  padding-block: 20px 56px;
+}
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 22px;
+}
+.sectionHeader h2 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  font-size: 32px;
+  font-weight: 600;
+  letter-spacing: -0.045em;
+  line-height: 1.4;
+}
+.headingMark {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 13px;
+  background: var(--theme-soft, #fcf0f4);
+  color: var(--theme-accent, #a50034);
+}
+.sectionHeader p {
+  margin-top: 10px;
+  color: #767670;
+  font-size: 15px;
+}
+.viewAll {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  flex: none;
+  color: var(--theme-accent, #a50034);
+  font-size: 14px;
+  padding-block: 8px;
+}
+.viewAll:hover {
+  color: #111;
+}
+.viewAll svg {
+  transition: transform 0.2s;
+}
+.viewAll:hover svg {
+  transform: translateX(3px);
+}
+.productToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 26px;
+  min-width: 0;
+}
+.productToolbar > select {
+  flex: none;
+  font-size: 14px;
+  border: 1px solid #e5e3df;
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px 14px;
+}
+.tabs {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 3px 1px;
+}
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+.tabs > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  white-space: nowrap;
+  padding: 10px 24px;
+  border: 0;
+  border-radius: 999px;
+  background: #f5f4f1;
+  color: #66655e;
+  font-size: 15px;
+  font-weight: 400;
+}
+.tabs > button:hover {
+  background: #efefed;
+  color: #30302e;
+}
+.tabs > button[aria-pressed="true"],
+.tabs > .tabActive {
+  background: #e6e6e3;
+  color: #252523;
+  font-weight: 600;
+}
+.productCards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+}
+.productCard {
+  min-width: 0;
+  overflow: hidden;
+  background: #f6f5f2;
+  border-radius: 24px;
+}
+.productImage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 270px;
+  padding: 28px;
+}
+.productImage img {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  mix-blend-mode: multiply;
+  transition: transform 0.45s cubic-bezier(0.2, 0.65, 0.25, 1);
+}
+.productImage:hover img {
+  transform: scale(1.035);
+}
+.productTag {
+  position: absolute;
+  z-index: 2;
+  top: 24px;
+  left: 24px;
+  color: #5e5b53;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+.productInfo {
+  padding: 4px 26px 22px;
+}
+.productInfo > small {
+  display: none;
+}
+.productInfo h3 {
+  margin: 0 0 7px;
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: -0.035em;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.model {
+  display: block;
+  color: #85837c;
+  font-size: 12px;
+  letter-spacing: 0.01em;
+}
+.featuredPriceBlock {
+  margin-top: 20px;
+}
+.featuredPriceBlock > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #8a877f;
+  font-size: 12px;
+}
+.featuredPriceBlock > span b {
+  text-decoration: line-through;
+  font-weight: 400;
+}
+.featuredPriceBlock > strong {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  color: var(--theme-accent, #a50034);
+  font-size: 32px;
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: -0.045em;
+  margin-top: 7px;
+  flex-wrap: wrap;
+}
+.featuredPriceBlock > strong small {
+  color: var(--theme-accent, #a50034);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+.featuredPriceBlock .benefitFlag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: var(--theme-soft, #fcf0f4);
+  border: 1px solid var(--theme-border, #efd3dd);
+  color: var(--theme-accent, #a50034);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.featuredPriceBlock > strong > span {
+  white-space: nowrap;
+}
+.featuredPriceBlock em {
+  font-size: 0.48em;
+  font-style: normal;
+  font-weight: 500;
+  margin-left: 2px;
+}
+.featuredPriceBlock > p {
+  margin-top: 6px;
+  color: #8a877e;
+  font-size: 12px;
+}
+.productCta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid #e3e1da;
+  font-size: 14px;
+  font-weight: 400;
+  color: #55564f;
+}
+.productCta svg {
+  width: 18px;
+  height: 18px;
+}
+.productCta:hover {
+  color: #111;
+}
+.priceLine {
+  margin-top: 18px;
+}
+.priceLine > span {
+  display: block;
+  font-size: 13px;
+  color: #77756e;
+}
+.priceLine strong {
+  display: block;
+  font-size: 28px;
+  margin-top: 4px;
+  font-weight: 600;
+}
+.priceLine strong small {
+  font-size: 13px;
+  font-weight: 400;
+  margin-left: 4px;
+}
+.productCondition {
+  color: #77756e;
+  margin-top: 9px;
+  font-size: 13px;
+}
+.weeklySection .productCards {
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  grid-template-rows: 1fr 1fr;
+  gap: 20px;
+}
+.weeklySection .featuredProduct {
+  grid-row: 1 / 3;
+  background: #fff;
+  border: 2px solid var(--theme-accent, #a50034);
+}
+.weeklySection .featuredProduct .productImage {
+  height: 430px;
+  padding: 36px 28px 12px;
+}
+.featuredProduct .productImage::before {
+  content: "";
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 55%;
+  height: 22px;
+  border-radius: 50%;
+  background: #d7d7d4;
+  filter: blur(12px);
+  opacity: 0.55;
+}
+.weeklySection .productTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid #e2e2df;
+  border-radius: 10px;
+  background: #fff;
+  color: #50504c;
+  font-size: 18px;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+.weeklySection .productTag svg {
+  flex: none;
+}
+.featuredProduct .productTag {
+  gap: 9px;
+  padding: 8px 14px;
+  border: 1.5px solid var(--theme-accent, #a50034);
+  color: var(--theme-accent, #a50034);
+  font-size: 23px;
+  font-weight: 750;
+}
+.featuredProduct .productInfo {
+  padding: 6px 32px 26px;
+}
+.featuredProduct .productInfo h3 {
+  font-size: 25px;
+}
+.featuredProduct .featuredPriceBlock > strong {
+  font-size: 42px;
+}
+.weeklySection .productCard:not(.featuredProduct) {
+  display: grid;
+  grid-template-columns: 37% minmax(0, 1fr);
+  align-items: center;
+  background: #fff;
+  border: 1px solid #dededb;
+}
+.weeklySection .productCta {
+  color: var(--theme-accent, #a50034);
+}
+.weeklySection .productCard:not(.featuredProduct) .productImage {
+  height: 100%;
+  min-height: 255px;
+  padding: 72px 16px 22px;
+}
+.weeklySection .productCard:not(.featuredProduct) .productInfo {
+  padding: 25px 25px 25px 6px;
+}
+.weeklySection .productCard:not(.featuredProduct) .productInfo h3 {
+  font-size: 20px;
+  -webkit-line-clamp: 3;
+}
+.weeklySection .productCard:not(.featuredProduct) .featuredPriceBlock {
+  margin-top: 13px;
+}
+.weeklySection .productCard:not(.featuredProduct) .featuredPriceBlock > strong {
+  font-size: 32px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.weeklySection .productCard:not(.featuredProduct) .productCta {
+  margin-top: 13px;
+  padding-top: 0;
+  border: 0;
+  font-size: 16px;
+}
+.weeklySection .model {
+  font-size: 15px;
+  color: #696961;
+}
+.weeklySection .featuredPriceBlock > span {
+  flex-wrap: wrap;
+  font-size: 15px;
+  color: #76766f;
+}
+.weeklySection .featuredPriceBlock > strong small {
+  font-size: 16px;
+}
+.weeklySection .benefitFlag {
+  background: #fff;
+  font-size: 13px;
+}
+.weeklySection .featuredProduct .productCta {
+  font-size: 16px;
+}
+.priceNote {
+  margin-top: 18px;
+  color: #8a8880;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.productSkeleton {
+  min-height: 390px;
+  background: #f6f5f2;
+  border-radius: 24px;
+}
+.weeklySection .productSkeleton:first-child {
+  grid-row: 1 / 3;
+  min-height: 565px;
+}
+.weeklySection .productSkeleton:not(:first-child) {
+  min-height: 255px;
+}
+.benefitsSection {
+  padding-bottom: 50px;
+}
+.benefitsSection > .sectionHeader {
+  display: none;
+}
+.benefitCards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.benefitCards > button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  text-align: left;
+  padding: 28px 32px;
+  background: #f7f7f4;
+  border: 0;
+  border-radius: 22px;
+}
+.benefitCards > .careBenefit {
+  background: #edf7f1;
+}
+.benefitCards > .careBenefit:hover {
+  background: #e4f2ea;
+}
+.benefitCards > .cardBenefit {
+  background: #f5effa;
+}
+.benefitCards > .cardBenefit:hover {
+  background: #eee4f6;
+}
+.careBenefit > div > span,
+.careBenefit > div > h3 {
+  color: #28694f;
+}
+.cardBenefit > div > span,
+.cardBenefit > div > h3 {
+  color: #715092;
+}
+.benefitCards > button > div {
+  flex: 1;
+  min-width: 0;
+}
+.benefitArtwork {
+  width: 112px;
+  flex: none;
+}
+.benefitArtwork svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.benefitCards > button:hover {
+  background: #efefea;
+}
+.benefitCards div > span {
+  display: block;
+  font-size: 12px;
+  color: #77786f;
+  margin-bottom: 9px;
+}
+.benefitCards h3 {
+  font-size: 21px;
+  font-weight: 500;
+  line-height: 1.5;
+  margin: 0;
+  letter-spacing: -0.035em;
+}
+.benefitCards h3 br {
+  display: none;
+}
+.benefitCards p {
+  margin-top: 8px;
+  color: #85857c;
+  font-size: 13px;
+}
+.benefitCards > button > svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  color: #77786f;
+}
+.consultInner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  padding-block: 34px 42px;
+  border-top: 1px solid #eeede7;
+}
+.consultInner > div > span {
+  display: none;
+}
+.consultInner h2 {
+  font-size: 25px;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  margin: 0;
+}
+.consultInner p {
+  margin-top: 8px;
+  color: #85837c;
+  font-size: 14px;
+}
+.consultInner .consultButton {
+  display: inline-flex;
+  gap: 24px;
+  align-items: center;
+  justify-content: space-between;
+  border: 0;
+  border-radius: 999px;
+  padding: 14px 25px;
+  background: #a50034;
+  color: #fff;
+  font-size: 14px;
+}
+.consultInner .consultButton:hover {
+  background: #85002a;
+}
+.consultCopy {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.consultInner > .consultCopy > .consultIcon {
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  flex: none;
+  border-radius: 20px;
+  background: #fcf0f4;
+  color: #a50034;
+}
+@media (max-width: 1100px) {
+  .container,
+  .heroInner {
+    width: calc(100% - 64px);
+  }
+  .weeklySection .productCards {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    gap: 16px;
+  }
+  .weeklySection .featuredProduct .productImage {
+    height: 390px;
+  }
+  .featuredProduct .productInfo {
+    padding: 6px 24px 22px;
+  }
+  .featuredProduct .productInfo h3 {
+    font-size: 23px;
+  }
+  .weeklySection .productCard:not(.featuredProduct) {
+    grid-template-columns: 33% minmax(0, 1fr);
+  }
+  .weeklySection .productCard:not(.featuredProduct) .productInfo {
+    padding: 22px 20px 22px 4px;
+  }
+  .weeklySection .productCard:not(.featuredProduct) .productInfo h3 {
+    font-size: 19px;
+  }
+  .weeklySection
+    .productCard:not(.featuredProduct)
+    .featuredPriceBlock
+    > strong {
+    font-size: 27px;
+  }
+  .benefitCards > button {
+    padding: 24px;
+  }
+  .benefitCards h3 {
+    font-size: 19px;
+  }
+  .benefitArtwork {
+    width: 92px;
+  }
+}
+@media (max-width: 760px) {
+  .container,
+  .heroInner {
+    width: calc(100% - 40px);
+  }
+  .bannerControls {
+    right: 18px;
+    bottom: 14px;
+    gap: 9px;
+    padding: 3px 8px;
+    font-size: 12px;
+  }
+  .bannerControls button {
+    width: 27px;
+    height: 27px;
+    font-size: 23px;
+  }
+  .heroInner {
+    min-height: 300px;
+    display: block;
+  }
+  .heroCopy {
+    padding-block: 36px;
+  }
+  .heroCopy h1 {
+    font-size: 30px;
+  }
+  .heroCopy p {
+    font-size: 15px;
+  }
+  .categorySection {
+    padding-block: 20px 30px;
+    width: 100%;
+    padding-inline: 20px;
+  }
+  .mainCategoryRail {
+    --rail-gap: 4px;
+  }
+  .mainCategoryRail .mainCategoryLink {
+    width: 90px;
+    padding: 12px 6px;
+    gap: 9px;
+    border-radius: 18px;
+  }
+  .mainCategoryRail .mainCategoryLink > img,
+  .categoryGlyph {
+    width: 52px;
+    height: 52px;
+  }
+  .mainCategoryRail .mainCategoryLink > span:last-child {
+    font-size: 12px;
+  }
+  .productsSection {
+    padding-block: 8px 36px;
+  }
+  .sectionHeader {
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .sectionHeader h2 {
+    font-size: 24px;
+    gap: 8px;
+  }
+  .headingMark {
+    width: 29px;
+    height: 29px;
+    border-radius: 10px;
+  }
+  .headingMark svg {
+    width: 18px;
+    height: 18px;
+  }
+  .viewAll {
+    gap: 3px;
+    font-size: 12px;
+  }
+  .viewAll svg {
+    width: 13px;
+    height: 13px;
+  }
+  .productToolbar {
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .productToolbar > select {
+    font-size: 12px;
+    max-width: 115px;
+  }
+  .tabs {
+    gap: 6px;
+  }
+  .tabs > button {
+    font-size: 13px;
+    padding: 9px 16px;
+    gap: 6px;
+  }
+  .tabs > button > svg {
+    width: 16px;
+    height: 16px;
+  }
+  .weeklySection .productCards {
+    display: flex;
+    gap: 14px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    padding-bottom: 1px;
+  }
+  .weeklySection .productCards::-webkit-scrollbar {
+    display: none;
+  }
+  .weeklySection .productCard,
+  .weeklySection .productCard:not(.featuredProduct) {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    flex: 0 0 82%;
+    scroll-snap-align: start;
+  }
+  .weeklySection .featuredProduct {
+    flex-basis: 90%;
+  }
+  .productCard {
+    border-radius: 20px;
+  }
+  .weeklySection .featuredProduct .productImage {
+    height: 360px;
+    padding: 64px 20px 12px;
+  }
+  .weeklySection .productCard:not(.featuredProduct) .productImage {
+    height: 245px;
+    min-height: 0;
+    padding: 64px 28px 20px;
+  }
+  .productTag {
+    top: 20px;
+    left: 20px;
+    font-size: 11px;
+  }
+  .featuredProduct .productInfo,
+  .weeklySection .productCard:not(.featuredProduct) .productInfo {
+    padding: 0 20px 20px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  .featuredProduct .productInfo h3,
+  .weeklySection .productCard:not(.featuredProduct) .productInfo h3 {
+    font-size: 20px;
+    -webkit-line-clamp: 2;
+  }
+  .featuredProduct .productInfo h3 {
+    font-size: 21px;
+  }
+  .weeklySection .productTag {
+    font-size: 17px;
+    padding: 6px 9px;
+  }
+  .featuredProduct .productTag {
+    font-size: 21px;
+    padding: 7px 12px;
+  }
+  .model {
+    font-size: 11px;
+  }
+  .featuredPriceBlock,
+  .weeklySection .productCard:not(.featuredProduct) .featuredPriceBlock {
+    margin-top: 18px;
+  }
+  .featuredProduct .featuredPriceBlock > strong {
+    font-size: 34px;
+  }
+  .weeklySection
+    .productCard:not(.featuredProduct)
+    .featuredPriceBlock
+    > strong {
+    font-size: 29px;
+  }
+  .featuredPriceBlock > strong small {
+    font-size: 12px;
+  }
+  .weeklySection .model,
+  .weeklySection .featuredPriceBlock > span,
+  .weeklySection .featuredPriceBlock > strong small {
+    font-size: 14px;
+  }
+  .weeklySection .benefitFlag {
+    font-size: 12px;
+    padding: 3px 6px;
+    gap: 3px;
+  }
+  .featuredPriceBlock > span,
+  .featuredPriceBlock > p {
+    font-size: 11px;
+  }
+  .productCta,
+  .weeklySection .productCard:not(.featuredProduct) .productCta {
+    margin-top: 18px;
+    padding-top: 12px;
+    border-top: 1px solid #e3e1da;
+    font-size: 12px;
+  }
+  .weeklySection .featuredProduct .productCta,
+  .weeklySection .productCard:not(.featuredProduct) .productCta {
+    font-size: 15px;
+  }
+  .priceNote {
+    margin-top: 13px;
+    font-size: 11px;
+  }
+  .productCards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .productImage {
+    height: 180px;
+    padding: 22px 14px;
+  }
+  .productInfo {
+    padding: 2px 14px 18px;
+  }
+  .productInfo h3 {
+    font-size: 15px;
+  }
+  .priceLine strong {
+    font-size: 22px;
+  }
+  .priceLine > span,
+  .productCondition {
+    font-size: 11px;
+  }
+  .productSkeleton,
+  .weeklySection .productSkeleton:first-child,
+  .weeklySection .productSkeleton:not(:first-child) {
+    min-height: 450px;
+    flex: 0 0 90%;
+  }
+  .benefitsSection {
+    padding-bottom: 32px;
+  }
+  .benefitCards {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .benefitCards > button {
+    padding: 22px 24px;
+    border-radius: 18px;
+    gap: 12px;
+  }
+  .benefitCards > button > svg {
+    display: none;
+  }
+  .benefitArtwork {
+    width: 85px;
+  }
+  .benefitCards div > span {
+    margin-bottom: 6px;
+    font-size: 11px;
+  }
+  .benefitCards h3 {
+    font-size: 18px;
+  }
+  .benefitCards p {
+    font-size: 12px;
+    margin-top: 6px;
+  }
+  .consultInner {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 20px;
+    padding-block: 28px 32px;
+  }
+  .consultInner h2 {
+    font-size: 23px;
+  }
+  .consultInner p {
+    font-size: 13px;
+  }
+  .consultButton {
+    padding: 12px 22px;
+    font-size: 13px;
+  }
+  .consultCopy {
+    gap: 13px;
+    align-items: flex-start;
+  }
+  .consultInner > .consultCopy > .consultIcon {
+    width: 48px;
+    height: 48px;
+    border-radius: 16px;
+  }
+  .consultIcon svg {
+    width: 25px;
+    height: 25px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .productImage img,
+  .viewAll svg {
+    transition: none;
+  }
+}

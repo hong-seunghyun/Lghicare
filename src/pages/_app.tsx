@@ -54,6 +54,22 @@ export default function App({ Component, pageProps }: AppProps) {
   const isManagerRoute = router.pathname.startsWith("/manager");
   const isManagerLoginRoute = router.pathname === "/manager/login";
 
+  // 리뉴얼은 별도 레이아웃을 사용하되 운영 Firebase 인증을 공유합니다.
+  const isRenewalTestRoute =
+    router.pathname === "/renewal-test" ||
+    router.pathname.startsWith("/renewal-test/");
+
+  if (isRenewalTestRoute) {
+    return (
+      <ThemeProvider theme={{}}>
+        <GlobalStyle />
+        <UserProvider>
+          <Component {...pageProps} />
+        </UserProvider>
+      </ThemeProvider>
+    );
+  }
+
   return (
     <ThemeProvider theme={{}}>
       <Script

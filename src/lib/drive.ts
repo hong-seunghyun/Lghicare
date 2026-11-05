@@ -14,6 +14,9 @@ const cache: Record<string, DriveCacheEntry> = {};
 
 //  나중에 admin 버튼에서 사용할 캐시 초기화 헬퍼
 export function clearDriveThumbnailCache(modelCode?: string) {
+  if (!modelCode) {
+    (globalThis as typeof globalThis & { __renewalThemeFiles?: Map<string, unknown> }).__renewalThemeFiles?.clear();
+  }
   if (modelCode) {
     const key = modelCode;
     if (cache[key]) {

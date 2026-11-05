@@ -7,6 +7,7 @@ import React, { useEffect, useState } from "react";
 import styled from "styled-components";
 import { useRouter } from "next/router";
 import { db, app } from "@/lib/firebase";
+import { getManagerLoginDestination } from "@/lib/renewalTest";
 import {
   doc,
   getDoc,
@@ -31,6 +32,7 @@ const MANAGER_AUTH_COMMON_PASSWORD = "q1w2e3r4@@!!@@";
 const ManagerLoginPage: React.FC = () => {
   const router = useRouter();
   const auth = getAuth(app);
+  const nextPath = getManagerLoginDestination(router.query.next);
 
   const [managerId, setManagerId] = useState("");
   const [password, setPassword] = useState("");
@@ -41,6 +43,7 @@ const ManagerLoginPage: React.FC = () => {
 
   // 이미 로그인된 상태면 role 확인 후 매니저면 /manager 로, 아니면 로그아웃
   useEffect(() => {
+    if (!router.isReady) return;
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       if (!fbUser) {
         setCurrentUser(null);
@@ -78,7 +81,7 @@ const ManagerLoginPage: React.FC = () => {
             localStorage.setItem("managerSession", JSON.stringify(session));
           }
 
-          router.replace("/manager");
+          router.replace(nextPath);
         } else {
           // 매니저 전용 페이지이므로 다른 role 이면 강제 로그아웃
           await signOut(auth);
@@ -92,7 +95,7 @@ const ManagerLoginPage: React.FC = () => {
     });
 
     return () => unsubscribe();
-  }, [auth, router]);
+  }, [auth, router, nextPath, router.isReady]);
 
   // 매니저 로그인 처리 (managerId + 개인 비번 → 공통 비번으로 Auth 로그인)
   const handleSubmit = async (e: React.FormEvent) => {
@@ -142,7 +145,7 @@ const ManagerLoginPage: React.FC = () => {
           localStorage.setItem("managerSession", JSON.stringify(session));
         }
 
-        router.replace("/manager");
+        router.replace(nextPath);
         return;
       }
 
@@ -231,7 +234,7 @@ const ManagerLoginPage: React.FC = () => {
         localStorage.setItem("managerSession", JSON.stringify(session));
       }
 
-      router.replace("/manager");
+      router.replace(nextPath);
     } catch (err: any) {
       console.error("매니저 로그인 오류:", err);
       let message = "로그인 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
