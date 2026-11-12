@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import styled from "styled-components";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
+import { isPublishedProductImage } from "@/lib/catalog/imageUrl";
 
 import Loading from "@/components/loading/Loading";
 import { getProductColorChipColors } from "@/constants/colorMap";
@@ -323,6 +324,7 @@ function ProductCardItem({ card }: { card: ProductCard }) {
         {activeThumb ? (
           <Thumbnail
             src={activeThumb}
+            unoptimized={isPublishedProductImage(activeThumb)}
             alt="썸네일"
             width={300}
             height={300}

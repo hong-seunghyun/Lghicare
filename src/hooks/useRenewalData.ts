@@ -57,6 +57,7 @@ export async function fetchRenewalProducts(
   signal?: AbortSignal,
 ) {
   const params = new URLSearchParams({ groupBy: "modelCode" });
+  if (!model) params.set("summary", "true");
   if (category && category !== "전체")
     params.set("middle", category === "스타일러" ? "의류관리기" : category);
   else
@@ -68,8 +69,8 @@ export async function fetchRenewalProducts(
   if (model) params.set("models", model);
   const key = params.toString(),
     cached = productCache.get(key);
-  if (cached && Date.now() - cached.ts < 5 * 60 * 1000) return cached.products;
-  const response = await fetch(`/api/products?${key}`, { signal });
+  if (!model && cached && Date.now() - cached.ts < 60_000) return cached.products;
+  const response = await fetch(`/api/products?${key}`, { signal, cache: "no-store" });
   if (!response.ok)
     throw new Error(`상품을 불러오지 못했습니다. (${response.status})`);
   const data = (await response.json()) as {
@@ -82,6 +83,13 @@ export async function fetchRenewalProducts(
     .filter((p): p is PreviewProduct => p !== null);
   if (!signal?.aborted) productCache.set(key, { products, ts: Date.now() });
   return products;
+}
+export async function loadRenewalProductOptions(product: PreviewProduct): Promise<PreviewProduct> {
+  if (product.optionsLoaded !== false) return product;
+  const products = await fetchRenewalProducts(product.category, "", product.id);
+  const found = products.find(item => item.id === product.id);
+  if (!found || found.optionsLoaded === false) throw new Error("제품의 구독 조건을 불러오지 못했습니다. 다시 선택해 주세요.");
+  return found;
 }
 export function useRenewalProducts(
   category: string,

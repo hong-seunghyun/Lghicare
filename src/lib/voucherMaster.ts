@@ -1,5 +1,3 @@
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 
 export type VoucherRules = {
   version?: number;
@@ -56,70 +54,39 @@ export type VoucherModel = {
   multiProductNote?: string;
   multiProductExcludeVoucher?: boolean;
   excludeWhenPromoTypeIsNormalN?: boolean;
+  themePromoExcludePromoNameKeywords?: string[];
 };
 
-const RULES_DOC_ID = "current";
-const RULES_COLLECTION = "voucherRules";
-const MODELS_COLLECTION = "voucherModels";
-
-let cachedRules: VoucherRules | null = null;
-let cachedRulesPromise: Promise<VoucherRules | null> | null = null;
-
-const modelCache = new Map<string, VoucherModel | null>();
-const modelPromiseCache = new Map<string, Promise<VoucherModel | null>>();
-
-export async function fetchVoucherRules(): Promise<VoucherRules | null> {
-  if (cachedRules) return cachedRules;
-  if (cachedRulesPromise) return cachedRulesPromise;
-
-  cachedRulesPromise = (async () => {
-    const snap = await getDoc(doc(db, RULES_COLLECTION, RULES_DOC_ID));
-    if (!snap.exists()) return null;
-    const data = snap.data() as VoucherRules;
-    cachedRules = data;
+const CACHE_TTL = 60_000;
+const MISSING_TTL = 15_000;
+type VoucherData = { rules: VoucherRules | null; model: VoucherModel | null; version: string };
+const cache = new Map<string, { value: VoucherData; expiresAt: number }>();
+const pending = new Map<string, Promise<VoucherData>>();
+export async function fetchVoucherData(modelCode = "", version?: string): Promise<VoucherData> {
+  const key = `${version ?? "current"}:${modelCode.trim()}`;
+  const cached = cache.get(key);
+  if (cached && Date.now() < cached.expiresAt) return cached.value;
+  const waiting = pending.get(key);
+  if (waiting) return waiting;
+  const request = (async () => {
+    const params = new URLSearchParams();
+    if (modelCode.trim()) params.set("model", modelCode.trim());
+    if (version) params.set("version", version);
+    const response = await fetch(`/api/catalog/vouchers?${params}`, { cache: "no-store" });
+    if (!response.ok) throw new Error("상품권 정보를 확인하지 못했습니다. 다시 시도해 주세요.");
+    const data = await response.json() as VoucherData;
+    if (!("rules" in data) || !("model" in data) || typeof data.version !== "string") throw new Error("상품권 응답 형식이 올바르지 않습니다.");
+    if (cache.size >= 300 && !cache.has(key)) cache.delete(cache.keys().next().value!);
+    cache.set(key, { value: data, expiresAt: Date.now() + (data.rules && (!modelCode || data.model) ? CACHE_TTL : MISSING_TTL) });
     return data;
   })();
-
-  return cachedRulesPromise;
+  pending.set(key, request);
+  try { return await request; } finally { if (pending.get(key) === request) pending.delete(key); }
 }
-
-export async function fetchVoucherModel(
-  modelCode: string,
-): Promise<VoucherModel | null> {
-  const trimmed = (modelCode || "").toString().trim();
-  if (!trimmed) return null;
-
-  if (modelCache.has(trimmed)) return modelCache.get(trimmed) ?? null;
-  if (modelPromiseCache.has(trimmed))
-    return modelPromiseCache.get(trimmed) ?? null;
-
-  const promise = (async () => {
-    const snap = await getDoc(doc(db, MODELS_COLLECTION, trimmed));
-    if (!snap.exists()) {
-      modelCache.set(trimmed, null);
-      return null;
-    }
-    const data = snap.data() as VoucherModel;
-    modelCache.set(trimmed, data);
-    return data;
-  })();
-
-  modelPromiseCache.set(trimmed, promise);
-  return promise;
-}
-
-export async function getVoucherMasterForModel(modelCode: string) {
-  const [rules, model] = await Promise.all([
-    fetchVoucherRules(),
-    fetchVoucherModel(modelCode),
-  ]);
-
+export async function fetchVoucherRules(version?: string): Promise<VoucherRules | null> { return (await fetchVoucherData("", version)).rules; }
+export async function fetchVoucherModel(modelCode: string, version?: string): Promise<VoucherModel | null> { return modelCode.trim() ? (await fetchVoucherData(modelCode, version)).model : null; }
+export async function getVoucherMasterForModel(modelCode: string, version?: string) {
+  const { rules, model } = await fetchVoucherData(modelCode, version);
   if (!rules || !model) return null;
-
-  return {
-    version: rules.version ?? 1,
-    generatedFrom: rules.generatedFrom ?? "",
-    rules,
-    products: { [modelCode]: model },
-  };
+  return { version: rules.version ?? 1, generatedFrom: rules.generatedFrom ?? "", rules, products: { [modelCode]: model } };
 }

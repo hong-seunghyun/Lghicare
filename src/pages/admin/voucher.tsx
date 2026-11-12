@@ -15,6 +15,9 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import promoRulesFinal from "@/data/promo_rules_final.json";
+import { isValidMultiProductCount } from "@/utils/voucher/calcVoucher";
+import { adminCatalogRequest } from "@/lib/admin/catalogClient";
+import type { VoucherBundle } from "@/lib/catalog/types";
 
 type VoucherRules = {
   version?: number;
@@ -173,10 +176,18 @@ export default function VoucherAdminPage() {
   const [themePromoText, setThemePromoText] = useState("");
 
   const [importing, setImporting] = useState(false);
+  const [catalogGeneration, setCatalogGeneration] = useState<string | undefined>();
+  const publishedVouchers = async () => {
+    const data = await adminCatalogRequest<{ active: boolean; bundle?: VoucherBundle; generation?: string }>("/api/admin/product-import/vouchers");
+    if (data.active) setCatalogGeneration(data.generation);
+    return data;
+  };
 
   const loadRules = async () => {
     setRulesLoading(true);
     try {
+      const released = await publishedVouchers();
+      if (released.active && released.bundle) { setRulesJson(JSON.stringify(released.bundle.rules, null, 2)); return; }
       const snap = await getDoc(doc(db, RULES_COLLECTION, RULES_DOC_ID));
       if (!snap.exists()) {
         setRulesJson(
@@ -227,6 +238,11 @@ export default function VoucherAdminPage() {
   const loadModels = async () => {
     setModelsLoading(true);
     try {
+      const released = await publishedVouchers();
+      if (released.active && released.bundle) {
+        setModels(Object.values(released.bundle.models).map(model => ({ ...model, id: model.modelCode })).sort((a, b) => a.modelCode.localeCompare(b.modelCode)));
+        return;
+      }
       const colRef = collection(db, MODELS_COLLECTION);
       const q = query(colRef, orderBy("modelCode"));
       const snap = await getDocs(q);
@@ -351,6 +367,8 @@ const getThemePromoLabel = (
         return;
       }
       const { createdAt, updatedAt, ...rest } = parsed as any;
+      const released = await adminCatalogRequest<{ active: boolean }>("/api/admin/product-import/vouchers", { action: "rules", rules: rest, generation: catalogGeneration });
+      if (released.active) { await loadRules(); alert("규칙이 새 버전에 저장되었습니다."); return; }
       await setDoc(
         doc(db, RULES_COLLECTION, RULES_DOC_ID),
         {
@@ -374,6 +392,10 @@ const getThemePromoLabel = (
     const modelCode = editing.modelCode.trim();
     if (!modelCode) {
       alert("모델 코드를 입력해 주세요.");
+      return;
+    }
+    if (!isValidMultiProductCount(editing.multiProductCount ?? 0)) {
+      alert("다품목 인정수는 상품 1개당 0~1대 사이의 숫자로 입력해 주세요. (예: 0, 0.5, 1)");
       return;
     }
 
@@ -438,6 +460,8 @@ const getThemePromoLabel = (
         updatedAt: new Date(),
         createdAt: new Date(),
       };
+      const released = await adminCatalogRequest<{ active: boolean }>("/api/admin/product-import/vouchers", { action: "model", modelCode, model: payload, generation: catalogGeneration });
+      if (released.active) { await loadModels(); setEditing(null); alert("상품권 조건이 새 버전에 저장되었습니다."); return; }
       await setDoc(doc(db, MODELS_COLLECTION, modelCode), dbPayload, {
         merge: true,
       });
@@ -474,6 +498,8 @@ const getThemePromoLabel = (
     if (!confirmDelete) return;
 
     try {
+      const released = await adminCatalogRequest<{ active: boolean }>("/api/admin/product-import/vouchers", { action: "delete", modelCode, generation: catalogGeneration });
+      if (released.active) { await loadModels(); return; }
       await deleteDoc(doc(db, MODELS_COLLECTION, modelCode));
       setModels((prev) => prev.filter((m) => m.modelCode !== modelCode));
     } catch (err) {
@@ -515,6 +541,22 @@ const getThemePromoLabel = (
       if (!hasLegacyShape && !hasNewShape && !hasExcelRulesShape) {
         return false;
       }
+
+      // 전체 상품의 대수를 먼저 검증해 잘못된 파일이 기존 규칙/상품을 변경하지 않게 한다.
+      const entries = Object.entries<any>(
+        hasNewShape && !hasLegacyShape ? data.products : data.models,
+      );
+      const invalidEntry = entries.find(([, value]) =>
+        !isValidMultiProductCount(value?.multiProductCount ?? value?.multiProduct?.recognizedUnits ?? 0),
+      );
+      if (invalidEntry) {
+        const [key, value] = invalidEntry;
+        alert(`${value?.modelCode || key}: 다품목 인정수는 0~1대 사이여야 합니다. 금액이 입력되어 있는지 확인해 주세요.`);
+        return false;
+      }
+
+      const released = await adminCatalogRequest<{ active: boolean }>("/api/admin/product-import/vouchers", { action: "import", data, generation: catalogGeneration });
+      if (released.active) { await loadRules(); await loadModels(); return true; }
 
       const rulesDocRef = doc(db, RULES_COLLECTION, RULES_DOC_ID);
       await deleteDoc(rulesDocRef);
@@ -611,13 +653,6 @@ const getThemePromoLabel = (
       data?.rules?.combineKeywords ||
       ["신규결합", "기존결합", "기존결합/신규결합"];
 
-    const entries = Object.entries<any>(
-      hasLegacyShape
-        ? data.models
-        : hasNewShape
-        ? data.products
-        : data.models,
-    );
     const importedModelCodes = new Set<string>();
     const batchSize = 400;
 
@@ -701,7 +736,8 @@ const getThemePromoLabel = (
       await batch.commit();
     }
 
-    await deleteMissingModels(importedModelCodes);
+    // JSON imports update included models; absent models remain intact.
+    void deleteMissingModels;
     await loadRules();
     await loadModels();
     return true;
@@ -942,6 +978,8 @@ const getThemePromoLabel = (
               <label>다품목 인정수</label>
               <input
                 type="number"
+                min="0"
+                max="1"
                 step="0.1"
                 value={editing.multiProductCount ?? 0}
                 onChange={(e) =>

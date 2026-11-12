@@ -1,5 +1,7 @@
 // src/lib/sheet.ts
 import { google } from "googleapis";
+import { registerCacheInvalidator, syncProductCacheRevision } from "@/lib/productCacheControl";
+import { publishedRows } from "@/lib/catalog/read";
 
 type Product = Record<string, string>;
 
@@ -98,18 +100,24 @@ export function clearSheetCache(sheet?: string) {
     sheetGlobal.pending = {};
   }
 }
+registerCacheInvalidator("sheet-data", "sheets", () => clearSheetCache());
 
-//  시트 데이터 가져오기 (30일 TTL + 전역 캐시 + pending 공유)
+//  시트 데이터 가져오기 (5분 TTL + 전역 캐시 + pending 공유)
 export async function fetchSheetData(sheet: string) {
   return fetchSheetDataWithPolicy(sheet);
 }
-export async function fetchSheetDataWithPolicy(sheet: string, options?: { maxAgeMs?: number; allowStale?: boolean }) {
+export async function fetchSheetDataWithPolicy(sheet: string, options?: { maxAgeMs?: number; allowStale?: boolean; forceRefresh?: boolean; sourceOnly?: boolean }) {
+  if (!options?.sourceOnly) {
+    const published = await publishedRows(sheet);
+    if (published) return published.rows;
+  }
+  await syncProductCacheRevision();
   const now = Date.now();
-  const ttl = options?.maxAgeMs ?? 30 * 24 * 60 * 60 * 1000;
+  const ttl = options?.maxAgeMs ?? 5 * 60 * 1000;
 
   // 1) 캐시 유효하면 바로 반환
   const cached = sheetGlobal.dataCache[sheet];
-  if (cached && now - cached.ts < ttl) {
+  if (!options?.forceRefresh && cached && now - cached.ts < ttl) {
     return cached.data;
   }
 
@@ -117,12 +125,14 @@ export async function fetchSheetDataWithPolicy(sheet: string, options?: { maxAge
   const existing = sheetGlobal.pending[sheet];
   if (existing) {
     const result = await existing;
-    if (result && (options?.allowStale !== false || Date.now() - result.ts < ttl)) return result.data;
+    if (result && (!options?.forceRefresh || result.ts >= now) && (options?.allowStale !== false || Date.now() - result.ts < ttl)) return result.data;
     // pending이 null을 반환했다면 새로 시도
   }
 
   // 3) 새로 시트 요청 Promise 생성 (다른 요청과 공유)
-  const promise: Promise<CacheEntry | null> = (async () => {
+  const dataCache = sheetGlobal.dataCache;
+  const pending = sheetGlobal.pending;
+  const promise: Promise<CacheEntry | null> = Promise.resolve().then(async () => {
     try {
       // 필요한 범위만 가져오기 (A~Z, 26컬럼)
       const res = await safeSheetGet(sheet, `${sheet}!A:Z`);
@@ -140,7 +150,7 @@ export async function fetchSheetDataWithPolicy(sheet: string, options?: { maxAge
       const entry: CacheEntry = { data: products, ts: Date.now() };
 
       //  전역 캐시에 저장
-      sheetGlobal.dataCache[sheet] = entry;
+      if (sheetGlobal.dataCache === dataCache && pending[sheet] === promise) dataCache[sheet] = entry;
 
       return entry;
     } catch (err) {
@@ -154,9 +164,9 @@ export async function fetchSheetDataWithPolicy(sheet: string, options?: { maxAge
       return null;
     } finally {
       // pending 정리
-      delete sheetGlobal.pending[sheet];
+      if (pending[sheet] === promise) delete pending[sheet];
     }
-  })();
+  });
 
   sheetGlobal.pending[sheet] = promise;
 

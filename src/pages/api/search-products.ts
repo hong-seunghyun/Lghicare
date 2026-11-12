@@ -1,8 +1,9 @@
 //  pages/api/search-products.ts
 import type { NextApiRequest, NextApiResponse } from "next";
-import { google, drive_v3 } from "googleapis";
+import { getProductImageCache, imageModelKey } from "@/lib/productImageCache";
 import { fetchSheetData } from "@/lib/sheet";
 import { normalizeAndExpandModelNames } from "@/lib/utils";
+import { publishedRows } from "@/lib/catalog/read";
 
 type Product = Record<string, string>;
 
@@ -25,74 +26,11 @@ type ProductCard = {
   [key: string]: string | Variant[] | undefined; // 기타 시트 필드
 };
 
-if (!globalThis.__driveCache) {
-  globalThis.__driveCache = { middleCache: {} };
-}
-const driveCache = globalThis.__driveCache || { middleCache: {} };
-
-const normalizeModelName = (s?: string) =>
-  (s || "").replace(/\s+/g, "").trim().toLowerCase();
-
-async function ensureMiddleCache(drive: drive_v3.Drive, middleName: string) {
-  if (driveCache.middleCache[middleName])
-    return driveCache.middleCache[middleName];
-
-  const parentFolderId = "12kbRkg4PREBp6f5_tmXCu0_SYgUngIrw";
-  const middleRes = await drive.files.list({
-    q: `'${parentFolderId}' in parents and name='${middleName}' and mimeType='application/vnd.google-apps.folder'`,
-    fields: "files(id,name)",
-    pageSize: 1,
-  });
-  const middleFolder = middleRes.data.files?.[0];
-  if (!middleFolder?.id) return null;
-
-  const subRes = await drive.files.list({
-    q: `'${middleFolder.id}' in parents and mimeType='application/vnd.google-apps.folder'`,
-    fields: "files(id,name)",
-    pageSize: 1000,
-  });
-
-  const subFolders = subRes.data.files || [];
-  const images: Record<string, string[]> = {};
-
-  //  이미지 병렬 로딩 (속도 개선)
-  await Promise.all(
-    subFolders.map(async (sf) => {
-      const imgRes = await drive.files.list({
-        q: `'${sf.id}' in parents and mimeType contains 'image/' and trashed = false`,
-        fields: "files(id,name)",
-        pageSize: 1000,
-      });
-      images[sf.name ?? ""] = (imgRes.data.files || []).map(
-        (f) => `/api/image-proxy?fileId=${f.id}`
-      );
-    })
-  );
-
-  driveCache.middleCache[middleName] = {
-    id: middleFolder.id,
-    subFolders,
-    images,
-  };
-  return driveCache.middleCache[middleName];
-}
-
-async function getThumbnailUrl(
-  drive: drive_v3.Drive,
-  middle: string,
-  modelId: string
-) {
-  const cache = await ensureMiddleCache(drive, middle);
+async function getThumbnailUrl(middle: string, modelId: string) {
+  const cache = await getProductImageCache(middle);
   if (!cache) return "";
-
-  const candidates = normalizeAndExpandModelNames(modelId).map((c) =>
-    normalizeModelName(c)
-  );
-  for (const candidate of candidates) {
-    const match = Object.entries(cache.images).find(([folderName]) => {
-      return normalizeModelName(folderName) === candidate;
-    });
-    if (match?.[1]?.[0]) return match[1][0];
+  for (const candidate of normalizeAndExpandModelNames(modelId).map(imageModelKey)) {
+    if (cache.imageIndex[candidate]?.[0]) return cache.thumbnailIndex?.[candidate] || cache.imageIndex[candidate][0];
   }
   return "";
 }
@@ -101,6 +39,7 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
+  res.setHeader("Cache-Control", "no-store");
   const { q, limit = "9", cursor } = req.query;
   const search = (q as string)?.trim();
   const limitNum = parseInt(limit as string, 10);
@@ -111,15 +50,6 @@ export default async function handler(
   }
 
   try {
-    const auth = new google.auth.GoogleAuth({
-      credentials: {
-        client_email: process.env.GOOGLE_SERVICE_EMAIL,
-        private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-      },
-      scopes: ["https://www.googleapis.com/auth/drive.readonly"],
-    });
-    const drive = google.drive({ version: "v3", auth });
-
     //  중분류 시트 병렬 로딩 (기존 유지)
     const sheetsToSearch = [
       "정수기",
@@ -148,7 +78,8 @@ export default async function handler(
     const allProductsArrays = await Promise.all(
       sheetsToSearch.map(async (sheet) => {
         try {
-          const rows = await fetchSheetData(sheet);
+          const released = await publishedRows(sheet, undefined, true);
+          const rows = released?.rows ?? await fetchSheetData(sheet);
           return rows.map((r: Product) => ({ ...r, 중분류: sheet }));
         } catch {
           return [];
@@ -226,7 +157,6 @@ const grouped = (filtered as Product[]).reduce<Record<string, Product[]>>(
               v.thumbnailUrl && v.thumbnailUrl.trim()
                 ? v.thumbnailUrl
                 : await getThumbnailUrl(
-                    drive,
                     representative["중분류"],
                     v["모델코드"] //  variant별 모델코드 기준으로 탐색
                   );
@@ -238,7 +168,6 @@ const grouped = (filtered as Product[]).reduce<Record<string, Product[]>>(
         const thumbnailUrl =
         representative.thumbnailUrl ||
         (await getThumbnailUrl(
-          drive,
           representative["중분류"],
           representative["모델코드"]
         ));
@@ -256,7 +185,7 @@ const grouped = (filtered as Product[]).reduce<Record<string, Product[]>>(
       })
     );
 
-    res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
+    res.setHeader("Cache-Control", "no-store");
     return res.status(200).json({
       total: totalGroups,
       groups: cards,

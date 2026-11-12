@@ -18,8 +18,8 @@ import Loading from "@/components/loading/Loading";
 import ToolTip from "@/components/ToolTip/ToolTip";
 import AutoHeightIframe from "@/components/Iframe/AutoHeightIframe";
 import { getProductColorChipColors } from "@/constants/colorMap";
+import { isPublishedProductImage } from "@/lib/catalog/imageUrl";
 
-import disclaimerData from "@/disclaimer/disclaimer.json";
 
 import { classifyPrepayRate } from "@/utils/prepay/classifyPrepayRate";
 
@@ -175,7 +175,7 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
       const data = await res.json();
       const firstOption = data?.options?.[0];
       productName = firstOption?.["상품명"] || id || "";
-      imageUrl = firstOption?.thumbnailUrl || imageUrl;
+      imageUrl = firstOption?.shareImageUrl || firstOption?.thumbnailUrl || imageUrl;
 
       // ✅ 절대경로 보정
       if (imageUrl && !/^https?:\/\//.test(imageUrl)) {
@@ -313,6 +313,9 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
       : [];
 
   const [disclaimerText, setDisclaimerText] = useState<string | null>(null);
+  const [disclaimerError, setDisclaimerError] = useState(false);
+  const [disclaimerRetry, setDisclaimerRetry] = useState(0);
+  const disclaimerVersion = typeof options[0]?.catalogVersion === "string" ? options[0].catalogVersion : undefined;
 
   const [prepayRate, setPrepayRate] = useState(""); // 30 / 50 / ""
   const [prepayAvailableRate, setPrepayAvailableRate] = useState<
@@ -524,14 +527,20 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
 
     try {
       const idValue = Array.isArray(id) ? id[0] : id;
-      const found = disclaimerData.find((item) => item["모델코드"] === idValue);
-
-      if (found) setDisclaimerText(found["디스클레이머"]);
-      else setDisclaimerText(null);
+      let cancelled = false;
+      setDisclaimerText(null);
+      setDisclaimerError(false);
+      const parameters = new URLSearchParams({ model: idValue });
+      if (disclaimerVersion) parameters.set("version", disclaimerVersion);
+      fetch(`/api/catalog/disclaimer?${parameters}`, { cache: "no-store" })
+        .then(async response => { if (!response.ok) throw new Error("Disclaimer unavailable"); return response.json(); })
+        .then(data => { if (!cancelled) setDisclaimerText(typeof data.text === "string" ? data.text : null); })
+        .catch(() => { if (!cancelled) setDisclaimerError(true); });
+      return () => { cancelled = true; };
     } catch (err) {
       console.error("❌ 디스클레이머 로드 오류:", err);
     }
-  }, [id]);
+  }, [id, disclaimerVersion, disclaimerRetry]);
 
   // 🔹 포맷 변환
   const formatContract = (value: string) => {
@@ -1390,6 +1399,7 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
                         >
                           <Image
                             src={src}
+                            unoptimized={isPublishedProductImage(src)}
                             alt={`상품 이미지 ${idx + 1}`}
                             width={1000}
                             height={1000}
@@ -1420,6 +1430,7 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
                           <SwiperSlide key={idx}>
                             <Image
                               src={src}
+                              unoptimized={isPublishedProductImage(src)}
                               alt={`썸네일 ${idx + 1}`}
                               width={90}
                               height={90}
@@ -2100,6 +2111,7 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
               <Text>계약기간 동안 무상 A/S</Text>
               <Text>초기 구입비용 0원(계약기간 동안 분할납부)</Text>
               {disclaimerText && <Text>{disclaimerText}</Text>}
+              {disclaimerError && <Text role="alert">상품 안내 문구를 확인하지 못했습니다. <button type="button" onClick={() => setDisclaimerRetry(value => value + 1)}>다시 확인</button></Text>}
               {teacherTotalSeats > 0 && (
                 <>
                   <Text>

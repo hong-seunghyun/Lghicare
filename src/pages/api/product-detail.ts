@@ -1,6 +1,7 @@
 // pages/api/product-detail.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { google } from "googleapis";
+import { registerCacheInvalidator, syncProductCacheRevision } from "@/lib/productCacheControl";
 
 //  글로벌 캐시 선언
 if (!globalThis.__detailCache) {
@@ -11,10 +12,19 @@ if (!globalThis.__detailCache) {
 }
 
 const detailCache = globalThis.__detailCache;
+let generation = 0;
+registerCacheInvalidator("product-detail-folders", "drive", () => {
+  generation += 1;
+  detailCache.rootFolderId = null;
+  detailCache.middleFolders = {};
+});
 
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  res.setHeader("Cache-Control", "no-store");
   try {
+    await syncProductCacheRevision();
+    const requestGeneration = generation;
     const { middle, id } = req.query;
 
     if (!middle || !id || typeof middle !== "string" || typeof id !== "string") {
@@ -47,10 +57,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           </div>
         `;
         res.setHeader("Content-Type", "text/html; charset=utf-8");
-        res.setHeader("Cache-Control", "public, max-age=600"); // 10분 캐시
+        res.setHeader("Cache-Control", "no-store");
         return res.status(200).send(fallbackHtml);
       }
-      detailCache.rootFolderId = rootFolderId;
+      if (generation === requestGeneration) detailCache.rootFolderId = rootFolderId;
     }
 
     //  2. 중분류 폴더 캐싱
@@ -70,13 +80,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             </div>
           `;
           res.setHeader("Content-Type", "text/html; charset=utf-8");
-          res.setHeader("Cache-Control", "public, max-age=600"); // 10분 캐시
+          res.setHeader("Cache-Control", "no-store");
           return res.status(200).send(fallbackHtml);
         }
 
 
         middleFolderId = foundId;
-        detailCache.middleFolders[middle] = middleFolderId; //  null 들어갈 일 없음
+        if (generation === requestGeneration) detailCache.middleFolders[middle] = middleFolderId;
       }
 
 
@@ -95,7 +105,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       `;
 
       res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.setHeader("Cache-Control", "public, max-age=600"); // 10분 캐시
+      res.setHeader("Cache-Control", "no-store");
       return res.status(200).send(fallbackHtml);
     }
 
@@ -169,7 +179,7 @@ document.querySelectorAll("img").forEach(img => {
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader(
       "Cache-Control",
-      "public, s-maxage=300, stale-while-revalidate=600" // 5분 캐시 + 10분 SWR
+      "no-store"
     );
     res.send(html);
   } catch (err: unknown) {

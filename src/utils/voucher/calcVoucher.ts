@@ -39,6 +39,7 @@
     {
       modelCode: string;
       excludeWhenPromoTypeIsNormalN?: boolean;
+      themePromoExcludePromoNameKeywords?: string[];
       base: {
         default?: number;
         combine_new_existing: number; // 기존/신규결합
@@ -77,6 +78,18 @@ export type MultiProductVoucherResult = {
   totalUnits: number;
   eligibleUnits: number;
 };
+
+// 상품 한 개의 인정 대수다. 상품권 금액(예: 50,000원)을 대수로 사용하지 않는다.
+export function isValidMultiProductCount(value: unknown): boolean {
+  if (typeof value !== "number" && typeof value !== "string") return false;
+  if (typeof value === "string" && !value.trim()) return false;
+  const count = Number(value);
+  return Number.isFinite(count) && count >= 0 && count <= 1;
+}
+
+export function normalizeMultiProductCount(value: unknown): number {
+  return isValidMultiProductCount(value) ? Number(value) : 0;
+}
 
 const normalizeText = (value: string) =>
   value.replace(/\s+/g, "").replace(/[()]/g, "");
@@ -137,6 +150,15 @@ const applyRounding = (value: number, mode?: "floor" | "round" | "ceil") => {
   if (mode === "round") return Math.round(value);
   if (mode === "ceil") return Math.ceil(value);
   return Math.floor(value);
+};
+const withinThemePeriod = (at: Date, startValue?: unknown, endValue?: unknown) => {
+  if ((startValue != null && typeof startValue !== "string") || (endValue != null && typeof endValue !== "string")) return false;
+  const startText = typeof startValue === "string" ? startValue : undefined;
+  const endText = typeof endValue === "string" ? endValue : undefined;
+  const boundary = (text: string, end: boolean) => /^\d{4}-\d{2}-\d{2}$/.test(text)
+    ? new Date(`${text}T00:00:00+09:00`).getTime() + (end ? 86400000 : 0)
+    : new Date(text).getTime() + (end ? 1 : 0);
+  return (!startText || at.getTime() >= boundary(startText, false)) && (!endText || at.getTime() < boundary(endText, true));
 };
 
 type ServiceCycleMetadata = {
@@ -451,7 +473,7 @@ export function calcVoucher(params: {
   // 4) 테마판촉 상품권
   let themePromo = 0;
   const themePromoRaw = model.themePromo;
-  if (themePromoRaw) {
+  if (themePromoRaw && !includesAny(promoName, model.themePromoExcludePromoNameKeywords ?? [])) {
     const matches: Array<{ key: string; amount: number }> = [];
     const themeNames: string[] = [];
 
@@ -463,9 +485,7 @@ export function calcVoucher(params: {
     events.forEach((event) => {
       if (!event?.name) return;
       if (!event.startDate || !event.endDate) return;
-      const start = new Date(event.startDate);
-      const end = new Date(event.endDate);
-      if (themeDate >= start && themeDate <= end) {
+      if (withinThemePeriod(themeDate, event.startDate, event.endDate)) {
         themeNames.push(event.name);
       }
     });
@@ -494,10 +514,7 @@ export function calcVoucher(params: {
           addMatch(name, amount);
           return;
         }
-        const start = item?.startDate ? new Date(item.startDate) : null;
-        const end = item?.endDate ? new Date(item.endDate) : null;
-        const inRange =
-          (!start || themeDate >= start) && (!end || themeDate <= end);
+        const inRange = withinThemePeriod(themeDate, item?.startDate, item?.endDate);
         if (!inRange) return;
         if (hasThemeContext && !uniqueNames.some((n) => matchByName(n, name)))
           return;
@@ -518,14 +535,7 @@ export function calcVoucher(params: {
             addMatch(name, amount);
           }
         } else {
-          const start = themePromoRaw?.startDate
-            ? new Date(themePromoRaw.startDate)
-            : null;
-          const end = themePromoRaw?.endDate
-            ? new Date(themePromoRaw.endDate)
-            : null;
-          const inRange =
-            (!start || themeDate >= start) && (!end || themeDate <= end);
+          const inRange = withinThemePeriod(themeDate, themePromoRaw?.startDate, themePromoRaw?.endDate);
           if (
             inRange &&
             (!hasThemeContext || uniqueNames.some((n) => matchByName(n, name)))
@@ -608,12 +618,15 @@ export function calcMultiProductVoucher(params: {
   }
 
   const totalUnitsRaw = products.reduce(
-    (sum, item) => sum + (Number(item.multiProductCount) || 0),
+    (sum, item) => sum + normalizeMultiProductCount(item.multiProductCount),
     0,
   );
   const eligibleUnitsRaw = products.reduce(
     (sum, item) =>
-      sum + (item.multiProductCountOnly ? 0 : Number(item.multiProductCount) || 0),
+      sum +
+      (item.multiProductCountOnly
+        ? 0
+        : normalizeMultiProductCount(item.multiProductCount)),
     0,
   );
   const rounding = voucherRules.multiProductRule?.rounding ?? "floor";
@@ -623,7 +636,7 @@ export function calcMultiProductVoucher(params: {
   const exceptionNotes = new Set<string>();
   products.forEach((item) => {
     if (
-      item.multiProductCount &&
+      normalizeMultiProductCount(item.multiProductCount) > 0 &&
       item.multiProductCountOnly &&
       item.multiProductNote
     ) {

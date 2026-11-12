@@ -1,5 +1,20 @@
-import { PreviewLine, lineTotals, money, textValue } from "@/lib/renewalTest";
-import s from "./renewal.module.css";
+import { PreviewLine, lineTotals, money, textValue, selectedConditionTags, promotionTypeLabel } from "@/lib/renewalTest";
+import baseStyles from "./renewal.module.css";
+import presentationStyles from "./quotePresentation.module.css";
+const s = { ...baseStyles, ...presentationStyles };
+
+export function ConditionTags({ line, confirmed, className = "" }: {
+  line: PreviewLine; confirmed?: number; className?: string;
+}) {
+  return (
+    <ul className={`${s.conditionTags} ${className}`} aria-label="현재 선택한 구독 조건">
+      {selectedConditionTags(line, confirmed).map((tag) => (
+        <li key={tag}
+          title={tag === "복합프로모션" ? promotionTypeLabel(line.selectedVariant.프로모션유형) : undefined}>#{tag}</li>
+      ))}
+    </ul>
+  );
+}
 
 export function ContractDetails({ line }: { line: PreviewLine }) {
   const v = line.selectedVariant;

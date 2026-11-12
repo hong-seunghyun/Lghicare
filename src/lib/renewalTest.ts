@@ -1,4 +1,5 @@
 /** Renewal UI data uses the existing products API and Firebase settings. */
+import { calcMultiProductVoucher } from "@/utils/voucher/calcVoucher";
 export type ProductVariant = Record<string, unknown>;
 export type PreviewProduct = {
   id: string;
@@ -12,6 +13,8 @@ export type PreviewProduct = {
   care: string[];
   cycles: number[];
   variants: ProductVariant[];
+  optionsLoaded?: boolean;
+  catalogVersion?: string;
   tag?: string;
 };
 export type ThemeProductSummary = Pick<
@@ -59,6 +62,25 @@ export const VARIANT_FIELDS = [
   "프로모션명",
 ] as const;
 export type VariantField = (typeof VARIANT_FIELDS)[number];
+export function promotionTypeLabel(value: unknown) {
+  const raw = textValue(value);
+  const repeated = raw.match(/^(.+?)\1+$/);
+  return [...new Set((repeated?.[1] || raw).split(/[|｜\n]+/).map((part) => part.trim()).filter(Boolean))].join(" · ");
+}
+
+export function selectedConditionTags(line: PreviewLine, confirmed: number = VARIANT_FIELDS.length) {
+  const promotion = promotionTypeLabel(line.selectedVariant.프로모션유형);
+  const values = [
+    line.signup ? `${line.signup}유형` : "기본가입",
+    line.term ? `${line.term % 12 === 0 ? `${line.term / 12}년` : `${line.term}개월`}계약` : "계약기간없음",
+    line.care ? `${line.care.replace(/관리$/, "")}관리` : "관리없음",
+    line.cycle ? `${line.cycle}개월주기` : "주기없음",
+    promotion ? promotion.length > 22 ? "복합프로모션" : `프로모션${promotion}` : "프로모션없음",
+  ];
+  const tags = values.slice(0, Math.min(confirmed, values.length));
+  if (confirmed >= VARIANT_FIELDS.length) tags.push(line.prepay ? `${line.prepay}%선납` : "선납없음");
+  return tags;
+}
 // Old mock quotes are never restored. Each authenticated owner has separate storage.
 export const DRAFT_KEY = "lgcare-renewal-test:draft:live-v2";
 export const SAVED_KEY = "lgcare-renewal-test:saved:live-v2";
@@ -92,6 +114,11 @@ export type PreviewLine = {
   teachers: TeacherSelection[];
   voucherTotal?: number;
   voucherDetails?: Array<{ type: string; amount: number; reason: string }>;
+  voucherMultiProductCount?: number;
+  voucherMultiProductCountOnly?: boolean;
+  voucherMultiProductNote?: string;
+  voucherMultiProductRule?: Parameters<typeof calcMultiProductVoucher>[0]["voucherRules"]["multiProductRule"];
+  voucherCheckedAt?: number;
 };
 export type PreviewQuote = {
   id: string;
@@ -252,6 +279,8 @@ export function normalizeProduct(
     cycles: [
       ...new Set(variants.map((v) => fieldNumber(v["서비스주기/월"]))),
     ].filter(Boolean),
+    optionsLoaded: raw.optionsLoaded !== false,
+    catalogVersion: typeof raw.catalogVersion === "string" ? raw.catalogVersion : undefined,
   };
   product.monthly = variantBefore(defaultVariant(product));
   return product;
@@ -260,6 +289,7 @@ export function createLine(
   product: PreviewProduct,
   variant = defaultVariant(product),
 ): PreviewLine {
+  if (product.optionsLoaded === false) throw new Error("제품의 전체 구독 조건을 먼저 불러와 주세요.");
   return {
     id: `line-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     product,
@@ -317,6 +347,11 @@ export function changeLineVariant(
     prepay: 0,
     voucherTotal: undefined,
     voucherDetails: undefined,
+    voucherMultiProductCount: undefined,
+    voucherMultiProductCountOnly: undefined,
+    voucherMultiProductNote: undefined,
+    voucherMultiProductRule: undefined,
+    voucherCheckedAt: undefined,
   };
 }
 export const emptyQuote = (ownerUid = "", manager = ""): PreviewQuote => ({
@@ -363,7 +398,7 @@ export function lineTotals(line: PreviewLine) {
   };
 }
 export function quoteTotals(lines: PreviewLine[]) {
-  return lines.reduce(
+  const totals = lines.reduce(
     (acc, l) => {
       const t = lineTotals(l);
       return {
@@ -392,6 +427,19 @@ export function quoteTotals(lines: PreviewLine[]) {
       units: 0,
     },
   );
+  const latestRules = [...lines]
+    .filter((line) => line.voucherCheckedAt !== undefined)
+    .sort((a, b) => (b.voucherCheckedAt ?? 0) - (a.voucherCheckedAt ?? 0))[0]?.voucherMultiProductRule;
+  const multi = calcMultiProductVoucher({
+    voucherRules: { multiProductRule: latestRules },
+    products: lines.flatMap((line) => Array.from({ length: line.quantity }, () => ({
+      modelCode: line.product.id,
+      multiProductCount: line.voucherMultiProductCount,
+      multiProductCountOnly: line.voucherMultiProductCountOnly,
+      multiProductNote: line.voucherMultiProductNote,
+    }))),
+  });
+  return { ...totals, productVoucher: totals.voucher, multiProductVoucher: multi.total, voucher: totals.voucher + multi.total };
 }
 export function validateLine(line: PreviewLine): boolean {
   if (

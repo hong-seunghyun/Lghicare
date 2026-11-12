@@ -17,6 +17,9 @@ function load(file, mocks = {}) {
   new Function("require", "module", "exports", source)(
     (name) => {
       if (name in mocks) return mocks[name];
+      if (name === "@/lib/catalog/read") return { publishedRows: async () => null };
+      if (name === "@/lib/catalog/publishedImages") return { publishedImageIndex: async () => null };
+    if (name === "@/utils/voucher/calcVoucher") return load("src/utils/voucher/calcVoucher.ts");
       throw new Error(name);
     },
     module,
@@ -368,6 +371,7 @@ test("theme endpoint only looks up selected image folders and limits input to th
     "@/lib/renewalThemeCatalog": catalog,
     "@/lib/renewalTest": lib,
     "@/lib/utils": { normalizeAndExpandModelNames: (id) => [id] },
+    "@/lib/productCacheControl": { registerCacheInvalidator() {} },
   }).default;
   const response = () => ({ code: 0, body: null, setHeader() {}, status(code) { this.code = code; return this; }, json(body) { this.body = body; return this; } });
   const bad = response();
@@ -386,12 +390,12 @@ test("theme endpoint only looks up selected image folders and limits input to th
   assert.equal(calls.length, count);
 });
 
-test("a fresh sheet read refreshes an old legacy cache without changing legacy read policy", async () => {
+test("sheet reads expire after five minutes and can force a fresh read", async () => {
   const previous = global.__sheetCache;
   global.__sheetCache = { dataCache: { 정수기: { ts: Date.now() - 600000, data: [{ price: "old" }] } }, pending: {}, sheetsClient: { spreadsheets: { values: { get: async () => ({ data: { values: [["price"], ["current"]] } }) } } } };
   try {
-    const sheet = load("src/lib/sheet.ts", { googleapis: { google: {} } });
-    assert.equal((await sheet.fetchSheetData("정수기"))[0].price, "old");
+    const sheet = load("src/lib/sheet.ts", { googleapis: { google: {} }, "@/lib/productCacheControl": { registerCacheInvalidator() {}, async syncProductCacheRevision() {} } });
+    assert.equal((await sheet.fetchSheetData("정수기"))[0].price, "current");
     assert.equal((await sheet.fetchSheetDataWithPolicy("정수기", { maxAgeMs: 300000, allowStale: false }))[0].price, "current");
   } finally { global.__sheetCache = previous; }
 });

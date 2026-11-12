@@ -4,6 +4,9 @@ import { fetchSheetDataWithPolicy } from "@/lib/sheet";
 import { buildThemeCatalog } from "@/lib/renewalThemeCatalog";
 import { PREVIEW_CATEGORIES, normalizeModelCode } from "@/lib/renewalTest";
 import { normalizeAndExpandModelNames } from "@/lib/utils";
+import { registerCacheInvalidator } from "@/lib/productCacheControl";
+import { publishedImageIndex } from "@/lib/catalog/publishedImages";
+import { publishedRows } from "@/lib/catalog/read";
 
 const ROOT_FOLDER = "12kbRkg4PREBp6f5_tmXCu0_SYgUngIrw";
 const TTL = 5 * 60 * 1000;
@@ -16,12 +19,19 @@ const state = globalThis as typeof globalThis & {
 const cache = state.__renewalThemeFiles ??= new Map();
 const pending = state.__renewalThemePending ??= new Map();
 let client: drive_v3.Drive | undefined;
+let generation = 0;
+registerCacheInvalidator("renewal-theme-images", "drive", () => {
+  generation += 1;
+  cache.clear();
+  pending.clear();
+});
 
 async function listFiles(key: string, query: string): Promise<File[]> {
   const found = cache.get(key);
   if (found && Date.now() - found.ts < TTL) return found.files;
   const existing = pending.get(key);
   if (existing) return existing;
+  const requestGeneration = generation;
   const request = (async () => {
     client ??= google.drive({ version: "v3", auth: new google.auth.GoogleAuth({
       credentials: { client_email: process.env.GOOGLE_SERVICE_EMAIL, private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n") },
@@ -35,14 +45,21 @@ async function listFiles(key: string, query: string): Promise<File[]> {
       pageToken = response.data.nextPageToken || undefined;
     } while (pageToken);
     if (cache.size >= 200) cache.delete(cache.keys().next().value!);
-    cache.set(key, { ts: Date.now(), files });
+    if (requestGeneration === generation) cache.set(key, { ts: Date.now(), files });
     return files;
   })();
   pending.set(key, request);
-  try { return await request; } finally { pending.delete(key); }
+  try { return await request; } finally { if (pending.get(key) === request) pending.delete(key); }
 }
 
 async function thumbnail(category: string, model: string) {
+  const published = await publishedImageIndex(category);
+  if (published) {
+    for (const key of normalizeAndExpandModelNames(model).map(value => normalizeModelCode(value))) {
+      if (published.imageIndex[key]?.[0]) return published.thumbnailIndex?.[key] || published.imageIndex[key][0];
+    }
+    return "";
+  }
   const roots = await listFiles(`category:${category}`, `'${ROOT_FOLDER}' in parents and name = '${category}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`);
   if (!roots[0]?.id) return "";
   // Folder metadata only; images are requested for the selected models, never every folder.
@@ -56,16 +73,18 @@ async function thumbnail(category: string, model: string) {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  res.setHeader("Cache-Control", "no-store");
   if (req.method !== "GET") { res.setHeader("Allow", "GET"); return res.status(405).json({ error: "GET_REQUIRED" }); }
   const category = typeof req.query.middle === "string" ? req.query.middle : "";
   const models = typeof req.query.models === "string" ? req.query.models.split(",").filter(Boolean) : [];
   if (!PREVIEW_CATEGORIES.includes(category) || category === "전체" || !models.length || models.length > 3 || models.some((m) => !/^[A-Za-z0-9()_.-]{1,80}$/.test(m)))
     return res.status(400).json({ error: "INVALID_CATEGORY_OR_MODELS" });
   try {
-    const rows = await fetchSheetDataWithPolicy(category, { maxAgeMs: TTL, allowStale: false });
+    const released = await publishedRows(category, models);
+    const rows = released?.rows ?? await fetchSheetDataWithPolicy(category, { maxAgeMs: TTL, allowStale: false });
     const products = buildThemeCatalog(rows, category, models);
     const options = await Promise.all(products.map(async (product) => ({ ...product, image: await thumbnail(category, product.id) })));
-    res.setHeader("Cache-Control", "public, max-age=0, s-maxage=60, stale-while-revalidate=60");
+    res.setHeader("Cache-Control", "no-store");
     return res.status(200).json({ products: options });
   } catch {
     res.setHeader("Cache-Control", "no-store");

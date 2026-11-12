@@ -1,0 +1,16 @@
+.git
+.product-catalog-local
+.next
+node_modules
+functions
+out
+tmp
+test-results
+.firebase
+.env*
+*.env
+*.pem
+*.key
+*.log
+*-check.png
+tsconfig.tsbuildinfo

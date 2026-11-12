@@ -1,6 +1,9 @@
 "use server";
 import { google } from "googleapis";
 import { normalizeAndExpandModelNames } from "@/lib/utils";
+import { registerCacheInvalidator, syncProductCacheRevision } from "@/lib/productCacheControl";
+import { imagePointer, publishedImageIndex } from "@/lib/catalog/publishedImages";
+import { normalizeModelName } from "@/lib/utils";
 
 let cachedDrive: ReturnType<typeof google.drive> | null = null;
 
@@ -9,11 +12,14 @@ type DriveCacheEntry = {
   ts: number;
 };
 
-//  모델코드별 썸네일 캐시 (긴 TTL + 나중에 버튼으로 초기화)
-const cache: Record<string, DriveCacheEntry> = {};
+// 모델코드별 썸네일 캐시. 상품 캐시 초기화와 함께 갱신합니다.
+const driveGlobal = globalThis as typeof globalThis & { __driveThumbnails?: Record<string, DriveCacheEntry> };
+const cache = driveGlobal.__driveThumbnails ??= {};
+let generation = 0;
 
 //  나중에 admin 버튼에서 사용할 캐시 초기화 헬퍼
 export function clearDriveThumbnailCache(modelCode?: string) {
+  generation += 1;
   if (!modelCode) {
     (globalThis as typeof globalThis & { __renewalThemeFiles?: Map<string, unknown> }).__renewalThemeFiles?.clear();
   }
@@ -28,6 +34,7 @@ export function clearDriveThumbnailCache(modelCode?: string) {
     });
   }
 }
+registerCacheInvalidator("drive-thumbnails", "drive", () => clearDriveThumbnailCache());
 
 // 🔹 구글 드라이브 클라이언트 생성
 async function getDriveClient() {
@@ -47,8 +54,16 @@ async function getDriveClient() {
 
 // 🔹 특정 모델코드에 대한 썸네일 URL 가져오기
 export async function getDriveThumbnail(modelCode: string): Promise<string> {
+  await syncProductCacheRevision();
+  const published = await imagePointer();
+  const keys = normalizeAndExpandModelNames(modelCode).map(model => normalizeModelName(model.replace(/\s+/g, "").toLowerCase()));
+  for (const category of Object.keys(published.categories)) {
+    const index = await publishedImageIndex(category);
+    for (const key of keys) if (index?.imageIndex[key]?.[0]) return index.thumbnailIndex?.[key] || index.imageIndex[key][0];
+  }
+  const requestGeneration = generation;
   const now = Date.now();
-  const ttl = 30 * 24 * 60 * 60 * 1000; //  30일 TTL
+  const ttl = 30 * 60 * 1000;
   const cacheKey = modelCode;
 
   //  캐시 유효하면 반환
@@ -79,8 +94,8 @@ export async function getDriveThumbnail(modelCode: string): Promise<string> {
       const file = files[0];
       const url = file.thumbnailLink?.replace("=s220", "=s800") || "";
 
-      //  캐시 저장 (30일 유지, 나중에 버튼으로 초기화)
-      cache[cacheKey] = { url, ts: now };
+      // 초기화 이후에는 이전 요청의 이미지를 다시 저장하지 않습니다.
+      if (generation === requestGeneration) cache[cacheKey] = { url, ts: now };
       return url;
     }
 

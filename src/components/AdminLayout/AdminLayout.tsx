@@ -130,6 +130,7 @@ export default function AdminLayout({ children }: Props) {
         { type: "link", label: "선결제 관리", path: "/admin/prepay" },
         { type: "link", label: "구독교원 관리", path: "/admin/teacher" },
         { type: "link", label: "상품 관리", path: "/admin/missing-images" },
+        { type: "link", label: "제품 엑셀 통합 업로드", path: "/admin/product-import" },
         { type: "link", label: "상품권 관리", path: "/admin/voucher" },
         { type: "link", label: "매니저 관리", path: "/admin/manager" },
         { type: "link", label: "캐시 관리", path: "/admin/cache" },

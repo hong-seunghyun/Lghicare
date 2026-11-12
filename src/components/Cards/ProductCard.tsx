@@ -6,8 +6,12 @@ import styled from "styled-components";
 import CustomSelect from "@/components/Select/CustomSelect";
 import { classifyPrepayRate } from "@/utils/prepay/classifyPrepayRate";
 
-import { calcVoucher } from "@/utils/voucher/calcVoucher";
+import {
+  calcVoucher,
+  normalizeMultiProductCount,
+} from "@/utils/voucher/calcVoucher";
 import { getVoucherMasterForModel } from "@/lib/voucherMaster";
+import { isPublishedProductImage } from "@/lib/catalog/imageUrl";
 
 const KEY = {
   modelCode: "모델코드",
@@ -708,7 +712,7 @@ export default function ProductCard({
 
     (async () => {
       try {
-        const master = await getVoucherMasterForModel(voucherModelCode);
+        const master = await getVoucherMasterForModel(voucherModelCode, typeof product.catalogVersion === "string" ? product.catalogVersion : undefined);
         if (!cancelled) setVoucherMasterForModel(master);
       } catch (err) {
         console.error("상품권 마스터 불러오기 오류:", err);
@@ -719,7 +723,7 @@ export default function ProductCard({
     return () => {
       cancelled = true;
     };
-  }, [voucherModelCode]);
+  }, [voucherModelCode, product.catalogVersion]);
 
   const voucher = useMemo(() => {
     if (!current || !voucherMasterForModel || !voucherModelCode) {
@@ -743,8 +747,7 @@ export default function ProductCard({
 
   const multiProductCount = useMemo(() => {
     if (!voucherModel) return 0;
-    const count = Number(voucherModel.multiProductCount);
-    return Number.isFinite(count) ? count : 0;
+    return normalizeMultiProductCount(voucherModel.multiProductCount);
   }, [voucherModel]);
   const multiProductOnlyCount = Boolean(
     voucherModel?.multiProductExcludeVoucher,
@@ -760,6 +763,7 @@ export default function ProductCard({
         {product.thumbnailUrl ? (
           <StyledImage
             src={product.thumbnailUrl}
+            unoptimized={isPublishedProductImage(product.thumbnailUrl)}
             alt={(product[KEY.productName] as string) || ""}
             width={280}
             height={280}

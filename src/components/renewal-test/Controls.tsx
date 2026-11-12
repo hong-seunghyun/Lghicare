@@ -6,7 +6,9 @@ import {
   useRef,
   useState,
 } from "react";
-import s from "./renewal.module.css";
+import baseStyles from "./renewal.module.css";
+import presentationStyles from "./quotePresentation.module.css";
+const s = { ...baseStyles, ...presentationStyles };
 export function Accordion({
   title,
   children,
@@ -190,12 +192,14 @@ export function SelectField({
   options,
   onChange,
   disabled = false,
+  placeholder,
 }: {
   label: string;
   value: string;
   options: Array<{ label: string; value: string }>;
   onChange: (value: string) => void;
   disabled?: boolean;
+  placeholder?: string;
 }) {
   const id = useId();
   return (
@@ -208,6 +212,7 @@ export function SelectField({
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
         >
+          {placeholder && <option value="__unselected__" disabled>{placeholder}</option>}
           {options.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label || "없음"}
@@ -256,6 +261,28 @@ export function RadioField({
               onChange={() => onChange(o.value)}
             />
             {o.label || "없음"}
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+export function ListField({ label, value, options, onChange }: {
+  label: string;
+  value: string;
+  options: Array<{ label: string; value: string }>;
+  onChange: (value: string) => void;
+}) {
+  const name = useId();
+  return (
+    <fieldset className={s.optionListField}>
+      <legend>{label}</legend>
+      <div className={s.optionChoiceList}>
+        {options.map((option) => (
+          <label key={option.value}>
+            <input type="radio" name={name} checked={value === option.value} onChange={() => onChange(option.value)} />
+            <span>{option.label || "없음"}</span>
           </label>
         ))}
       </div>

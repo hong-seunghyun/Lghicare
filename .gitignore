@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+/tmp/
+/.product-catalog-local/
 
 # next.js
 /.next/

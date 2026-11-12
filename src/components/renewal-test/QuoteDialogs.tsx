@@ -1,5 +1,5 @@
 /* eslint-disable @next/next/no-img-element */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   PRODUCT_CATEGORIES,
@@ -7,6 +7,8 @@ import {
   PreviewProduct,
   PreviewQuote,
   VariantField,
+  VARIANT_FIELDS,
+  promotionTypeLabel,
   changeLineVariant,
   createLine,
   koreaDate,
@@ -20,14 +22,16 @@ import {
 import {
   useRenewalProducts,
   fetchRenewalPrepayRate,
+  loadRenewalProductOptions,
 } from "@/hooks/useRenewalData";
 import type { PrepayRate } from "@/utils/prepay/classifyPrepayRate";
-import { getVoucherMasterForModel } from "@/lib/voucherMaster";
-import { calcVoucher } from "@/utils/voucher/calcVoucher";
-import { SelectField, RadioField, Accordion, CategoryRail } from "./Controls";
+import { resolveRenewalVoucher } from "@/lib/renewalVoucher";
+import { SelectField, RadioField, ListField, Accordion, CategoryRail } from "./Controls";
 import { Icon, Modal } from "./TestLayout";
-import s from "./renewal.module.css";
-import { ContractDetails, RateBreakdown } from "./QuoteDetails";
+import baseStyles from "./renewal.module.css";
+import presentationStyles from "./quotePresentation.module.css";
+import { ConditionTags } from "./QuoteDetails";
+const s = { ...baseStyles, ...presentationStyles };
 
 function CurrentQuoteLines({ lines }: { lines: PreviewLine[] }) {
   return (
@@ -39,17 +43,18 @@ function CurrentQuoteLines({ lines }: { lines: PreviewLine[] }) {
     >
       {lines.length ? (
         lines.map((line) => (
-          <div className={s.miniLine} key={line.id}>
-            {line.product.image && <img src={line.product.image} alt="" />}
+          <div className={s.currentQuoteItem} key={line.id}>
+            {line.product.image ? <img src={line.product.image} alt="" /> : <div className={s.currentQuotePlaceholder}>이미지<br />준비 중</div>}
             <div>
               <b>{line.product.name}</b>
               <small>{line.product.id}</small>
-              <strong>{money(lineTotals(line).monthly)}</strong>
+              <ConditionTags line={line} confirmed={4} />
+              <div className={s.currentQuoteItemPrice}><span>월 구독료</span><strong>{money(lineTotals(line).monthly)}</strong></div>
             </div>
           </div>
         ))
       ) : (
-        <p className={s.caption}>아직 담은 제품이 없습니다.</p>
+        <div className={s.currentQuoteEmpty}><Icon name="document" size={28} /><b>첫 제품을 선택해 주세요</b><p>구독 조건을 정하면 이곳에 추가됩니다.</p></div>
       )}
     </div>
   );
@@ -72,11 +77,23 @@ export function ProductPicker({
     category,
     keyword,
   );
+  const [choosing, setChoosing] = useState<string | null>(null);
+  const [chooseError, setChooseError] = useState("");
+  const alive = useRef(true);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+  const choose = async (product: PreviewProduct) => {
+    if (choosing) return;
+    setChoosing(product.id); setChooseError("");
+    try { const full = await loadRenewalProductOptions(product); if (alive.current) onChoose(full); }
+    catch (error) { if (alive.current) setChooseError(error instanceof Error ? error.message : "구독 조건을 확인하지 못했습니다."); }
+    finally { if (alive.current) setChoosing(null); }
+  };
   useEffect(() => {
     const timer = setTimeout(() => setKeyword(search.trim()), 350);
     return () => clearTimeout(timer);
   }, [search]);
   useEffect(() => setLimit(12), [category, keyword]);
+  const totals = quoteTotals(lines);
   return (
     <Modal
       className={s.productPickerDialog}
@@ -114,7 +131,7 @@ export function ProductPicker({
           </CategoryRail>
           <div className={s.pickerCurrentMobile}>
             <Accordion
-              title={`현재 견적 ${lines.length}개 · 월 ${money(quoteTotals(lines).monthly)}`}
+              title={`현재 견적 ${lines.length}개 · 월 ${money(totals.monthly)}`}
             >
               <CurrentQuoteLines lines={lines} />
             </Accordion>
@@ -132,12 +149,16 @@ export function ProductPicker({
               </button>
             </div>
           )}
+          {chooseError && <p className={s.errorNotice} role="alert">{chooseError}</p>}
+          {choosing && <p role="status">전체 구독 조건을 확인하고 있습니다.</p>}
           <div className={s.pickerCards}>
             {products.slice(0, limit).map((p) => (
               <button
                 className={s.pickerCard}
                 key={p.id}
-                onClick={() => onChoose(p)}
+                aria-label={`${p.name} 구독 조건 선택`}
+                onClick={() => choose(p)}
+                disabled={choosing !== null}
               >
                 {p.image ? (
                   <img src={p.image} alt="" />
@@ -169,18 +190,17 @@ export function ProductPicker({
             </button>
           )}
         </div>
-        <aside className={s.pickerSummary}>
-          <h3>
-            현재 견적<span>{lines.length}개 항목</span>
-          </h3>
+        <aside className={s.currentQuoteSummary} aria-label="현재 견적 요약">
+          <div className={s.currentQuoteHeading}><h3>현재 견적</h3><span>{lines.length}개 제품</span></div>
           <CurrentQuoteLines lines={lines} />
-          <div className={s.miniTotal}>
+          <div className={s.currentQuoteTotal}>
             <span>월 구독료 합계</span>
-            <strong>{money(quoteTotals(lines).monthly)}</strong>
+            <strong>{money(totals.monthly)}</strong>
+            <small>카드·교원 할인 전</small>
           </div>
-          <p className={s.caption}>
-            옵션 설정을 완료한 제품만 견적에 추가됩니다.
-          </p>
+          {totals.deposit > 0 && <p className={s.currentQuoteExtra}>선납금 합계 <b>{money(totals.deposit)}</b></p>}
+          {totals.voucher > 0 && <p className={s.currentQuoteExtra}>상품권 합계 <b>{money(totals.voucher)}</b></p>}
+          <p className={s.currentQuoteHint}>조건을 확정한 제품이 견적에 반영됩니다.</p>
         </aside>
       </div>
     </Modal>
@@ -193,21 +213,27 @@ export function OptionWizard({
   editing,
   onApply,
   onClose,
+  title,
+  applyLabel,
 }: {
   initial: PreviewLine;
   lines: PreviewLine[];
   editing: boolean;
   onApply: (l: PreviewLine) => void;
   onClose: () => void;
+  title?: string;
+  applyLabel?: string;
 }) {
   const [line, setLine] = useState({ ...initial }),
-    [step, setStep] = useState(0),
+    [confirmed, setConfirmed] = useState(editing ? VARIANT_FIELDS.length : 0),
     [rate, setRate] = useState<PrepayRate>(null),
     [rateLoading, setRateLoading] = useState(true),
     [rateError, setRateError] = useState(""),
     [rateRevision, setRateRevision] = useState(0),
     [voucherLoading, setVoucherLoading] = useState(true),
     [voucherError, setVoucherError] = useState("");
+  const [editingField, setEditingField] = useState<number | null>(null);
+  const { product, selectedVariant } = line;
   useEffect(() => {
     let cancelled = false;
     setRateLoading(true);
@@ -243,28 +269,18 @@ export function OptionWizard({
     let cancelled = false;
     setVoucherLoading(true);
     setVoucherError("");
-    getVoucherMasterForModel(line.product.id)
-      .then((master) => {
+    resolveRenewalVoucher({ product, selectedVariant })
+      .then((voucher) => {
         if (cancelled) return;
-        const voucher = master
-          ? calcVoucher({
-              voucherMaster: master,
-              modelCode: line.product.id,
-              promoType: textValue(line.selectedVariant.프로모션유형),
-              serviceCycle: textValue(line.selectedVariant["서비스주기/월"]),
-              promoName: textValue(line.selectedVariant.프로모션명),
-            })
-          : { total: 0, details: [] };
         setLine((l) => ({
           ...l,
-          voucherTotal: voucher.total,
-          voucherDetails: voucher.details,
+          ...voucher,
         }));
       })
       .catch(() => {
         if (!cancelled)
           setVoucherError(
-            "상품권 내역을 불러오지 못했습니다. 조건을 다시 선택해 주세요.",
+            "상품권 내역을 불러오지 못했습니다. 다시 확인해 주세요.",
           );
       })
       .finally(() => {
@@ -273,7 +289,7 @@ export function OptionWizard({
     return () => {
       cancelled = true;
     };
-  }, [line.product.id, line.selectedVariant]);
+  }, [product, selectedVariant]);
   const totals = lineTotals(line),
     others = lines.filter((l) => l.id !== initial.id),
     overall = quoteTotals([...others, line]);
@@ -283,214 +299,141 @@ export function OptionWizard({
       label:
         field === "계약기간"
           ? `${Number(value) / 12}년 (${value}개월)`
-          : value || "없음",
+          : field === "프로모션유형" ? promotionTypeLabel(value) || "없음" : value || "없음",
     }));
-  const choose = (field: VariantField, value: string) =>
-    setLine((l) => changeLineVariant(l, field, value));
+  const viewport = useRef<HTMLDivElement>(null);
+  const scrollRequested = useRef(false);
+  useEffect(() => {
+    if (!scrollRequested.current) return;
+    scrollRequested.current = false;
+    const node = viewport.current;
+    const next = node?.querySelector<HTMLElement>(editingField === null ? '[data-next-option="true"]' : `[data-option-index="${editingField}"]`);
+    if (!node || !next) return;
+    const frame = requestAnimationFrame(() => node.scrollTo({
+      top: node.scrollTop + next.getBoundingClientRect().top - node.getBoundingClientRect().top - 12,
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    }));
+    return () => cancelAnimationFrame(frame);
+  }, [confirmed, editingField]);
+  const choose = (field: VariantField, value: string) => {
+    setLine((l) => textValue(l.selectedVariant[field]) === value ? l : changeLineVariant(l, field, value));
+    scrollRequested.current = true;
+    setEditingField(null);
+    setConfirmed(VARIANT_FIELDS.indexOf(field) + 1);
+  };
+  const labels = ["가입 유형", "계약 기간", "관리 방식", "관리 주기", "프로모션 유형", "프로모션 상세"];
+  const complete = confirmed === VARIANT_FIELDS.length;
   return (
     <Modal
       className={s.optionDialog}
-      title={editing ? "제품 조건 수정" : "제품 구독 조건 선택"}
-      description="가입 유형과 계약 기간에 맞는 관리·프로모션 조건을 확인하세요."
+      title={title || (editing ? "제품 조건 수정" : "제품 구독 조건 선택")}
       onClose={onClose}
       wide
     >
-      <div className={s.stepper}>
-        {["가입·계약", "관리 방식", "프로모션·선납"].map((label, i) => (
-          <button
-            key={label}
-            disabled={i > step}
-            className={i === step ? s.stepActive : ""}
-            onClick={() => setStep(i)}
-          >
-            <span>{i + 1}</span>
-            {label}
-          </button>
-        ))}
-      </div>
       <div className={s.optionLayout}>
         <aside className={s.optionProduct}>
-          {line.product.image ? (
-            <img src={line.product.image} alt={line.product.name} />
-          ) : (
-            <div className={s.imageMissing}>이미지 준비 중</div>
-          )}
-          <span className={s.pill}>{line.product.category}</span>
-          <h3>{line.product.name}</h3>
-          <p>{line.product.id}</p>
+          {line.product.image ? <img src={line.product.image} alt={line.product.name} /> : <div className={s.imageMissing}>이미지 준비 중</div>}
+          <div className={s.optionProductInfo}>
+            <span>{line.product.category}</span>
+            <h3>{line.product.name}</h3>
+            <p>{line.product.id}</p>
+          </div>
         </aside>
         <div className={s.optionForm}>
-          <span className={s.eyebrow}>STEP {step + 1}</span>
-          <h3>
-            {
-              [
-                "가입 유형과 계약 기간",
-                "관리 방식과 주기",
-                "프로모션과 선납 조건",
-              ][step]
-            }
-          </h3>
-          {step === 0 && (
-            <>
-              <SelectField
-                label="가입 유형"
-                value={textValue(line.selectedVariant["프로모션 대분류"])}
-                options={options("프로모션 대분류")}
-                onChange={(v) => choose("프로모션 대분류", v)}
-              />
-              <RadioField
-                label="계약 기간"
-                value={textValue(line.selectedVariant.계약기간)}
-                options={options("계약기간")}
-                onChange={(v) => choose("계약기간", v)}
-              />
-            </>
-          )}
-          {step === 1 && (
-            <>
-              <RadioField
-                label="관리 방식"
-                value={textValue(line.selectedVariant.서비스유형)}
-                options={options("서비스유형")}
-                onChange={(v) => choose("서비스유형", v)}
-              />
-              <RadioField
-                label="관리 주기"
-                value={textValue(line.selectedVariant["서비스주기/월"])}
-                options={options("서비스주기/월")}
-                onChange={(v) => choose("서비스주기/월", v)}
-              />
-              <p className={s.notice}>
-                현재 모델과 가입·계약 조건에서 가능한 옵션만 표시합니다.
-              </p>
-            </>
-          )}
-          {step === 2 && (
-            <>
-              <SelectField
-                label="프로모션 유형"
-                value={textValue(line.selectedVariant.프로모션유형)}
-                options={options("프로모션유형")}
-                onChange={(v) => choose("프로모션유형", v)}
-              />
-              <SelectField
-                label="프로모션명"
-                value={textValue(line.selectedVariant.프로모션명)}
-                options={options("프로모션명")}
-                onChange={(v) => choose("프로모션명", v)}
-              />
-              <Accordion title="프로모션 상세">
-                <p className={s.selectedPromotion}>
-                  {textValue(line.selectedVariant.프로모션명) ||
-                    "선택한 프로모션이 없습니다."}
-                </p>
-              </Accordion>
-              {rateError ? (
-                <div className={s.errorNotice} role="alert">
-                  {rateError}
-                  <button
-                    className={s.secondary}
-                    onClick={() => setRateRevision((n) => n + 1)}
-                  >
-                    다시 확인
-                  </button>
+          <div className={s.optionFlowHeading}>
+            <h3>계약 조건</h3>
+            <span aria-live="polite">{complete ? "선택 완료" : `${confirmed} / ${VARIANT_FIELDS.length}`}</span>
+          </div>
+          <div className={s.optionScroll} ref={viewport} tabIndex={0} role="region" aria-label="구독 조건 선택 목록">
+            {VARIANT_FIELDS.slice(0, Math.min(confirmed + 1, VARIANT_FIELDS.length)).map((field, index) => {
+              const open = editingField === index || (editingField === null && index === confirmed);
+              const selected = options(field).find((option) => option.value === textValue(line.selectedVariant[field]));
+              const Field = field === "프로모션유형" || field === "프로모션명" ? ListField : RadioField;
+              return (
+                <section className={s.optionSection} key={field} data-next-option={index === confirmed} data-option-index={index}>
+                  {index < confirmed && (
+                    <button className={s.optionCompleted} onClick={() => { scrollRequested.current = !open; setEditingField(open ? null : index); }} aria-expanded={open}>
+                      <span>{labels[index]}</span>
+                      <b title={selected?.label}>{selected?.label || "없음"}</b>
+                      <small>{open ? "접기" : "변경"}</small>
+                    </button>
+                  )}
+                  {open && (
+                    <Field label={labels[index]} value={index < confirmed ? textValue(line.selectedVariant[field]) : "__unselected__"}
+                      options={options(field)} onChange={(value) => choose(field, value)} />
+                  )}
+                </section>
+              );
+            })}
+            {complete && editingField === null && (
+              <section className={`${s.optionSection} ${s.optionBenefits}`} data-next-option="true" aria-label="선납 및 제공 혜택">
+                <div className={s.optionPrepay}>
+                {rateError ? (
+                  <div className={s.errorNotice} role="alert">
+                    {rateError}
+                    <button className={s.secondary} onClick={() => setRateRevision((n) => n + 1)}>다시 확인</button>
+                  </div>
+                ) : line.term === 72 && (rate || rateLoading) ? (
+                  <RadioField
+                    label={rateLoading ? "선납 가능 여부 확인 중" : "선납"}
+                    value={String(line.prepay)}
+                    options={[
+                      { value: "0", label: "선납 없음" },
+                      ...(!rateLoading && rate ? [{ value: "30", label: "30% 선납" }] : []),
+                      ...(!rateLoading && rate === "30_50" ? [{ value: "50", label: "50% 선납" }] : []),
+                    ]}
+                    onChange={(v) => setLine((l) => ({ ...l, prepay: Number(v) }))}
+                  />
+                ) : <div className={s.prepayUnavailable}><b>선납</b><p>이 조건은 선납 없이 이용합니다.</p></div>}
                 </div>
-              ) : line.term === 72 && (rate || rateLoading) ? (
-                <RadioField
-                  label={rateLoading ? "선납 가능 여부 확인 중" : "선납"}
-                  value={String(line.prepay)}
-                  options={[
-                    { value: "0", label: "선납 없음" },
-                    ...(!rateLoading && rate
-                      ? [{ value: "30", label: "30% 선납" }]
-                      : []),
-                    ...(!rateLoading && rate === "30_50"
-                      ? [{ value: "50", label: "50% 선납" }]
-                      : []),
-                  ]}
-                  onChange={(v) =>
-                    setLine((l) => ({ ...l, prepay: Number(v) }))
-                  }
-                />
-              ) : (
-                <p className={s.notice}>
-                  선택한 모델·계약에는 선납 옵션이 없습니다.
-                </p>
-              )}
-              <Accordion title="선납금·상품권 내역">
-                <dl className={s.detailList}>
-                  <div>
-                    <dt>선납금</dt>
-                    <dd>{money(totals.deposit)}</dd>
-                  </div>
-                  <div>
-                    <dt>상품권</dt>
-                    <dd>
-                      {voucherLoading ? "확인 중" : money(totals.voucher)}
-                    </dd>
-                  </div>
-                </dl>
-              </Accordion>
-              {voucherError && (
-                <p className={s.error} role="alert">
-                  {voucherError}
-                </p>
-              )}
-            </>
-          )}
-          <div className={s.wizardButtons}>
-            <button
-              className={s.secondary}
-              onClick={() => (step ? setStep(step - 1) : onClose())}
-            >
-              {step ? "이전" : "취소"}
-            </button>
-            <button
-              className={s.primary}
-              disabled={
-                step === 2 &&
-                (rateLoading ||
-                  voucherLoading ||
-                  Boolean(voucherError) ||
-                  Boolean(rateError))
-              }
-              onClick={() => (step < 2 ? setStep(step + 1) : onApply(line))}
-            >
-              {step === 2
-                ? editing
-                  ? "수정한 조건 반영"
-                  : "견적에 추가"
-                : "다음"}
-              <Icon name="arrow" size={20} />
-            </button>
+                <div className={s.optionBenefitDetails}>
+                <Accordion title="선납금·상품권 내역">
+                  <dl className={s.detailList}>
+                    <div><dt>선납금</dt><dd>{money(totals.deposit)}</dd></div>
+                    <div><dt>제품 상품권</dt><dd>{voucherLoading ? "확인 중" : money(totals.voucher)}</dd></div>
+                  </dl>
+                </Accordion>
+                </div>
+                {voucherError && <div className={s.errorNotice} role="alert"><p>{voucherError}</p><button className={s.secondary} onClick={() => setLine((current) => ({ ...current, selectedVariant: { ...current.selectedVariant } }))}>상품권 다시 확인</button></div>}
+              </section>
+            )}
+          </div>
+          <div className={s.optionFlowFooter}>
+            <p aria-live="polite">{complete ? "선택한 조건으로 요금이 계산됩니다." : labels[confirmed] + "을 선택해 주세요."}</p>
+            <div className={s.wizardButtons}>
+              <button className={s.secondary} onClick={onClose}>취소</button>
+              <button
+                className={s.primary}
+                disabled={!complete || editingField !== null || rateLoading || voucherLoading || Boolean(voucherError) || Boolean(rateError)}
+                onClick={() => onApply(line)}
+              >
+                {applyLabel || (editing ? "수정한 조건 반영" : "견적에 추가")}<Icon name="arrow" size={20} />
+              </button>
+            </div>
           </div>
         </div>
         <aside className={s.optionSummary}>
           <span>선택 제품 월 구독료</span>
           <strong>{money(totals.monthly)}</strong>
-          <small>카드·교원 할인 전</small>
-          <Accordion title={`선택 조건 · ${line.term / 12}년 · ${line.care}`}>
-            <dl className={s.detailList}>
-              <div>
-                <dt>계약</dt>
-                <dd>{line.term / 12}년</dd>
-              </div>
-              <div>
-                <dt>관리</dt>
-                <dd>
-                  {line.care} · {line.cycle ? `${line.cycle}개월` : "상품 기준"}
-                </dd>
-              </div>
-              <div>
-                <dt>프로모션 할인</dt>
-                <dd>-{money(totals.discount)}</dd>
-              </div>
-            </dl>
-          </Accordion>
+          <small>{complete ? "선택 조건 기준 · 카드·교원 할인 전" : "조건 선택 중 · 최종 선택에 따라 변경"}</small>
+          <div className={s.conditionSummary}>
+            <h4>선택 조건</h4>
+            {confirmed ? (
+              <ConditionTags line={line} confirmed={confirmed} />
+            ) : <p className={s.caption}>가입 유형부터 선택해 주세요.</p>}
+            {complete && (
+              <Accordion title="프로모션 내용">
+                <p className={s.promotionTypeText}>{promotionTypeLabel(line.selectedVariant.프로모션유형)}</p>
+                <p className={s.selectedPromotion}>{textValue(line.selectedVariant.프로모션명) || "적용 프로모션 없음"}</p>
+                <p className={s.promotionDiscount}>월 프로모션 할인 −{money(totals.discount)}</p>
+              </Accordion>
+            )}
+          </div>
           <div className={s.optionOverall}>
             <span>반영 후 전체 월 구독료</span>
             <strong>{money(overall.monthly)}</strong>
-            <small>선택한 계약 조건 기준</small>
+            <small>{complete ? "선택한 계약 조건 기준" : "조건 선택 중 예상 금액"}</small>
+            {overall.multiProductVoucher > 0 && <p className={s.currentQuoteExtra}>견적 다품목 상품권 <b>{money(overall.multiProductVoucher)}</b></p>}
           </div>
         </aside>
       </div>
@@ -511,138 +454,93 @@ export function CompareDialog({
   onApply: (l: PreviewLine) => void;
   onClose: () => void;
 }) {
-  const [mode, setMode] = useState("condition"),
-    [term, setTerm] = useState(String(line.term)),
-    [productId, setProductId] = useState(line.product.id);
-  const { products, loading, error } = useRenewalProducts(
-    line.product.category,
-  );
-  const choices = [
-    line.product,
-    ...products.filter((p) => p.id !== line.product.id),
-  ];
-  const selected = choices.find((p) => p.id === productId) ?? line.product;
-  const candidate = useMemo(
-    () =>
-      mode === "condition"
-        ? term === String(line.term)
-          ? line
-          : changeLineVariant(line, "계약기간", term)
-        : { ...createLine(selected), id: line.id, quantity: line.quantity },
-    [mode, line, term, selected],
-  );
-  const baseline = lines.find((l) => l.id === line.id) ?? line;
-  const before = lineTotals(baseline),
-    after = lineTotals(candidate),
-    total = quoteTotals(lines).monthly,
-    next = total - before.monthly + after.monthly;
+  const [mode, setMode] = useState<"condition" | "product">("condition");
+  const [conditionCandidate, setConditionCandidate] = useState({ ...line });
+  const [productCandidate, setProductCandidate] = useState({ ...line });
+  const [editingCandidate, setEditingCandidate] = useState(false);
+  const { products, loading, error } = useRenewalProducts(line.product.category);
+  const choices = [line.product, ...products.filter((product) => product.id !== line.product.id)];
+  const candidate = mode === "condition" ? conditionCandidate : productCandidate;
+  const setCandidate = mode === "condition" ? setConditionCandidate : setProductCandidate;
+  const baseline = lines.find((item) => item.id === line.id) ?? line;
+  const before = lineTotals(baseline), after = lineTotals(candidate);
+  const total = quoteTotals(lines).monthly;
+  const next = total - before.monthly + after.monthly;
+  const [choiceLoading, setChoiceLoading] = useState(false);
+  const [choiceError, setChoiceError] = useState("");
+  const choiceRequest = useRef(0);
+  useEffect(() => () => { choiceRequest.current++; }, []);
+  const chooseProduct = async (id: string) => {
+    const product = choices.find((item) => item.id === id);
+    if (!product || product.id === productCandidate.product.id) return;
+    const request = ++choiceRequest.current;
+    setChoiceLoading(true); setChoiceError("");
+    try {
+      const full = await loadRenewalProductOptions(product);
+      if (request === choiceRequest.current) setProductCandidate({ ...createLine(full), id: line.id, quantity: line.quantity });
+    } catch { if (request === choiceRequest.current) setChoiceError("제품 조건을 불러오지 못했습니다. 다시 선택해 주세요."); }
+    finally { if (request === choiceRequest.current) setChoiceLoading(false); }
+  };
+  if (editingCandidate) {
+    return <OptionWizard
+      initial={candidate} lines={lines} editing
+      title="비교할 제품의 구독 조건" applyLabel="비교 조건 반영"
+      onApply={(updated) => { setCandidate(updated); setEditingCandidate(false); }}
+      onClose={() => setEditingCandidate(false)}
+    />;
+  }
   return (
-    <Modal
-      title="제품·계약 조건 비교"
-      description="실제 옵션의 월 구독료와 전체 견적 변화를 비교합니다."
-      onClose={onClose}
-      wide
-    >
+    <Modal className={s.comparisonDialog} title="제품·계약 조건 비교"
+      description="비교할 제품과 구독 조건을 바꿔 월 요금 차이를 확인하세요." onClose={onClose} wide>
+      {choiceLoading && <p role="status">제품의 전체 구독 조건을 확인하고 있습니다.</p>}
+      {choiceError && <p role="alert">{choiceError}</p>}
       <div className={s.modalContent}>
         <div className={s.tabs}>
-          <button
-            className={mode === "condition" ? s.tabActive : ""}
-            onClick={() => setMode("condition")}
-          >
-            같은 제품의 조건
-          </button>
-          <button
-            className={mode === "product" ? s.tabActive : ""}
-            onClick={() => setMode("product")}
-          >
-            다른 제품
-          </button>
+          <button className={mode === "condition" ? s.tabActive : ""} onClick={() => setMode("condition")}>같은 제품의 조건</button>
+          <button className={mode === "product" ? s.tabActive : ""} onClick={() => setMode("product")}>다른 제품</button>
         </div>
-        {mode === "condition" ? (
-          <RadioField
-            label="비교할 계약 기간"
-            value={term}
-            options={variantOptions(line, "계약기간").map((v) => ({
-              value: v,
-              label: `${Number(v) / 12}년 (${v}개월)`,
-            }))}
-            onChange={setTerm}
-          />
-        ) : (
-          <SelectField
-            label={loading ? "비교 제품을 불러오는 중" : "비교할 제품"}
-            value={productId}
-            options={choices.map((p) => ({
-              value: p.id,
-              label: `${p.name} · ${p.id}`,
-            }))}
-            onChange={setProductId}
-          />
-        )}
-        {error && <p className={s.error}>{error}</p>}
+        {mode === "product" && <SelectField
+          label={loading ? "비교 제품을 불러오는 중" : "비교할 제품"}
+          value={productCandidate.product.id}
+          options={choices.map((product) => ({ value: product.id, label: product.name + " · " + product.id }))}
+          onChange={chooseProduct}
+        />}
+        {error && <p className={s.error} role="alert">{error}</p>}
         <div className={s.comparisonGrid}>
-          {[
-            { label: "현재 조건", value: baseline, t: before },
-            { label: "비교 조건", value: candidate, t: after },
-          ].map((item) => (
-            <article key={item.label} className={s.comparisonCard}>
-              <h3>{item.label}</h3>
-              {item.value.product.image && (
-                <img src={item.value.product.image} alt="" />
-              )}
+          {[{ label: "현재 조건", value: baseline, price: before }, { label: "비교 조건", value: candidate, price: after }].map((item, index) => (
+            <article key={item.label} className={s.comparisonCard} data-candidate={index === 1}>
+              <div className={s.comparisonCardHeading}>
+                <h3>{item.label}</h3>
+                {index === 1 && <button className={s.comparisonEdit} disabled={choiceLoading} onClick={() => setEditingCandidate(true)}>세부 조건 변경</button>}
+              </div>
+              {item.value.product.image && <img src={item.value.product.image} alt="" />}
               <b>{item.value.product.name}</b>
               <small>{item.value.product.id}</small>
+              <ConditionTags line={item.value} />
               <details>
-                <summary>프로모션 조건 확인</summary>
-                <p>
-                  {textValue(item.value.selectedVariant.프로모션명) ||
-                    "프로모션 미적용"}
-                </p>
+                <summary>프로모션 내용</summary>
+                <p>{promotionTypeLabel(item.value.selectedVariant.프로모션유형)}</p>
+                <p>{textValue(item.value.selectedVariant.프로모션명) || "프로모션 미적용"}</p>
               </details>
               <dl className={s.detailList}>
-                <div>
-                  <dt>계약·관리</dt>
-                  <dd>
-                    {item.value.term / 12}년 · {item.value.care} ·{" "}
-                    {item.value.cycle}개월
-                  </dd>
-                </div>
-                <div>
-                  <dt>월 구독료</dt>
-                  <dd>{money(item.t.monthly)}</dd>
-                </div>
-                <div>
-                  <dt>예상 총비용</dt>
-                  <dd>{money(item.t.total)}</dd>
-                </div>
+                <div><dt>월 구독료</dt><dd className={s.comparisonMonthly}>{money(item.price.monthly)}</dd></div>
+                <div><dt>선납금</dt><dd>{item.price.deposit > 0 ? money(item.price.deposit) : "없음"}</dd></div>
+                <div><dt>예상 총비용</dt><dd>{money(item.price.total)}</dd></div>
               </dl>
             </article>
           ))}
         </div>
-        <div className={s.comparisonImpact}>
-          <span>
-            전체 월 구독료
-            <b>
-              {money(total)} → {money(next)}
-            </b>
-          </span>
-          <strong>
-            {next - total > 0 ? "+" : ""}
-            {money(next - total)} / 월
-          </strong>
+        <div className={s.comparisonImpact} data-change={next < total ? "lower" : next > total ? "higher" : "same"}>
+          <span>전체 월 구독료<b>{money(total)} → {money(next)}</b></span>
+          <strong>{next - total > 0 ? "+" : ""}{money(next - total)} / 월</strong>
         </div>
         <p className={s.caption}>
-          다른 제품은 기본 옵션으로 비교합니다. 제품 교체 시 선택 항목의
-          카드·교원·선납은 초기화됩니다. 예상 총액은 선택한 월 요금이 유지된다는
-          기준이며 기간별 프로모션은 별도 확인이 필요합니다.
+          비교 조건은 ‘선택 항목에 반영’을 눌러야 견적에 저장됩니다. 다른 제품으로 바꾸면 카드·교원 혜택을 다시 선택해 주세요.
+          예상 총비용은 선택한 월 요금이 계약 기간 동안 유지되는 기준입니다.
         </p>
         <div className={s.buttonRow}>
-          <button className={s.secondary} onClick={onClose}>
-            취소
-          </button>
-          <button className={s.primary} onClick={() => onApply(candidate)}>
-            선택 항목에 반영
-          </button>
+          <button className={s.secondary} onClick={onClose}>취소</button>
+          <button className={s.primary} disabled={choiceLoading || Boolean(choiceError)} onClick={() => onApply(candidate)}>선택 항목에 반영</button>
         </div>
       </div>
     </Modal>
@@ -861,7 +759,7 @@ export function PrintPreview({
         <section className={s.printSheet}>
           <div className={s.paperBrand}>
             <img src="/images/logo.png" alt="LG전자 하이케어솔루션" />
-            <span>SUBSCRIPTION ESTIMATE</span>
+            <span>제품 구독 안내</span>
           </div>
           <h1>가전 구독 견적서</h1>
           <p className={s.paperTitle}>{quote.title}</p>
@@ -892,30 +790,48 @@ export function PrintPreview({
             </div>
           </div>
           <ul className={s.paperProductList} aria-label="견적 제품 목록">
-            {quote.lines.map((line) => (
-              <li className={s.paperProduct} key={line.id}>
-                <div className={s.paperProductHeading}>
-                  {images && line.product.image && (
-                    <img src={line.product.image} alt="" />
-                  )}
-                  <div>
-                    <span>{line.product.category}</span>
+            {quote.lines.map((line, index) => {
+              const price = lineTotals(line);
+              const promotion = textValue(line.selectedVariant.프로모션명);
+              const type = promotionTypeLabel(line.selectedVariant.프로모션유형);
+              return (
+                <li className={s.paperProduct} key={line.id} data-images={images && Boolean(line.product.image)}>
+                  {images && line.product.image && <img className={s.paperProductImage} src={line.product.image} alt="" />}
+                  <div className={s.paperProductInfo}>
+                    <span className={s.paperProductCategory}>{String(index + 1).padStart(2, "0")} / {line.product.category}</span>
                     <h2>{line.product.name}</h2>
-                    <p>{line.product.id}</p>
+                    <p className={s.paperModel}>{line.product.id}</p>
+                    <ConditionTags line={line} />
+                    {(promotion || type.length > 22) && <div className={s.paperPromotion}>
+                      {type.length > 22 && <p><span>프로모션 유형</span> {type}</p>}
+                      {promotion && <p><span>적용 혜택</span> {promotion}</p>}
+                    </div>}
+                    {cards && price.teacher > 0 && <p className={s.paperBenefitTerms}>구독교원 {line.teachers.map((plan) => `${plan.type} ${plan.seats}구좌`).join(" · ")}</p>}
                   </div>
-                </div>
-                <div className={s.paperProductDetails}>
-                  <ContractDetails line={line} />
-                  <RateBreakdown
-                    line={line}
-                    discounts={discounts}
-                    benefits={cards}
-                  />
-                </div>
-              </li>
-            ))}
+                  <div className={s.paperProductPrice}>
+                    <span>월 구독료</span>
+                    <strong>{money(price.monthly)}</strong>
+                    {discounts && price.normal > price.monthly && <div className={s.paperPriceDetail}>
+                      <p><span>기본 요금</span><s>{money(price.normal)}</s></p>
+                      {price.discount > 0 && <p><span>프로모션 할인</span><b>-{money(price.discount)}</b></p>}
+                      {price.deposit > 0 && <p><span>선납 월 차감</span><b>-{money(price.contract - price.monthly)}</b></p>}
+                    </div>}
+                    {cards && (line.card || price.teacher > 0) && <div className={s.paperBenefitPrice}>
+                      {line.card && <p>{line.card.issuer} -{money(price.card)}</p>}
+                      {price.teacher > 0 && <p>구독교원 -{money(price.teacher)}</p>}
+                      <b>혜택 후 {money(price.effective)}</b>
+                    </div>}
+                  </div>
+                  <div className={s.paperProductMeta}>
+                    {price.deposit > 0 && <span>선납금 <b>{money(price.deposit)}</b></span>}
+                    <span>계약 총비용 <b>{money(price.total)}</b></span>
+                    {line.voucherTotal !== undefined && price.voucher > 0 && <span>상품권 <b>{money(price.voucher)}</b></span>}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
-          {quote.lines.length > 1 && (
+          {quote.lines.length > 0 && (
             <div className={s.paperTotals}>
               {discounts && (
                 <>
@@ -940,6 +856,11 @@ export function PrintPreview({
               <div>
                 <span>예상 총비용 합계 (선납 포함·카드·교원 제외)</span>
                 <b>{money(totals.total)}</b>
+              </div>
+              <div className={s.paperVoucherTotals}>
+                <div><span>제품별 상품권 합계</span><b>{money(totals.productVoucher)}</b></div>
+                {totals.multiProductVoucher > 0 && <div><span>다품목 상품권</span><b>{money(totals.multiProductVoucher)}</b></div>}
+                <div className={s.paperVoucherGrandTotal}><span>총 지급 상품권</span><b>{money(totals.voucher)}</b></div>
               </div>
               {cards && (
                 <>
@@ -966,8 +887,7 @@ export function PrintPreview({
             </div>
           )}
           <div className={s.paperDisclaimer}>
-            기간별 총비용은 제품별 월 구독료 × 계약 개월 수 + 선납금의 합계이며
-            카드 할인은 제외합니다.
+            계약 총비용은 월 구독료 × 계약 개월 수 + 선납금의 합계이며 카드·교원 할인은 제외합니다.
             <br />
             기간별 프로모션·청구 할인 실적·적용 기간은 선택 상품의 계약 조건에
             따라 확인해 주세요. 예상 총액은 선택한 월 요금이 유지되는
@@ -976,7 +896,7 @@ export function PrintPreview({
         </section>
         <aside className={s.printSettings}>
           <h3>출력 설정</h3>
-          <p>A4 · 세로 · 제품별 상세 리스트</p>
+          <p>A4 · 세로 · 제품별 요약 리스트</p>
           {[
             { name: "제품 이미지 표시", value: images, set: setImages },
             { name: "할인 내역 표시", value: discounts, set: setDiscounts },

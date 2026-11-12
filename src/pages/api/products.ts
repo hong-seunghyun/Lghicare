@@ -1,20 +1,11 @@
 ﻿// pages/api/products.ts
 import type { NextApiRequest, NextApiResponse } from "next";
-import { fetchSheetData } from "@/lib/sheet";
-import { google, drive_v3 } from "googleapis";
+import { fetchSheetData, fetchSheetDataWithPolicy } from "@/lib/sheet";
+import { getProductImageCache } from "@/lib/productImageCache";
+import { registerCacheInvalidator, syncProductCacheRevision } from "@/lib/productCacheControl";
 import { normalizeAndExpandModelNames, normalizeModelName } from "@/lib/utils";
-
-type DriveCacheExtended = NonNullable<typeof globalThis.__driveCache> & {
-  pending: Record<string, Promise<MiddleCacheEntry | null>>;
-};
-
-type MiddleCacheEntry = {
-  id: string;
-  subFolders: drive_v3.Schema$File[];
-  images: Record<string, string[]>; // 폴더 원래 이름 기준
-  imageIndex: Record<string, string[]>; //  정규화된 폴더명 기준 (O(1) 조회용)
-  ts: number;
-};
+import { publishedRows, catalogPointer } from "@/lib/catalog/read";
+import { defaultVariant, lowestVariant, normalizeProduct } from "@/lib/renewalTest";
 
 type Product = { [key: string]: string };
 type ProductVariantSummary = Record<string, string | undefined>;
@@ -29,34 +20,13 @@ type ProductListResponse = {
 type ProductListCacheEntry = {
   ts: number;
   value: ProductListResponse;
+  bytes: number;
 };
 
-//  전역 Drive 클라이언트 + 캐시 설정
-const g = globalThis as typeof globalThis & {
-  __driveClient?: drive_v3.Drive;
-  __productListCache?: Record<string, ProductListCacheEntry>;
-};
-
-const DRIVE_PARENT_FOLDER_ID = "12kbRkg4PREBp6f5_tmXCu0_SYgUngIrw";
-const DRIVE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30일
-const PRODUCT_LIST_CACHE_TTL_MS = 30 * 60 * 1000; // 30분
-const DRIVE_MAX_RETRIES = 3;
-const DRIVE_BACKOFF_BASE_MS = 800; // 0.8s → 1.6s → 3.2s ...
-
-if (!g.__productListCache) {
-  g.__productListCache = {};
-}
-
-//  기존 전역 캐시 안전하게 초기화 (타입 충돌 방지)
-if (!globalThis.__driveCache) {
-  globalThis.__driveCache = { middleCache: {} };
-}
-
-//  여기서만 확장형으로 단언
-const driveCache = globalThis.__driveCache as DriveCacheExtended;
-if (!driveCache.pending) {
-  driveCache.pending = {};
-}
+const g = globalThis as typeof globalThis & { __productListCache?: Record<string, ProductListCacheEntry> };
+g.__productListCache ??= {};
+const PRODUCT_LIST_CACHE_TTL_MS = 60 * 1000;
+registerCacheInvalidator("product-lists", "all", () => { g.__productListCache = {}; });
 
 //  공통 정규화 함수 (폴더명/모델명 정규화에 사용)
 const normalizeName = (s?: string) =>
@@ -71,198 +41,11 @@ const queryValues = (value: string | string[] | undefined) =>
     .map((item) => item.trim())
     .filter(Boolean);
 
-//  전역 Drive 클라이언트 (1회 생성 후 재사용)
-async function getDriveClient(): Promise<drive_v3.Drive> {
-  if (g.__driveClient) return g.__driveClient;
-
-  const clientEmail = process.env.GOOGLE_SERVICE_EMAIL;
-  const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n");
-
-  if (!clientEmail || !privateKey) {
-    console.error(
-      "❌ Drive 클라이언트 설정 누락 (GOOGLE_SERVICE_EMAIL / GOOGLE_PRIVATE_KEY)"
-    );
-    throw new Error("Drive client not configured");
-  }
-
-  const auth = new google.auth.GoogleAuth({
-    credentials: {
-      client_email: clientEmail,
-      private_key: privateKey,
-    },
-    scopes: ["https://www.googleapis.com/auth/drive.readonly"],
-  });
-
-  g.__driveClient = google.drive({ version: "v3", auth });
-  return g.__driveClient!;
-}
-
-//  안전한 Drive API 호출 (쿼터 초과 자동 백오프)
-async function safeDriveList(
-  drive: drive_v3.Drive,
-  params: drive_v3.Params$Resource$Files$List,
-  retries = DRIVE_MAX_RETRIES
-): Promise<drive_v3.Schema$FileList> {
-  for (let i = 0; i < retries; i++) {
-    try {
-      const res = await drive.files.list(params);
-      return res.data;
-    } catch (err: unknown) {
-      if (
-        typeof err === "object" &&
-        err !== null &&
-        "code" in err &&
-        (err as { code: number }).code &&
-        ((err as { code: number }).code === 403 ||
-          (err as { code: number }).code === 429) &&
-        i < retries - 1
-      ) {
-        const wait = DRIVE_BACKOFF_BASE_MS * Math.pow(2, i); // 0.8s → 1.6s → 3.2s
-        console.warn(`⚠️ Drive quota exceeded. Retry in ${wait / 1000}s...`);
-        await new Promise((r) => setTimeout(r, wait));
-      } else {
-        const message =
-          typeof err === "object" && err && "message" in err
-            ? (err as { message?: string }).message
-            : String(err);
-        console.error("❌ Drive API Error:", message);
-        if (i === retries - 1) {
-          return { files: [] };
-        }
-      }
-    }
-  }
-  return { files: [] };
-}
-
-//  병렬 이미지 조회 (쿼터 완화 + 자연 정렬 완벽 대응)
-async function fetchImagesInBatches(
-  subFolders: drive_v3.Schema$File[],
-  drive: drive_v3.Drive
-): Promise<Record<string, string[]>> {
-  const BATCH_SIZE = 5; // 병렬 요청 단위
-  const images: Record<string, string[]> = {};
-
-  //  자연 정렬 객체 (사람이 보는 순서 그대로)
-  const collator = new Intl.Collator(undefined, {
-    numeric: true,
-    sensitivity: "base",
-  });
-
-  for (let i = 0; i < subFolders.length; i += BATCH_SIZE) {
-    const batch = subFolders.slice(i, i + BATCH_SIZE);
-
-    const results = await Promise.all(
-      batch.map(async (sf) => {
-        const res = await safeDriveList(drive, {
-          q: `'${sf.id}' in parents and mimeType contains 'image/' and trashed = false`,
-          fields: "files(id,name,mimeType)",
-          pageSize: 1000,
-        });
-
-        //  파일명 자연 정렬 적용
-        const sortedFiles = (res.files || []).sort((a, b) =>
-          collator.compare(a.name || "", b.name || "")
-        );
-
-        return { folderName: sf.name || "", files: sortedFiles };
-      })
-    );
-
-    //  폴더별 이미지 경로 병합
-    for (const { folderName, files } of results) {
-      images[folderName] = files.map((f) => `/api/image-proxy?fileId=${f.id}`);
-    }
-
-    //  쿼터 초과 방지용 짧은 딜레이
-    await new Promise((r) => setTimeout(r, 200));
-  }
-
-  return images;
-}
-
-//  중분류 캐시 생성 함수
-async function ensureMiddleCache(
-  middleName: string,
-  drive: drive_v3.Drive,
-  parentFolderId: string
-): Promise<MiddleCacheEntry | null> {
-  const now = Date.now();
-  const ttl = DRIVE_TTL_MS;
-
-  const cached = driveCache.middleCache[middleName] as
-    | MiddleCacheEntry
-    | undefined;
-  if (cached && now - cached.ts < ttl) return cached;
-
-  //  pending Promise 존재 여부 안전하게 확인
-  const existing = driveCache.pending[middleName];
-  if (existing) {
-    return existing;
-  }
-
-  const promise: Promise<MiddleCacheEntry | null> = (async (): Promise<
-    MiddleCacheEntry | null
-  > => {
-    try {
-      const middleRes = await safeDriveList(drive, {
-        q: `'${parentFolderId}' in parents and name = '${middleName}' and mimeType = 'application/vnd.google-apps.folder'`,
-        fields: "files(id,name)",
-        pageSize: 1,
-      });
-
-      const middleFolder = middleRes.files?.[0];
-      if (!middleFolder?.id) return null;
-
-      const allRes = await safeDriveList(drive, {
-        q: `'${middleFolder.id}' in parents and trashed = false`,
-        fields: "files(id,name,mimeType,parents)",
-        pageSize: 1000,
-      });
-
-      const allFiles = allRes.files || [];
-      const subFolders = allFiles.filter(
-        (f) => f.mimeType === "application/vnd.google-apps.folder"
-      );
-
-      const images = await fetchImagesInBatches(subFolders, drive);
-
-      //  정규화된 폴더명 → 이미지 배열 인덱스 미리 생성 (O(1) 조회용)
-      const imageIndex: Record<string, string[]> = {};
-      for (const [folderName, urls] of Object.entries(images)) {
-        const key = normalizeName(folderName);
-        if (!key) continue;
-        imageIndex[key] = urls;
-      }
-
-      const entry: MiddleCacheEntry = {
-        id: middleFolder.id,
-        subFolders,
-        images,
-        imageIndex,
-        ts: now,
-      };
-
-      driveCache.middleCache[middleName] = entry;
-      return entry;
-    } catch (error) {
-      console.error(`❌ ensureMiddleCache(${middleName}) Error:`, error);
-      const cached = driveCache.middleCache[middleName];
-      //  타입 단언으로 명시적 보장
-      return (cached as MiddleCacheEntry) ?? null;
-    } finally {
-      delete driveCache.pending[middleName];
-    }
-  })();
-
-  driveCache.pending[middleName] = promise;
-  return promise;
-}
-
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
+  res.setHeader("Cache-Control", "no-store");
   const middle = req.query.middle as string | undefined;
   const middlesQuery = req.query.middles;
   const sub = req.query.sub as string | undefined;
@@ -270,13 +53,14 @@ export default async function handler(
   const q = req.query.q as string | undefined;
   const modelsQuery = req.query.models;
   const includeImages = req.query.includeImages !== "false";
+  const summaryOnly = req.query.summary === "true" && !id && !modelsQuery;
 
 	const groupBy = req.query.groupBy as string | undefined;
   const isModelCodeGrouping = groupBy === "modelCode";
 
   const middleValues = queryValues(middlesQuery);
   const sheet = middleValues.length ? "__multi__" : middle || "정수기";
-  const listCacheKey = id
+  let listCacheKey = id
     ? ""
     : [
         sheet,
@@ -287,25 +71,36 @@ export default async function handler(
         queryValueKey(modelsQuery),
         groupBy || "",
         includeImages ? "images" : "no-images",
+        summaryOnly ? "summary" : "full",
       ].join("::");
 
   try {
+    await syncProductCacheRevision();
+    const version = (await catalogPointer()).id ?? "legacy";
+    if (listCacheKey) listCacheKey += `::${version}`;
+    const listCache = g.__productListCache;
     if (listCacheKey) {
       const cached = g.__productListCache?.[listCacheKey];
       if (cached && Date.now() - cached.ts < PRODUCT_LIST_CACHE_TTL_MS) {
         res.setHeader(
           "Cache-Control",
-          "public, s-maxage=300, stale-while-revalidate=1800"
+          "no-store"
         );
         return res.status(200).json(cached.value);
       }
     }
 
-    const drive = id || includeImages ? await getDriveClient() : null;
+    const loadImages = Boolean(id || includeImages);
 
     //  1. 시트 데이터 (fetchSheetData 자체는 별도 캐시 사용)
     const sheets = middleValues.length ? middleValues : [sheet];
-    const products = (await Promise.all(sheets.map(fetchSheetData))).flat();
+    const requestedModels = id ? [id] : queryValues(modelsQuery);
+    const publishedCategories = new Set<string>();
+    let products = (await Promise.all(sheets.map(async category => {
+      const released = await publishedRows(category, requestedModels, summaryOnly);
+      if (released) publishedCategories.add(category);
+      return released?.rows ?? fetchSheetData(category);
+    }))).flat();
 
     // (기존 normalize는 그대로 두되, 아래에서는 normalizeName 사용)
     const normalize = (s?: string) =>
@@ -323,17 +118,13 @@ export default async function handler(
       middleName: string,
       modelId: string
     ): Promise<string> => {
-      if (!drive) return "";
+      if (!loadImages) return "";
       const cacheKey = `${middleName}::${modelId}`;
       if (thumbCache.has(cacheKey)) {
         return thumbCache.get(cacheKey)!;
       }
 
-      const cache = await ensureMiddleCache(
-        middleName,
-        drive,
-        DRIVE_PARENT_FOLDER_ID
-      );
+      const cache = await getProductImageCache(middleName);
       if (!cache) {
         thumbCache.set(cacheKey, "");
         return "";
@@ -343,8 +134,9 @@ export default async function handler(
       for (const candidate of candidates) {
         const urls = cache.imageIndex[candidate];
         if (urls?.[0]) {
-          thumbCache.set(cacheKey, urls[0]);
-          return urls[0];
+          const url = cache.thumbnailIndex?.[candidate] || urls[0];
+          thumbCache.set(cacheKey, url);
+          return url;
         }
       }
 
@@ -357,17 +149,13 @@ export default async function handler(
       modelId: string,
       fallbackId?: string
     ): Promise<string[]> => {
-      if (!drive) return [];
+      if (!loadImages) return [];
       const cacheKey = `${middleName}::${modelId}::${fallbackId || ""}`;
       if (imagesCache.has(cacheKey)) {
         return imagesCache.get(cacheKey)!;
       }
 
-      const cache = await ensureMiddleCache(
-        middleName,
-        drive,
-        DRIVE_PARENT_FOLDER_ID
-      );
+      const cache = await getProductImageCache(middleName);
       if (!cache) {
         imagesCache.set(cacheKey, []);
         return [];
@@ -413,11 +201,14 @@ export default async function handler(
     //  상세 조회
     if (id) {
       //  1️⃣ 현재 모델코드 기준 행만
-      const options = products.filter(
+      let options = products.filter(
         (p) => p["모델코드"]?.trim() === id.trim()
       );
-      if (!options.length)
-        return res.status(404).json({ options: [], subCategories });
+      if (!options.length && !publishedCategories.has(sheet)) {
+        products = await fetchSheetDataWithPolicy(sheet, { forceRefresh: true, allowStale: false });
+        options = products.filter((p) => p["모델코드"]?.trim() === id.trim());
+      }
+      if (!options.length) return res.status(404).json({ options: [], subCategories });
 
       const target = options[0];
 
@@ -455,20 +246,24 @@ export default async function handler(
 
       //  5️⃣ 이미지 fetch 병렬화
       const [thumb, imgs] = await Promise.all([
-        getThumbnailUrl(target["중분류"], target["모델코드"]),
-        getAllImages(target["중분류"], target["모델코드"]),
+        getThumbnailUrl(target["중분류"], target["모델코드"]).then((url) =>
+          url || (target["동일모델기준"] ? getThumbnailUrl(target["중분류"], target["동일모델기준"]) : "")
+        ),
+        getAllImages(target["중분류"], target["모델코드"], target["동일모델기준"]),
       ]);
 
       const enrichedOptions = options.map((p) => ({
         ...p,
         thumbnailUrl: thumb,
         images: imgs,
+        shareImageUrl: imgs[0] || thumb,
+        catalogVersion: version,
       }));
 
       //  6️⃣ 응답에 relatedModels 추가
       res.setHeader(
         "Cache-Control",
-        "public, s-maxage=60, stale-while-revalidate=300"
+        "no-store"
       );
       return res.status(200).json({
         options: enrichedOptions,
@@ -516,13 +311,20 @@ export default async function handler(
       Object.values(groupedFiltered).map(async (group) => {
         const representative = group[0];
         const thumbnailUrl =
-          includeImages && drive
-            ? await getThumbnailUrl(
+          includeImages && loadImages
+            ? (await getThumbnailUrl(
                 representative["중분류"],
                 representative["모델코드"]
-              )
+              )) || (representative["동일모델기준"]
+                ? await getThumbnailUrl(representative["중분류"], representative["동일모델기준"])
+                : "")
             : "";
-        const variants = group.map((p) => ({
+        let selectedRows = group;
+        if (summaryOnly && !group[0].__summary) {
+          const product = normalizeProduct({ ...representative, variants: group });
+          if (product) selectedRows = [...new Set([defaultVariant(product), lowestVariant(product)])] as Product[];
+        }
+        const variants = selectedRows.map((p) => ({
           모델코드: p["모델코드"],
           제품색상: p["제품색상"],
           상품명: p["상품명"],
@@ -539,23 +341,26 @@ export default async function handler(
           가격: p["할인후금액"] || p["정상가"],
           thumbnailUrl,
         }));
-        return { ...representative, thumbnailUrl, variants };
+        return { ...representative, thumbnailUrl, variants, optionsLoaded: !summaryOnly, optionCount: Number(representative.__optionCount ?? group.length), catalogVersion: version };
       })
     );
 
     res.setHeader(
       "Cache-Control",
-      "public, s-maxage=300, stale-while-revalidate=1800"
+      "no-store"
     );
     const responseBody: ProductListResponse = {
       options: enrichedFiltered,
       subCategories,
     };
-    if (listCacheKey && g.__productListCache) {
-      g.__productListCache[listCacheKey] = {
-        ts: Date.now(),
-        value: responseBody,
-      };
+    if (listCacheKey && listCache && g.__productListCache === listCache) {
+      const bytes = Buffer.byteLength(JSON.stringify(responseBody));
+      for (const [key, entry] of Object.entries(listCache)) if (Date.now() - entry.ts >= PRODUCT_LIST_CACHE_TTL_MS) delete listCache[key];
+      if (bytes <= 16 * 1024 * 1024) {
+        let used = Object.values(listCache).reduce((sum, entry) => sum + (entry.bytes ?? 0), 0);
+        while ((used + bytes > 32 * 1024 * 1024 || Object.keys(listCache).length >= 120) && Object.keys(listCache).length) { const oldest = Object.keys(listCache)[0]; used -= listCache[oldest].bytes ?? 0; delete listCache[oldest]; }
+        g.__productListCache[listCacheKey] = { ts: Date.now(), value: responseBody, bytes };
+      }
     }
     return res.status(200).json(responseBody);
   } catch (error: unknown) {

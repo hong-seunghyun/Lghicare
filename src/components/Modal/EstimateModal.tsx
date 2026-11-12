@@ -7,7 +7,10 @@ import styled from "styled-components";
 import { db } from "@/lib/firebase";
 import { useRouter } from "next/router";
 
-import { calcMultiProductVoucher } from "@/utils/voucher/calcVoucher";
+import {
+  calcMultiProductVoucher,
+  normalizeMultiProductCount,
+} from "@/utils/voucher/calcVoucher";
 import { fetchVoucherRules } from "@/lib/voucherMaster";
 
 import {
@@ -258,13 +261,19 @@ function getVoucherSummaryDetails(
 function getProductMultiProductReward(
   product: SelectedProduct,
   multiProductVoucher: {
+    total: number;
     perUnitReward: number;
   },
 ) {
   const perUnitReward = multiProductVoucher?.perUnitReward ?? 0;
-  const count = Number(product.voucherMultiProductCount ?? 0);
+  const count = normalizeMultiProductCount(product.voucherMultiProductCount);
   const eligible = !product.voucherMultiProductCountOnly;
-  if (perUnitReward <= 0 || count <= 0 || !eligible) {
+  if (
+    multiProductVoucher.total <= 0 ||
+    perUnitReward <= 0 ||
+    count <= 0 ||
+    !eligible
+  ) {
     return { amount: 0, perUnitReward, count, eligible };
   }
   return {
@@ -314,7 +323,7 @@ export default function EstimateModal({
           voucherRules: rules as any,
           products: productList.map((p) => ({
             modelCode: p.모델코드,
-            multiProductCount: p.voucherMultiProductCount ?? 0,
+            multiProductCount: normalizeMultiProductCount(p.voucherMultiProductCount),
             multiProductCountOnly: p.voucherMultiProductCountOnly ?? false,
             multiProductNote: p.voucherMultiProductNote,
           })),
@@ -424,7 +433,7 @@ export default function EstimateModal({
             : undefined,
           voucherTotal: getVoucherTotal(p),
           voucherDetails: (p as any).voucherDetails ?? [],
-          voucherMultiProductCount: (p as any).voucherMultiProductCount ?? 0,
+          voucherMultiProductCount: normalizeMultiProductCount(p.voucherMultiProductCount),
           voucherMultiProductCountOnly:
             (p as any).voucherMultiProductCountOnly ?? false,
           voucherMultiProductNote:

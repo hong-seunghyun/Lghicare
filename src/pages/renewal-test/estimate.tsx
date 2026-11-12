@@ -41,8 +41,7 @@ import {
   ContractDetails,
   RateBreakdown,
 } from "@/components/renewal-test/QuoteDetails";
-import { getVoucherMasterForModel } from "@/lib/voucherMaster";
-import { calcVoucher } from "@/utils/voucher/calcVoucher";
+import { backfillRenewalVoucher, resolveRenewalVoucher } from "@/lib/renewalVoucher";
 
 type Dialog =
   | "summary"
@@ -226,6 +225,26 @@ function RenewalWorkspace({ uid, manager }: { uid: string; manager: string }) {
     return () => clearTimeout(timer);
   }, [toast]);
   const notify = (message: string) => setToast(message);
+  useEffect(() => {
+    if (!ready || savedView) return;
+    const pending = quote.lines.filter((line) => line.voucherCheckedAt === undefined);
+    if (!pending.length) return;
+    let cancelled = false;
+    Promise.allSettled(pending.map(async (line) => ({ line, voucher: await resolveRenewalVoucher(line) })))
+      .then((results) => {
+        if (cancelled) return;
+        const resolved = results.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
+        if (resolved.length) setQuote((current) => ({
+          ...current,
+          lines: current.lines.map((line) => {
+            const found = resolved.find((item) => item.line.id === line.id && item.line.selectedVariant === line.selectedVariant);
+            return found && line.voucherCheckedAt === undefined ? backfillRenewalVoucher(line, found.voucher) : line;
+          }),
+        }));
+        if (results.some((result) => result.status === "rejected")) setToast("일부 상품권 정보를 확인하지 못했습니다. 해당 제품의 조건을 다시 확인해 주세요.");
+      });
+    return () => { cancelled = true; };
+  }, [ready, savedView, quote.lines]);
   const optionRequest = useRef(0);
   const openCurrentOptions = async (line: PreviewLine, compare = false) => {
     const request = ++optionRequest.current;
@@ -270,25 +289,15 @@ function RenewalWorkspace({ uid, manager }: { uid: string; manager: string }) {
       lines: q.lines.map((l) => (l.id === line.id ? line : l)),
     }));
     if (line.voucherTotal === undefined) {
-      getVoucherMasterForModel(line.product.id)
-        .then((master) => {
-          const voucher = master
-            ? calcVoucher({
-                voucherMaster: master,
-                modelCode: line.product.id,
-                promoType: textValue(line.selectedVariant.프로모션유형),
-                serviceCycle: textValue(line.selectedVariant["서비스주기/월"]),
-                promoName: textValue(line.selectedVariant.프로모션명),
-              })
-            : { total: 0, details: [] };
+      resolveRenewalVoucher(line)
+        .then((voucher) => {
           setQuote((q) => ({
             ...q,
             lines: q.lines.map((l) =>
               l.id === line.id && l.selectedVariant === line.selectedVariant
                 ? {
                     ...l,
-                    voucherTotal: voucher.total,
-                    voucherDetails: voucher.details,
+                    ...voucher,
                   }
                 : l,
             ),
@@ -437,8 +446,10 @@ function RenewalWorkspace({ uid, manager }: { uid: string; manager: string }) {
         </div>
         <div>
           <dt>제품별 상품권 합계</dt>
-          <dd>{money(totals.voucher)}</dd>
+          <dd>{money(totals.productVoucher)}</dd>
         </div>
+        {totals.multiProductVoucher > 0 && <div><dt>다품목 상품권</dt><dd>{money(totals.multiProductVoucher)}</dd></div>}
+        <div><dt>총 지급 상품권</dt><dd>{money(totals.voucher)}</dd></div>
         <div>
           <dt>
             예상 총비용 합계
