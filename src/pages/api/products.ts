@@ -41,6 +41,11 @@ const queryValues = (value: string | string[] | undefined) =>
     .map((item) => item.trim())
     .filter(Boolean);
 
+const sameModelKey = (product: Product) => {
+  const value = (product["동일모델기준"] || "").trim();
+  return value === "-" || value === "동일모델기준없음" ? "" : value;
+};
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -96,9 +101,13 @@ export default async function handler(
     const sheets = middleValues.length ? middleValues : [sheet];
     const requestedModels = id ? [id] : queryValues(modelsQuery);
     const publishedCategories = new Set<string>();
+    const publishedVersions = new Map<string, string>();
     let products = (await Promise.all(sheets.map(async category => {
       const released = await publishedRows(category, requestedModels, summaryOnly);
-      if (released) publishedCategories.add(category);
+      if (released) {
+        publishedCategories.add(category);
+        publishedVersions.set(category, released.release);
+      }
       return released?.rows ?? fetchSheetData(category);
     }))).flat();
 
@@ -194,7 +203,7 @@ export default async function handler(
       const getGroupKey = (p: Product): string => {
       const model = (p["모델코드"] || "").trim();
       if (isModelCodeGrouping) return model; //  견적용: 무조건 모델코드 기준
-      const group = (p["동일모델기준"] || "").trim();
+      const group = sameModelKey(p);
       return group || model; //  기존 동작 유지
     };
 
@@ -212,13 +221,20 @@ export default async function handler(
 
       const target = options[0];
 
+      // Model artifacts contain only the selected color. Read the small category
+      // summary from the same release to discover its sibling color models.
+      const detailVersion = publishedVersions.get(sheet) ?? version;
+      const relatedProducts = publishedCategories.has(sheet) && !isModelCodeGrouping
+        ? (await publishedRows(sheet, [], true, detailVersion))?.rows ?? products
+        : products;
+
       //  2️⃣ 동일모델 그룹키 계산
 			const groupKey = isModelCodeGrouping
 			? (target["모델코드"] || "").trim()
-			: ((target["동일모델기준"] || "").trim() ||
+			: (sameModelKey(target) ||
 				 (target["모델코드"] || "").trim());
 
-		const relatedModels = products.filter((p) => {
+		const relatedModels = relatedProducts.filter((p) => {
 			const model = (p["모델코드"] || "").trim();
 
 			if (isModelCodeGrouping) {
@@ -227,7 +243,7 @@ export default async function handler(
 			}
 
 			//  기존 동작 유지: 동일모델기준 그룹 확장
-			const sameGroup = (p["동일모델기준"] || "").trim();
+			const sameGroup = sameModelKey(p);
 			return (
 				model === groupKey ||
 				sameGroup === groupKey ||
@@ -247,9 +263,9 @@ export default async function handler(
       //  5️⃣ 이미지 fetch 병렬화
       const [thumb, imgs] = await Promise.all([
         getThumbnailUrl(target["중분류"], target["모델코드"]).then((url) =>
-          url || (target["동일모델기준"] ? getThumbnailUrl(target["중분류"], target["동일모델기준"]) : "")
+          url || (sameModelKey(target) ? getThumbnailUrl(target["중분류"], sameModelKey(target)) : "")
         ),
-        getAllImages(target["중분류"], target["모델코드"], target["동일모델기준"]),
+        getAllImages(target["중분류"], target["모델코드"], sameModelKey(target)),
       ]);
 
       const enrichedOptions = options.map((p) => ({
@@ -257,7 +273,7 @@ export default async function handler(
         thumbnailUrl: thumb,
         images: imgs,
         shareImageUrl: imgs[0] || thumb,
-        catalogVersion: version,
+        catalogVersion: detailVersion,
       }));
 
       //  6️⃣ 응답에 relatedModels 추가
@@ -310,20 +326,26 @@ export default async function handler(
     const enrichedFiltered = await Promise.all(
       Object.values(groupedFiltered).map(async (group) => {
         const representative = group[0];
-        const thumbnailUrl =
-          includeImages && loadImages
-            ? (await getThumbnailUrl(
-                representative["중분류"],
-                representative["모델코드"]
-              )) || (representative["동일모델기준"]
-                ? await getThumbnailUrl(representative["중분류"], representative["동일모델기준"])
-                : "")
-            : "";
         let selectedRows = group;
         if (summaryOnly && !group[0].__summary) {
           const product = normalizeProduct({ ...representative, variants: group });
           if (product) selectedRows = [...new Set([defaultVariant(product), lowestVariant(product)])] as Product[];
         }
+        // Resolve once per color model, rather than assigning the group's
+        // representative thumbnail to every subscription variant.
+        const models = new Map(
+          [representative, ...selectedRows].map((row) => [row["모델코드"], row]),
+        );
+        const thumbnails = new Map(await Promise.all(
+          Array.from(models, async ([code, row]) => {
+            const thumbnail = await getThumbnailUrl(row["중분류"], code)
+              || (sameModelKey(row)
+                ? await getThumbnailUrl(row["중분류"], sameModelKey(row))
+                : "");
+            return [code, thumbnail] as const;
+          }),
+        ));
+        const thumbnailUrl = thumbnails.get(representative["모델코드"]) || "";
         const variants = selectedRows.map((p) => ({
           모델코드: p["모델코드"],
           제품색상: p["제품색상"],
@@ -339,7 +361,7 @@ export default async function handler(
           할인후금액: p["할인후금액"],
           할인금액: p["할인금액"],
           가격: p["할인후금액"] || p["정상가"],
-          thumbnailUrl,
+          thumbnailUrl: thumbnails.get(p["모델코드"]) || "",
         }));
         return { ...representative, thumbnailUrl, variants, optionsLoaded: !summaryOnly, optionCount: Number(representative.__optionCount ?? group.length), catalogVersion: version };
       })

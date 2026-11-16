@@ -17,7 +17,8 @@ import type { GetServerSidePropsContext } from "next";
 import Loading from "@/components/loading/Loading";
 import ToolTip from "@/components/ToolTip/ToolTip";
 import AutoHeightIframe from "@/components/Iframe/AutoHeightIframe";
-import { getProductColorChipColors } from "@/constants/colorMap";
+import { isProductColorName } from "@/constants/colorMap";
+import ColorChipBox from "@/components/ColorChipBox/ColorChipBox";
 import { isPublishedProductImage } from "@/lib/catalog/imageUrl";
 
 
@@ -406,27 +407,34 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
 
     if (!router.isReady || !idValue || !middleValue) return;
 
+    const controller = new AbortController();
     const fetchDetail = async () => {
       try {
         setLoading(true);
 
-        const url = `/api/products?middle=${middleValue}&id=${idValue}`;
-        const [res] = await Promise.all([fetch(url)]);
+        const parameters = new URLSearchParams({ middle: middleValue, id: idValue });
+        const res = await fetch(`/api/products?${parameters}`, {
+          signal: controller.signal,
+        });
 
         if (!res.ok) throw new Error(`API 요청 실패: ${res.status}`);
         const data = await res.json();
+        if (controller.signal.aborted) return;
 
         setOptions(data.options || []);
         setRelatedModels(data.relatedModels || []);
       } catch (err) {
+        if (controller.signal.aborted) return;
         console.error("상품 불러오기 오류:", err);
         setOptions([]);
+        setRelatedModels([]);
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     };
 
     fetchDetail();
+    return () => controller.abort();
   }, [router.isReady, router.query.middle, router.query.id]);
 
   // ✅ 최저가 자동 선택
@@ -1490,7 +1498,7 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
             </Model>
             <Section>
               <Label>색상</Label>
-              <ButtonGroup>
+              <ButtonGroup role="group" aria-label="제품 색상">
                 {(() => {
                   const idValue = Array.isArray(id)
                     ? id[0]
@@ -1532,27 +1540,23 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
                     ).values(),
                   );
 
-                  // ✅ 버튼 렌더링
-                  return groupModels.map((item) => {
+                  const colorModels = groupModels.filter((item) =>
+                    isProductColorName(item["제품색상"]),
+                  );
+                  if (!colorModels.length)
+                    return <span>색상 정보 없음</span>;
+
+                  return colorModels.map((item) => {
                     if (!item) return null;
 
                     const code = (item["모델코드"] || "").trim();
                     const colorName = item["제품색상"] || code;
 
-                    const colors = getProductColorChipColors(colorName);
-
                     return (
-                      <OptionButton
+                      <ColorChipBox
                         key={code}
-                        style={{
-                          position: "relative",
-                          width: "32px",
-                          height: "32px",
-                          overflow: "hidden",
-                          cursor: "pointer",
-                          borderRadius: "100%",
-                          minWidth: "initial",
-                        }}
+                        colorName={colorName}
+                        modelCode={code}
                         selected={code === idValue}
                         onClick={(e) => {
                           e.preventDefault();
@@ -1562,12 +1566,7 @@ export default function ProductDetail({ ogMeta }: { ogMeta: OgMeta }) {
                             )}/${encodeURIComponent(code)}`,
                           );
                         }}
-                      >
-                        <ColorChipBox
-                          colors={colors}
-                          data-colorname={colorName}
-                        />
-                      </OptionButton>
+                      />
                     );
                   });
                 })()}
@@ -2522,47 +2521,6 @@ const NonThumnail = styled.div`
 const Logo = styled.img`
   width: auto;
   height: 25px;
-`;
-
-const ColorChipBox = styled.div<{ colors: string[] }>`
-  position: relative;
-  width: 32px;
-  height: 32px;
-  overflow: hidden;
-  cursor: pointer;
-  border-radius: 100%;
-
-  ${({ colors }) =>
-    colors.length === 1
-      ? `background: ${colors[0]};`
-      : colors.length === 2
-        ? `
-        background: linear-gradient(to bottom, ${colors[0]} 50%, ${colors[1]} 50%);
-      `
-        : `background: conic-gradient(${colors
-            .map((color, index) => {
-              const start = (index / colors.length) * 100;
-              const end = ((index + 1) / colors.length) * 100;
-              return `${color} ${start}% ${end}%`;
-            })
-            .join(", ")});
-        `}
-
-  &:hover::after {
-    content: attr(data-colorname);
-    position: absolute;
-    top: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    margin-top: 4px;
-    padding: 2px 6px;
-    font-size: 12px;
-    color: #fff;
-    background: rgba(0, 0, 0, 0.75);
-    border-radius: 4px;
-    white-space: nowrap;
-    pointer-events: none;
-  }
 `;
 
 const CustomSelectWrapper = styled.div`

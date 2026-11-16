@@ -168,7 +168,9 @@ export default function ProductImportPage() {
       setPhase("파일을 검증하고 새 상품 버전을 반영하고 있습니다.");
       const published = await call(job.id, "publish", { acknowledged: true });
       setNotice(
-        published.warmup?.failed.length
+        localMode
+          ? "로컬 상품 버전을 저장했습니다. 공개 상품 화면은 운영에 반영된 데이터를 계속 조회합니다."
+          : published.warmup?.failed.length
           ? `반영은 완료했습니다. ${published.warmup.failed.join(", ")}의 사전 조회를 완료하지 못해 다음 조회 시 다시 불러옵니다.`
           : "반영과 변경 항목의 사전 조회를 완료했습니다. 새 조회는 15초 이내에 새 버전을 사용합니다. 시트와 Drive 원본은 유지됩니다.",
       );
@@ -200,20 +202,25 @@ export default function ProductImportPage() {
       <div className={styles.active}>
         <span className={styles.dot} />
         <b>
-          {pointer.id
+          {localMode
+            ? "로컬 업로드 검증 모드"
+            : pointer.id
             ? "등록된 상품 버전 사용 중"
             : "기존 시트·Drive 연결 사용 중"}
         </b>
         <span>
           {pointer.id
             ? `버전 ${pointer.id.slice(0, 8)}`
-            : "첫 반영 전까지 기존 조회를 유지합니다."}
+            : localMode
+              ? "이 컴퓨터에 반영한 상품 버전이 없습니다."
+              : "첫 반영 전까지 기존 조회를 유지합니다."}
         </span>
       </div>
       {localMode && (
         <p className={styles.notice}>
           로컬 검증 모드입니다. 업로드와 상품 버전은 이 컴퓨터에 저장하며, 운영
           상품 데이터·Google 시트·Drive 이미지는 수정하지 않습니다.
+          공개 상품 화면은 운영에 반영된 상품 데이터를 조회합니다.
         </p>
       )}
       {error && (

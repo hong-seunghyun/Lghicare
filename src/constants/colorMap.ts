@@ -1,5 +1,7 @@
 export const WHITE_SWATCH = "#FFFFFF";
-export const COLOR_FALLBACK = WHITE_SWATCH;
+export const COLOR_FALLBACK = "#CDD2D8";
+export const UNKNOWN_COLOR_SWATCH =
+  "repeating-linear-gradient(135deg, #EEF0F3 0px, #EEF0F3 4px, #C4CAD2 4px, #C4CAD2 8px)";
 export const RAINBOW_SWATCH =
   "linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)";
 const RAINBOW_CHIP_COLORS = [
@@ -17,8 +19,8 @@ export const colorMap: Record<string, string> = {
   화이트: WHITE_SWATCH,
   린넨화이트: WHITE_SWATCH,
   에센스화이트: WHITE_SWATCH,
-  크림화이트: WHITE_SWATCH,
-  오브제크림화이트: WHITE_SWATCH,
+  크림화이트: "#F4F1E9",
+  오브제크림화이트: "#F4F1E9",
   샤이니퓨어: "#F8F8FF",
   릴리화이트: WHITE_SWATCH,
   스톤실버: "#C0C0C0",
@@ -49,7 +51,7 @@ export const colorMap: Record<string, string> = {
   오브제베이지: "#E3D3B2",
   브라운: "#8B5E3C",
   코지브라운: "#7B4B3A",
-  클레이브라운: "#A9746E",
+  클레이브라운: "#A39789",
   토프: "#B9A18F",
   토푸: "#B19E8B",
 
@@ -77,7 +79,7 @@ export const colorMap: Record<string, string> = {
   크림레몬: "#FFFACD",
   크림스카이: "#B2D7E6",
   크림그레이: "#D6D6D6",
-  솔리드크림화이트: WHITE_SWATCH,
+  솔리드크림화이트: "#F4F1E9",
   솔리드크림라벤더: "#D8BFD8",
   솔리드크림레몬: "#FFFACD",
   솔리드크림스카이: "#B0E0E6",
@@ -92,7 +94,7 @@ export const colorMap: Record<string, string> = {
   솔리드스페이스블랙: "#1E1E1E",
   솔리드미드블랙: "#2B2B2B",
   솔리드프라임실버: "#B0B0B0",
-  솔리드카밍크림화이트: WHITE_SWATCH,
+  솔리드카밍크림화이트: "#F4F1E9",
   솔리드카밍크림그레이: "#DDD9D5",
   솔리드아몬드: "#D9CAB3",
 
@@ -110,19 +112,69 @@ export const colorMap: Record<string, string> = {
   // 기타
   솔리드모던스테인리스: "#B5B5B5",
   오브제클레임핑크: "#F1C5C5",
+
+  // Uploaded catalog names. Swatches are display approximations; preserve the
+  // catalog's full color names in the selector and use product photos as well.
+  카밍베이지: "#E3DFD5",
+  카밍클레이브라운: "#A39789",
+  카밍크림화이트: "#F4F1E9",
+  카밍크림그레이: "#D7D6D1",
+  카밍그린: "#8D9B8C",
+  카밍핑크: "#DDBDB7",
+  카밍클레이민트: "#B9C9BE",
+  그레이: "#A8AAAC",
+  그린: "#8D9B8C",
+  네이처베이지: "#D8CFBE",
+  에센스그라파이트: "#626668",
+  에센스블랙: "#272A2D",
+  미드블랙: "#2B2B2B",
+  스틸블랙: "#45494A",
+  딥블랙미러: "#242629",
+  블랙틴트미러: "#3C3E40",
+  미드프리실버: "#C8C8C8",
+  프라임실버: "#B0B0B0",
+  몽블랑네이처: "#A2A5A5",
+  스톤: "#B9BBBC",
+  스톤핑크: "#D6B8B0",
+  스톰브라운: "#6E5F56",
+  클레이민트: "#B9C9BE",
+  미스트베이지: "#DFD5C5",
+  미스트핑크: "#E1C2C2",
 };
 
-const normalizeColorName = (colorName: string) =>
+export const normalizeColorName = (colorName: string) =>
   colorName
+    .normalize("NFKC")
+    .replace(/^오[)）]/, "오브제")
     .replace(/\s+/g, "")
     .replace(/[()（）]/g, "")
+    .replace(/스테인레스/g, "스테인리스")
+    .replace(/플래티늄/g, "플래티넘")
+    .replace(/카멩/g, "카밍")
+    .toLowerCase()
     .trim();
 
 const splitColorNames = (colorName: string) =>
   colorName
-    .split(/[,/|:：]/)
+    .normalize("NFKC")
+    .replace(/(?:상단|하단|상부|하부|본체|패널)\s*[:：]\s*/g, "")
+    .split(/[,/|:+&·\-]/)
     .map(normalizeColorName)
     .filter(Boolean);
+
+const englishColors: Record<string, string> = {
+  white: WHITE_SWATCH, black: colorMap.블랙, beige: colorMap.베이지,
+  brown: colorMap.브라운, navy: colorMap.네이비, green: colorMap.그린,
+  pink: colorMap.핑크, silver: colorMap.실버, gray: colorMap.그레이,
+  grey: colorMap.그레이, blue: "#6D91AD", mint: colorMap.클레이민트,
+};
+const colorNamesByLength = Object.keys({ ...colorMap, ...englishColors })
+  .sort((a, b) => b.length - a.length);
+
+export const isProductColorName = (colorName?: string) => {
+  const value = normalizeColorName(colorName ?? "");
+  return Boolean(value) && !["-", "0", "단일색상", "없음", "n/a", "na"].includes(value);
+};
 
 export const resolveProductColor = (
   colorName: string,
@@ -132,11 +184,11 @@ export const resolveProductColor = (
 
   if (!normalized) return fallback;
   if (normalized.includes("무드업")) return RAINBOW_SWATCH;
-  if (normalized.includes("화이트") || /white/i.test(normalized)) {
-    return WHITE_SWATCH;
-  }
-
-  return colorMap[normalized] || fallback;
+  const exact = colorMap[normalized] || englishColors[normalized];
+  if (exact) return exact;
+  // Longer names win: 카밍 클레이 브라운 uses its own tone before 브라운.
+  const suffix = colorNamesByLength.find((name) => normalized.endsWith(name));
+  return suffix ? colorMap[suffix] || englishColors[suffix] : fallback;
 };
 
 export const getProductColorChipColors = (colorName: string) => {
@@ -151,4 +203,15 @@ export const getProductColorChipColors = (colorName: string) => {
   }
 
   return colorNames.map((name) => resolveProductColor(name));
+};
+
+export const getProductColorChipBackground = (colorName: string) => {
+  const colors = getProductColorChipColors(colorName);
+  if (colors.every((color) => color === COLOR_FALLBACK)) return UNKNOWN_COLOR_SWATCH;
+  if (colors.length === 1) return colors[0];
+  if (colors.length === 2)
+    return `linear-gradient(to bottom, ${colors[0]} 0% 50%, ${colors[1]} 50% 100%)`;
+  return `conic-gradient(${colors.map((color, index) =>
+    `${color} ${(index / colors.length) * 100}% ${((index + 1) / colors.length) * 100}%`,
+  ).join(", ")})`;
 };

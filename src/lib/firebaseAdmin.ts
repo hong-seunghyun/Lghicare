@@ -5,7 +5,7 @@ import { getFirestore } from "firebase-admin/firestore";
 let dbInstance: FirebaseFirestore.Firestore | null = null;
 
 export function initFirebaseAdmin() {
-  if (!getApps().length) {
+  if (!getApps().some((app) => app.name === "[DEFAULT]")) {
     const projectId = process.env.FIREBASE_PROJECT_ID;
     const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
     const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");

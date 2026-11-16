@@ -202,11 +202,6 @@ export const categories: Category[] = [
         items: [],
       },
       {
-        name: "고객혜택",
-        url: "https://lghicaresolution.com/another/event/customer.html",
-        items: [],
-      },
-      {
         name: "카드 할인 혜택",
         url: "https://lghicaresolution.com/another/event/card.html",
         items: [],

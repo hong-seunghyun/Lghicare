@@ -5,6 +5,7 @@ import { initFirebaseAdmin } from "@/lib/firebaseAdmin";
 import type { ArtifactRef, CatalogPointer, ImportJob } from "./types";
 import { isSafeId } from "./types";
 import { localCatalogStore } from "./localStore";
+import { developmentCatalogAccess } from "./developmentRead";
 export const localCatalogMode = () => process.env.NODE_ENV !== "production";
 
 export interface CatalogStore {
@@ -27,6 +28,7 @@ export interface CatalogStore {
   ): Promise<ImportJob>;
   jobs(): Promise<ImportJob[]>;
 }
+export type CatalogReadStore = Pick<CatalogStore, "pointer" | "version" | "get">;
 const hash = (bytes: Buffer) =>
   createHash("sha256").update(bytes).digest("hex");
 export function catalogBucket() {
@@ -50,11 +52,20 @@ function safePath(path: string) {
 const document = () => initFirebaseAdmin().doc("_system/productCatalog");
 const jobs = () => initFirebaseAdmin().collection("productImports");
 
-export function createCatalogStore(): CatalogStore {
-  if (localCatalogMode()) return localCatalogStore();
-  return {
+export function createCatalogStore(options: { readOnly: true }): CatalogReadStore;
+export function createCatalogStore(): CatalogStore;
+export function createCatalogStore(options?: { readOnly: true }): CatalogStore | CatalogReadStore {
+  // Public reads follow the published release in every environment. Keep the
+  // development admin's uploads and mutations isolated in the local store.
+  if (localCatalogMode() && !options?.readOnly) return localCatalogStore();
+  const developmentAccess = () => options?.readOnly && localCatalogMode()
+    ? developmentCatalogAccess()
+    : undefined;
+  const readDocument = (path: string) =>
+    (developmentAccess()?.db ?? initFirebaseAdmin()).doc(path);
+  const store: CatalogStore = {
     async pointer() {
-      const data = (await document().get()).data();
+      const data = (await readDocument("_system/productCatalog").get()).data();
       return data
         ? (data as CatalogPointer)
         : { id: null, generation: "legacy" };
@@ -63,7 +74,7 @@ export function createCatalogStore(): CatalogStore {
       if (!isSafeId(id)) throw new Error("Invalid release id");
       return (
         (
-          await initFirebaseAdmin().doc(`productCatalogVersions/${id}`).get()
+          await readDocument(`productCatalogVersions/${id}`).get()
         ).data()?.manifest ?? null
       );
     },
@@ -122,7 +133,7 @@ export function createCatalogStore(): CatalogStore {
       return ref;
     },
     async get<T>(ref: ArtifactRef) {
-      const [bytes] = await catalogBucket()
+      const [bytes] = await (developmentAccess()?.bucket ?? catalogBucket())
         .file(safePath(ref.path))
         .download({ validation: "crc32c" });
       if (bytes.length !== ref.bytes || hash(bytes) !== ref.sha256)
@@ -183,5 +194,8 @@ export function createCatalogStore(): CatalogStore {
       return snap.docs.map((doc) => doc.data() as ImportJob);
     },
   };
+  return options?.readOnly
+    ? { pointer: store.pointer, version: store.version, get: store.get }
+    : store;
 }
 export const newGeneration = () => randomUUID();

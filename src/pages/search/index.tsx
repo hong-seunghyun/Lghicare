@@ -7,7 +7,8 @@ import Image from "next/image";
 import { isPublishedProductImage } from "@/lib/catalog/imageUrl";
 
 import Loading from "@/components/loading/Loading";
-import { getProductColorChipColors } from "@/constants/colorMap";
+import { isProductColorName } from "@/constants/colorMap";
+import ColorChipBox, { SelectedColorName } from "@/components/ColorChipBox/ColorChipBox";
 
 type Variant = {
   모델코드: string;
@@ -249,8 +250,6 @@ function ProductCardItem({ card }: { card: ProductCard }) {
 
     setSelectedCode(code);
 
-    console.log("🟢 variant thumbnail:", variant.thumbnailUrl);
-
     // 1️⃣ 썸네일이 바로 있으면 즉시 교체
     if (thumb && thumb !== "") {
       setActiveThumb(thumb);
@@ -288,7 +287,7 @@ function ProductCardItem({ card }: { card: ProductCard }) {
         safeVariants
           .filter((v) => {
             const color = (v.제품색상 || "").trim();
-            return color !== "" && color !== "-" && !color.includes("무드업");
+            return isProductColorName(color);
           })
           .map((v) => [v.제품색상, v]),
       ).values(),
@@ -347,22 +346,27 @@ function ProductCardItem({ card }: { card: ProductCard }) {
             {uniqueVariants.map((variant) => {
               const code = (variant["모델코드"] || "").trim();
               const colorName = variant["제품색상"] || code;
-              const colors = getProductColorChipColors(colorName);
               return (
-                <OptionButton
+                <ColorChipBox
                   key={code}
+                  colorName={colorName}
+                  modelCode={code}
+                  compact
                   selected={code === selectedCode}
                   onClick={(e) => {
                     e.preventDefault();
+                    e.stopPropagation();
                     handleColorClick(variant);
                   }}
-                  style={{ position: "relative", borderRadius: "50%" }}
-                >
-                  <ColorChipBox colors={colors} data-colorname={colorName} />
-                </OptionButton>
+                />
               );
             })}
           </ButtonGroup>
+          {uniqueVariants.length > 0 && (
+            <SelectedColorName aria-live="polite">
+              {uniqueVariants.find((variant) => variant.모델코드.trim() === selectedCode)?.제품색상 || representative["제품색상"]}
+            </SelectedColorName>
+          )}
 
           <DecInfo>주요기능 {representative["제품기능"] || "-"}</DecInfo>
           <Models>{modelCodes.join(", ")}</Models>
@@ -671,57 +675,6 @@ const ButtonGroup = styled.div`
   gap: 8px;
   justify-content: center;
   min-height: 20px;
-`;
-
-const OptionButton = styled.button<{ selected: boolean }>`
-  border-radius: 6px;
-  font-size: 14px;
-  border: 1px solid ${({ selected }) => (selected ? "#000" : "#dee1e5")};
-  color: ${({ selected }) => (selected ? "#111" : "#444")};
-  font-weight: ${({ selected }) => (selected ? "700" : "400")};
-  background: #fff;
-  cursor: ${({ disabled }) => (disabled ? "not-allowed" : "pointer")};
-  opacity: ${({ disabled }) => (disabled ? 0.5 : 1)};
-  width: fit-content;
-`;
-
-const ColorChipBox = styled.div<{ colors: string[] }>`
-  position: relative;
-  width: 18px;
-  height: 18px;
-  overflow: hidden;
-  cursor: pointer;
-  border-radius: 100%;
-
-  ${({ colors }) =>
-    colors.length === 1
-      ? `background: ${colors[0]};`
-      : colors.length === 2
-        ? `background: linear-gradient(to bottom, ${colors[0]} 50%, ${colors[1]} 50%);`
-        : `background: conic-gradient(${colors
-          .map((color, index) => {
-            const start = (index / colors.length) * 100;
-            const end = ((index + 1) / colors.length) * 100;
-            return `${color} ${start}% ${end}%`;
-          })
-          .join(", ")});
-        `}
-
-  &:hover::after {
-    content: attr(data-colorname);
-    position: absolute;
-    top: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    margin-top: 4px;
-    padding: 2px 6px;
-    font-size: 12px;
-    color: #fff;
-    background: rgba(0, 0, 0, 0.75);
-    border-radius: 4px;
-    white-space: nowrap;
-    pointer-events: none;
-  }
 `;
 
 const SearchBar = styled.div`

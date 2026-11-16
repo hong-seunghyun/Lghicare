@@ -43,7 +43,7 @@ export async function catalogPointer(fresh = false): Promise<CatalogPointer> {
     return cache.pointer;
   if (cache.pending) return cache.pending;
   const epoch = cache.epoch;
-  const request = createCatalogStore()
+  const request = createCatalogStore({ readOnly: true })
     .pointer()
     .then((pointer) => {
       if (!pointer.generation || (pointer.id && !pointer.manifest))
@@ -90,7 +90,7 @@ async function loadArtifact<T>(ref: ArtifactRef): Promise<T> {
     cache.artifacts.set(ref.sha256, found);
     return found.value as T;
   }
-  const value = await createCatalogStore().get<T>(ref);
+  const value = await createCatalogStore({ readOnly: true }).get<T>(ref);
   const size = Buffer.byteLength(JSON.stringify(value));
   if (size < 32 * 1024 * 1024) {
     while (cache.bytes + size > 64 * 1024 * 1024 && cache.artifacts.size) {
@@ -109,7 +109,7 @@ export async function activeCatalog(
   if (version === "legacy") return null;
   if (version) {
     const reference =
-      versions.get(version) ?? (await createCatalogStore().version(version));
+      versions.get(version) ?? (await createCatalogStore({ readOnly: true }).version(version));
     if (!reference)
       throw new Error(
         "상품 데이터 버전을 찾지 못했습니다. 제품을 다시 선택해 주세요.",
@@ -132,8 +132,9 @@ export async function publishedRows(
   category: string,
   models?: string[],
   summary = false,
+  version?: string,
 ): Promise<{ rows: ProductRow[]; release: string } | null> {
-  const catalog = await activeCatalog();
+  const catalog = await activeCatalog(version);
   const entry = catalog?.categories[category];
   if (!entry || !catalog) return null;
   if (models?.length) {
